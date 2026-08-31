@@ -20,10 +20,6 @@ export function parseCoords(line: string): ParsedCoords | null {
   return { a, b };
 }
 
-export function stripCoords(line: string): string {
-  return line.replace(COORDS_RE, ' ');
-}
-
 /**
  * Splits a line at the first `[a, b]` tuple: name before, suffix after.
  * Extras like `(color …)` may then only be looked up in the suffix — parentheses

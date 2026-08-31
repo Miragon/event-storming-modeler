@@ -9,8 +9,8 @@ command Place Order [240, 300]
 aggregate Order [420, 290]
 event Order Placed [620, 300]
 policy When order placed, ship it [800, 300]
-command Ship Order [980, 300]
-event Order Shipped [1160, 300]
+command Ship Order [980, 420]
+event Order Shipped [1160, 420]
 readmodel Order Status [620, 120]
 external Payment Provider [420, 520]
 hotspot Double payment on retry? [620, 520]
@@ -160,6 +160,54 @@ describe('parseDSL – arrows', () => {
     expect(serializeDSL(parseDSL(out))).toBe(out);
   });
 
+  it('an arrow label containing a numeric tuple does not defeat arrow pre-detection', () => {
+    const src =
+      'title T\ncommand Command [800, 300]\naggregate Order [500, 600]\nCommand -> Order; retry [3, 5]';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    expect(board.elements).toHaveLength(2);
+    expect(board.edges).toHaveLength(1);
+    expect(board.edges[0]!.label).toBe('retry [3, 5]');
+    const out = serializeDSL(board);
+    expect(parseDSL(out).edges).toHaveLength(1);
+    expect(serializeDSL(parseDSL(out))).toBe(out);
+  });
+
+  it('escapes real line breaks in sticky labels (multi-line labels survive the round-trip)', () => {
+    const board = parseDSL(base + 'A -> B');
+    const renamed = {
+      ...board,
+      elements: board.elements.map((e) => (e.label === 'A' ? { ...e, label: 'Order\nPlaced' } : e)),
+    };
+    const out = serializeDSL(renamed);
+    expect(out).toContain('event Order\\nPlaced [800, 300]');
+    expect(out).toContain('Order\\nPlaced -> B');
+    const round = parseDSL(out);
+    const placed = round.elements.find((e) => e.elementType === 'event');
+    expect(placed?.label).toBe('Order\nPlaced');
+    expect(placed?.position).toEqual({ x: 800, y: 300 });
+    expect(round.edges).toHaveLength(1);
+    expect(serializeDSL(round)).toBe(out);
+  });
+
+  it('defuses `//` in sticky labels (nothing is comment-stripped on re-import)', () => {
+    const board = parseDSL(base + 'A -> B');
+    const renamed = {
+      ...board,
+      elements: board.elements.map((e) =>
+        e.label === 'A' ? { ...e, label: 'Save //TODO check' } : e,
+      ),
+    };
+    const out = serializeDSL(renamed);
+    const { board: round, diagnostics } = parseDSLWithDiagnostics(out);
+    expect(diagnostics).toHaveLength(0);
+    const saved = round.elements.find((e) => e.elementType === 'event');
+    expect(saved?.label).toBe('Save ∕∕TODO check');
+    expect(saved?.position).toEqual({ x: 800, y: 300 });
+    expect(round.edges).toHaveLength(1);
+    expect(serializeDSL(round)).toBe(out);
+  });
+
   it('sanitizes `->` in sticky labels to `→` (names stay arrow-safe)', () => {
     const board = parseDSL(base + 'A -> B');
     const renamed = {
@@ -212,6 +260,49 @@ describe('parseDSL – comments', () => {
     const once = serializeDSL(parseDSL(src));
     expect(once).toContain('// important note');
     expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('keeps `//` after a URL scheme separator intact when serializing note text', () => {
+    const once = serializeDSL(parseDSL('title T\nnote see https://example.org/docs [80, 80]'));
+    expect(once).toContain('note see https://example.org/docs [80, 80]');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+});
+
+describe('parseDSL – sticky names starting with config keywords', () => {
+  it('preserves arrows from a sticky named "Line Manager"', () => {
+    const src =
+      'title T\nactor Line Manager [80, 300]\ncommand Approve Request [240, 300]\nLine Manager -> Approve Request';
+    const board = parseDSL(src);
+    expect(board.edges).toHaveLength(1);
+    const out = serializeDSL(board);
+    expect(parseDSL(out).edges).toHaveLength(1);
+    expect(serializeDSL(parseDSL(out))).toBe(out);
+  });
+
+  it('preserves arrows from a sticky named "Style Guide"', () => {
+    const src = 'title T\nreadmodel Style Guide [80, 300]\ncommand B [240, 300]\nStyle Guide -> B';
+    const board = parseDSL(src);
+    expect(board.config.style).toBeUndefined();
+    expect(board.edges).toHaveLength(1);
+    const out = serializeDSL(board);
+    expect(serializeDSL(parseDSL(out))).toBe(out);
+  });
+
+  it('an arrow from a sticky named "Title Page" does NOT overwrite the board title', () => {
+    const src = 'title Checkout\nevent Title Page [80, 300]\ncommand B [240, 300]\nTitle Page -> B';
+    const board = parseDSL(src);
+    expect(board.config.title).toBe('Checkout');
+    expect(board.edges).toHaveLength(1);
+    const out = serializeDSL(board);
+    expect(parseDSL(out).config.title).toBe('Checkout');
+    expect(serializeDSL(parseDSL(out))).toBe(out);
+  });
+
+  it('a hand-written title containing `->` still parses as the title', () => {
+    const board = parseDSL('title Order -> Cash');
+    expect(board.config.title).toBe('Order -> Cash');
+    expect(board.edges).toHaveLength(0);
   });
 });
 
@@ -368,6 +459,47 @@ describe('note color (project extension: `(color …)`)', () => {
     const out = serializeDSL(parseDSL('title T\nnote Plain [500, 500]'));
     expect(out).toContain('note Plain [500, 500]');
     expect(out).not.toContain('(color');
+  });
+
+  it('keeps `(color …)` inside the note text (color is only read after the coordinates)', () => {
+    const board = parseDSL('title T\nnote use (color red) for risks [80, 80]');
+    const note = board.elements.find((e) => e.elementType === 'note');
+    expect(note?.label).toBe('use (color red) for risks');
+    expect(note?.color).toBeUndefined();
+    const once = serializeDSL(board);
+    expect(once).toContain('note use (color red) for risks [80, 80]');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+});
+
+describe('serializeDSL – huge coordinates', () => {
+  it('serializes magnitudes >= 1e21 without exponent notation', () => {
+    const board = parseDSL('title T\nevent A [800, 300]\ncommand B [500, 600]\nA -> B');
+    const far = {
+      ...board,
+      elements: board.elements.map((e) =>
+        e.label === 'A' ? { ...e, position: { x: 1e21, y: -3e22 } } : e,
+      ),
+    };
+    const out = serializeDSL(far);
+    expect(out).toContain('event A [1000000000000000000000, -30000000000000000000000]');
+    expect(out).not.toMatch(/e\+/i);
+    const round = parseDSL(out);
+    expect(round.elements.find((e) => e.label === 'A')?.position).toEqual({ x: 1e21, y: -3e22 });
+    expect(round.edges).toHaveLength(1);
+    expect(serializeDSL(round)).toBe(out);
+  });
+
+  it('round-trips a 24-digit coordinate literal to a fixed point (element and arrow survive)', () => {
+    const src = 'title T\nevent A [999999999999999999999999, 300]\ncommand B [500, 600]\nA -> B';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    const once = serializeDSL(board);
+    expect(once).not.toMatch(/e\+/i);
+    const reparsed = parseDSL(once);
+    expect(reparsed.elements).toHaveLength(2);
+    expect(reparsed.edges).toHaveLength(1);
+    expect(serializeDSL(reparsed)).toBe(once);
   });
 });
 

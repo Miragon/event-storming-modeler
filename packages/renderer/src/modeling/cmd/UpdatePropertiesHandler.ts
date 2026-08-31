@@ -13,6 +13,19 @@ function setOrDelete(obj: Record<string, unknown>, key: string, value: unknown):
   else obj[key] = value;
 }
 
+const GEOMETRY_KEYS = ['x', 'y', 'width', 'height'];
+
+/**
+ * Geometry changes (e.g. `setStickyKind` resizing the box) move the rectangle the attached
+ * arrows are cropped against at render time — the connections must be marked dirty too, or
+ * they keep pointing at the old boundary until something else forces a re-render.
+ */
+function dirtyElements(element: ElementLike, changedKeys: string[]): ElementLike[] {
+  if (!changedKeys.some((key) => GEOMETRY_KEYS.includes(key))) return [element];
+  const el = element as { incoming?: ElementLike[]; outgoing?: ElementLike[] };
+  return [element, ...(el.incoming ?? []), ...(el.outgoing ?? [])];
+}
+
 /**
  * Generic, undoable command handler for setting arbitrary Event Storming properties
  * (eventStormingLabel, eventStormingType, color, strokeStyle, ...). Returns the changed element
@@ -28,7 +41,7 @@ export default class UpdatePropertiesHandler implements CommandHandler {
       setOrDelete(target, key, properties[key]);
     }
     context.oldProperties = old;
-    return [element];
+    return dirtyElements(element, Object.keys(properties));
   }
 
   revert(context: UpdatePropertiesContext): ElementLike[] {
@@ -37,6 +50,6 @@ export default class UpdatePropertiesHandler implements CommandHandler {
     if (oldProperties) {
       for (const key of Object.keys(oldProperties)) setOrDelete(target, key, oldProperties[key]);
     }
-    return [element];
+    return dirtyElements(element, Object.keys(oldProperties ?? {}));
   }
 }

@@ -18,7 +18,8 @@ From the monorepo root:
 
 ```bash
 npm install
-npm run dev:webapp   # http://localhost:5180
+npm run dev:webapp         # named HTTPS URL via Portless — one-time setup in CONTRIBUTING.md
+npm run dev:webapp:plain   # plain Vite, http://localhost:5180
 ```
 
 ## License

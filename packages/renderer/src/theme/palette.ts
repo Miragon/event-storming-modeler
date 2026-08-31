@@ -58,13 +58,16 @@ export const CHROME_VARS: Record<string, string> = {
   '--event-storming-brand': MIRAGON.gruen,
   '--event-storming-danger': MIRAGON.danger,
   '--event-storming-shadow': 'rgba(29, 29, 29, 0.1)',
+  '--event-storming-drawing-ink': MIRAGON.schwarz,
 };
 
 /**
  * The per-board `style dark` directive (`.event-storming-container.event-storming-dark`)
- * overrides only the surround. This is the ONLY dark surface — there is no app-level dark mode.
- * The stickies keep their SVG presentation colours, so exports stay stable.
+ * overrides only the surround plus the default drawing ink (near-black strokes would vanish on
+ * navy). This is the ONLY dark surface — there is no app-level dark mode. The stickies keep
+ * their SVG presentation colours, so exports stay stable.
  */
 export const DARK_BOARD_VARS: Record<string, string> = {
   '--event-storming-paper': MIRAGON.navy,
+  '--event-storming-drawing-ink': MIRAGON.grau,
 };

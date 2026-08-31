@@ -20,7 +20,6 @@ import {
   slug,
   splitAtCoords,
   splitLineComment,
-  stripCoords,
 } from './lexer.js';
 
 /** Splits `A -> B` at the FIRST arrow — plain indexOf, immune to regex backtracking. */
@@ -32,10 +31,12 @@ function splitArrow(core: string): { left: string; right: string } | null {
   return left && right ? { left, right } : null;
 }
 
-// Config/special keywords that must NOT be (pre-)detected as an arrow — `title` can itself
-// contain `->` and `line` has its own handling in the switch.
-const NON_LINK_KEYWORDS: ReadonlySet<string> = new Set(['title', 'style', 'line']);
 const KNOWN_STYLES: ReadonlySet<string> = new Set(['classic', 'dark']);
+
+/** Undoes the serializer's `\n` name escaping (line-based DSL, multi-line labels). */
+function decodeName(name: string): string {
+  return name.replace(/\\n/g, '\n');
+}
 
 /** Sticky keywords double as `elementType` values; the value is the ID prefix. */
 const STICKY_ID_PREFIXES: Readonly<Partial<Record<ElementType, string>>> = {
@@ -189,10 +190,20 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
 
     // Arrows FIRST: sticky NAMES may begin with a keyword word (the default command is
     // named "Command" -> arrow `Command -> X`). Declarations carry coordinates `[...]`,
-    // arrows never do. Without this pre-detection `Command -> X` would be misread as a
-    // (broken) `command` declaration and vanish on re-import. Config/special keywords
-    // (title/style/line) are exempt — their content may use `->`/brackets itself.
-    if (!NON_LINK_KEYWORDS.has(kw) && !parseCoords(line) && pushArrow(line)) {
+    // arrows never do — but only the part BEFORE the `;` annotation counts, the annotation
+    // is free text and may contain a tuple. Without this pre-detection `Command -> X` would
+    // be misread as a (broken) `command` declaration and vanish on re-import. `title` is
+    // exempt (its content may itself use `->`) UNLESS the left side is an already-declared
+    // sticky name (e.g. one named "Title Page" — declarations always precede arrows in
+    // serialized DSL). `style`/`line` need no exemption: style values are single words and
+    // drawings always carry coordinate tuples.
+    const semi = line.indexOf(';');
+    const beforeAnnotation = semi >= 0 ? line.slice(0, semi) : line;
+    const titleAsArrow = (): boolean => {
+      const arrow = splitArrow(beforeAnnotation.trim());
+      return arrow !== null && nameToId.has(decodeName(arrow.left));
+    };
+    if ((kw !== 'title' || titleAsArrow()) && !parseCoords(beforeAnnotation) && pushArrow(line)) {
       continue;
     }
 
@@ -236,21 +247,23 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
       }
 
       case 'note': {
-        const { color, rest } = parseColor(after);
-        const coords = parseCoords(rest);
-        if (!coords && rest.includes('[')) {
+        const split = splitAtCoords(after);
+        if (!split && after.includes('[')) {
           failed(line);
           break;
         }
+        // Color ONLY from the suffix after the coordinates (mirrors parseSticky) — notes are
+        // free text, so `(color …)` may legitimately appear inside it.
+        const col = split ? parseColor(split.suffix) : parseColor(after);
         // Literal `\n` back into real line breaks (multi-line notes).
-        const textPart = (coords ? stripCoords(rest) : rest).trim().replace(/\\n/g, '\n');
+        const textPart = decodeName((split ? split.name : col.rest).trim());
         const id = ids.alloc('note', textPart || 'note');
         const note: NoteElement = compact({
           id,
           elementType: 'note',
           label: textPart,
-          position: coords ? pos(coords.a, coords.b) : pos(0, 0),
-          color,
+          position: split ? pos(split.coords.a, split.coords.b) : pos(0, 0),
+          color: col.color,
         }) as NoteElement;
         elements.push(note);
         break;
@@ -295,8 +308,8 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
   let arrowN = 0;
   const edges: BoardEdge[] = [];
   for (const arrow of pendingArrows) {
-    const fromId = nameToId.get(arrow.left);
-    const toId = nameToId.get(arrow.right);
+    const fromId = nameToId.get(decodeName(arrow.left));
+    const toId = nameToId.get(decodeName(arrow.right));
     if (!fromId || !toId) {
       rawPassthrough.push(arrow.raw);
       diag(
@@ -347,7 +360,7 @@ function parseSticky(after: string): ParsedSticky | null {
     if (!split.name) return null;
     const col = parseColor(split.suffix);
     return compact({
-      name: split.name,
+      name: decodeName(split.name),
       coords: { x: split.coords.a, y: split.coords.b },
       color: col.color ?? undefined,
     }) as ParsedSticky;
@@ -357,7 +370,7 @@ function parseSticky(after: string): ParsedSticky | null {
   const name = col.rest.trim();
   if (!name) return null;
   return compact({
-    name,
+    name: decodeName(name),
     coords: { x: 0, y: 0 },
     color: col.color ?? undefined,
   }) as ParsedSticky;

@@ -40,8 +40,7 @@ let importFailed = false; // the last import (e.g. externally typed text) was un
 let initialized = false; // first init done -> preserve zoom/viewport from then on
 
 // Serialize imports STRICTLY: init/update arrive as (un-awaited) messages; without chaining, two
-// quick updates (e.g. several undos) could import concurrently and finish in the wrong order. The
-// PNG save (respondPng) also hooks onto this chain, so a half-imported state is never rasterized.
+// quick updates (e.g. several undos) could import concurrently and finish in the wrong order.
 let importChain: Promise<void> = Promise.resolve();
 function enqueueImport(text: string, fit: boolean): Promise<void> {
   importChain = importChain.then(() => importText(text, fit)).catch(() => {});
@@ -99,7 +98,8 @@ function pushEdit(): void {
 
 modeler.on('commandStack.changed', pushEdit);
 // Do NOT hook fitView globally onto import.done — otherwise every mirrored-back 'update' resets the
-// zoom. Fit happens deliberately: on first load (importText fit=true) and on resize.
+// zoom. Fit happens deliberately: on first load (importText fit=true) and via the menu's
+// "Fit to view" item.
 
 window.addEventListener('message', (event: MessageEvent<HostToWebview>) => {
   const msg = event.data;

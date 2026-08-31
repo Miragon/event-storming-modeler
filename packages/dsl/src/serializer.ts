@@ -1,7 +1,33 @@
 import type { BoardElement, EventStormingBoard } from '@miragon/event-storming-schema-model';
 
+/**
+ * Coordinate formatter: 3-decimal rounding, NEVER exponent notation — `String(1e21)` yields
+ * `"1e+21"`, which the coordinate regex cannot read back. Magnitudes >= 1e21 are always
+ * integer-valued doubles, so BigInt expands them losslessly (the rounding step is skipped
+ * there; it would be a no-op and could overflow to Infinity for huge values).
+ */
 function r(n: number): string {
-  return String(Math.round(n * 1000) / 1000);
+  const v = Math.abs(n) < 1e21 ? Math.round(n * 1000) / 1000 : n;
+  return Math.abs(v) < 1e21 ? String(v) : BigInt(v).toString();
+}
+
+/**
+ * Free text emitted into the line-based grammar: real line breaks become the literal `\n`
+ * escape (decoded on parse) and comment starters are defused with the Unicode division slash
+ * — otherwise the parser would split the line or strip the rest as a comment. `//` directly
+ * after `:` stays untouched (URL scheme separator, the comment splitter is URL-aware).
+ */
+function escapeText(label: string): string {
+  return label
+    .trim()
+    .replace(/\n/g, '\\n')
+    .replace(/(?<!:)\/\//g, '∕∕')
+    .replace(/\/\*/g, '∕*');
+}
+
+/** Names are additionally arrow-safe: a literal `->` inside a name would break `A -> B` lines. */
+function escapeName(label: string): string {
+  return escapeText(label).replace(/->/g, '→');
 }
 
 /** Types referenced BY THEIR NAME in the DSL (arrow endpoints + namespace) — all sticky kinds. */
@@ -43,7 +69,7 @@ function uniqueNames(board: EventStormingBoard): Map<string, string> {
   const byId = new Map<string, string>();
   for (const el of board.elements) {
     if (!NAMED_TYPES.has(el.elementType)) continue;
-    const base = el.label.trim().replace(/->/g, '→') || defaultName(el.elementType);
+    const base = escapeName(el.label) || defaultName(el.elementType);
     let name = base;
     let i = 2;
     while (used.has(name)) name = `${base} ${i++}`;
@@ -75,12 +101,11 @@ export function serializeDSL(board: EventStormingBoard): string {
     lines.push(elementLine(el, nameOf(el)));
   }
 
-  // Arrows may reference notes/drawings only via saved JSON — fall back to the element label
-  // for endpoint types that are not part of the unique-name pass.
-  const labelsById = new Map(board.elements.map((el) => [el.id, el.label]));
+  // validateBoard guarantees arrow endpoints are sticky kinds, so the unique-name pass always
+  // covers them — the `?? edge.from` is purely defensive for unvalidated input.
   for (const edge of board.edges) {
-    const from = names.get(edge.from) ?? labelsById.get(edge.from) ?? edge.from;
-    const to = names.get(edge.to) ?? labelsById.get(edge.to) ?? edge.to;
+    const from = names.get(edge.from) ?? edge.from;
+    const to = names.get(edge.to) ?? edge.to;
     const annotation = edge.label ? `; ${edge.label}` : '';
     lines.push(`${from} -> ${to}${annotation}`);
   }
@@ -113,8 +138,9 @@ function elementLine(el: BoardElement, name: string): string {
     case 'hotspot':
       return `${el.elementType} ${name} [${r(p.x)}, ${r(p.y)}]${colorSuffix(el)}`;
     case 'note':
-      // Encode line breaks as literal `\n` -> the line-based DSL stays single-line.
-      return `note ${name.replace(/\n/g, '\\n')} [${r(p.x)}, ${r(p.y)}]${colorSuffix(el)}`;
+      // Escape line breaks/comment starters -> the line-based DSL stays single-line. `->` is
+      // fine in note text (notes are never arrow endpoints), so no `→` replacement here.
+      return `note ${escapeText(name)} [${r(p.x)}, ${r(p.y)}]${colorSuffix(el)}`;
     case 'drawing': {
       // Project extension (freeform drawing): tuple list + style flags.
       const pts = el.points.map((q) => `[${r(q.x)}, ${r(q.y)}]`).join(', ');

@@ -19,10 +19,15 @@ interface ActiveEdit {
 
 /**
  * Defuses DSL metacharacters in labels: in the `.storm` DSL, names double as references —
- * `->`, `;` and square brackets would corrupt arrow/coordinate lines on re-import.
+ * `->`, `;`, square brackets and comment starters would corrupt arrow/coordinate lines on
+ * re-import. The comment defusing mirrors the DSL serializer's `escapeText` exactly (division
+ * slash U+2215, `://` URLs exempt), so what the user sees on canvas is byte-identical to what a
+ * save/reload produces. Newlines stay: the DSL escapes them (`\n`) for stickies and notes alike.
  */
-function sanitizeLabel(raw: string): string {
+export function sanitizeLabel(raw: string): string {
   return raw
+    .replace(/(?<!:)\/\//g, '∕∕') // // starts a line comment (URL `://` stays intact)
+    .replace(/\/\*/g, '∕*') // /* starts a block comment
     .replace(/->/g, '→') // -> would be the arrow operator
     .replace(/;/g, ',') // ; separates arrow annotations
     .replace(/\[/g, '(') // [..] would be a coordinate tuple
@@ -65,8 +70,10 @@ export default class EventStormingLabelEditing {
     const scale = this.canvas.zoom();
     const vb = this.canvas.viewbox();
     const isNote = element.eventStormingType === 'note';
-    const left = (element.x + element.width + 6 - vb.x) * scale;
-    const top = (element.y + element.height / 2 - 11 - vb.y) * scale;
+    // Overlay the editor centered ON the sticky (the text lives inside it — WYSIWYG); this also
+    // keeps the field visible for stickies at the viewport edge.
+    const left = (element.x + element.width / 2 - vb.x) * scale;
+    const top = (element.y + element.height / 2 - vb.y) * scale;
 
     const field = document.createElement('textarea');
     field.className = 'event-storming-label-input event-storming-label-textarea';
@@ -76,6 +83,8 @@ export default class EventStormingLabelEditing {
     field.style.position = 'absolute';
     field.style.left = `${left}px`;
     field.style.top = `${top}px`;
+    field.style.transform = 'translate(-50%, -50%)';
+    field.style.width = `${element.width * scale}px`;
     container.appendChild(field);
     field.focus();
     field.select();
@@ -160,8 +169,9 @@ export default class EventStormingLabelEditing {
     };
     const commit = () => {
       if (done) return;
-      // Defuse DSL metacharacters: `;` starts the annotation, `->` is the arrow operator.
-      const value = field.value.replace(/;/g, ',').replace(/->/g, '→').trim();
+      // Same metacharacter protection as sticky labels: an unescaped `[..]` tuple in the
+      // serialized arrow line would be misread as a declaration, silently losing the edge.
+      const value = sanitizeLabel(field.value);
       const current = conn.linkLabel ?? '';
       cleanup();
       if (value === current) return;

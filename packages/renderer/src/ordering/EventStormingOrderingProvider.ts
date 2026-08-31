@@ -19,6 +19,11 @@ export default class EventStormingOrderingProvider extends OrderingProvider {
     element: ElementLike,
     newParent: ShapeLike,
   ): { parent: ShapeLike; index?: number } {
+    // The board is flat — everything lives directly under the root. diagram-js Create/Move pass
+    // the hovered element as drop target; without retargeting, releasing a sticky over another
+    // one would nest it as a child (cascade move/delete). The returned parent overrides the
+    // command context on both shape.create and shape.move.
+    while (newParent.parent) newParent = newParent.parent as ShapeLike;
     const siblings = (newParent.children ?? []) as ElementLike[];
     if (isEventStormingConnection(element)) {
       // Behind the stickies: after all drawings and existing connections.

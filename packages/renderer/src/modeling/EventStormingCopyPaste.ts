@@ -12,6 +12,7 @@ import {
   type EventStormingConnection,
   type EventStormingShape,
 } from '../model/di-types.js';
+import { noteMetrics } from '../draw/styles.js';
 
 /** Offset (px) accumulated per paste operation. */
 const PASTE_OFFSET = 24;
@@ -148,16 +149,26 @@ export default class EventStormingCopyPaste {
   private buildClones(): { shapes: Shape[]; connections: Element[] } {
     const clipboard = this.clipboard!;
     const labels = this.uniqueLabels(clipboard.shapes.map((s) => s.label));
-    const shapes = clipboard.shapes.map((snap, i) =>
-      this.elementFactory.createShape({
+    const shapes = clipboard.shapes.map((snap, i) => {
+      const label = labels[i]!;
+      let { x, y, width, height } = snap;
+      // Note boxes are text-derived everywhere else (factory, updateLabel) — the unique-suffixed
+      // label needs a recomputed box (recentered), or the suffix is clipped invisible on canvas.
+      if (snap.props['eventStormingType'] === 'note') {
+        const metrics = noteMetrics(label);
+        x = snap.x + snap.width / 2 - metrics.width / 2;
+        y = snap.y + snap.height / 2 - metrics.height / 2;
+        ({ width, height } = metrics);
+      }
+      return this.elementFactory.createShape({
         ...structuredClone(snap.props),
-        x: snap.x,
-        y: snap.y,
-        width: snap.width,
-        height: snap.height,
-        eventStormingLabel: labels[i]!,
-      }),
-    );
+        x,
+        y,
+        width,
+        height,
+        eventStormingLabel: label,
+      });
+    });
     const connections = clipboard.connections.map((c) =>
       this.elementFactory.createConnection({
         ...structuredClone(c.props),

@@ -5,6 +5,20 @@ import type { BoardConfig, EventStormingBoard } from './types.js';
 /** Number of decimal places for coordinates in serialization. */
 const COORD_PRECISION = 3;
 
+// The 8 sticky kinds — the only legal arrow endpoints. Notes/drawings are annotations; the
+// renderer's connection rules forbid them and the DSL cannot reference them, so accepting
+// such edges here would mean silent loss on the next DSL round-trip.
+const CONNECTABLE_TYPES: ReadonlySet<string> = new Set([
+  'event',
+  'command',
+  'actor',
+  'aggregate',
+  'policy',
+  'readmodel',
+  'external',
+  'hotspot',
+]);
+
 function round(n: number, digits = COORD_PRECISION): number {
   const f = 10 ** digits;
   return Math.round(n * f) / f;
@@ -12,15 +26,17 @@ function round(n: number, digits = COORD_PRECISION): number {
 
 /**
  * Validates arbitrary data against the schema plus additional cross-field invariants
- * (unique IDs, edge endpoints exist). Throws on violation.
+ * (unique IDs, edge endpoints exist and are sticky kinds). Throws on violation.
  */
 export function validateBoard(data: unknown): EventStormingBoard {
   const parsed = eventStormingBoardSchema.parse(data);
 
   const ids = new Set<string>();
+  const typeById = new Map<string, string>();
   for (const el of parsed.elements) {
     if (ids.has(el.id)) throw new Error(`Duplicate element id: ${el.id}`);
     ids.add(el.id);
+    typeById.set(el.id, el.elementType);
   }
 
   // Shared ID namespace: diagram-js' ElementRegistry has only ONE namespace for
@@ -35,6 +51,16 @@ export function validateBoard(data: unknown): EventStormingBoard {
     }
     if (!ids.has(edge.to)) {
       throw new Error(`Edge ${edge.id}: target "${edge.to}" references no element.`);
+    }
+    if (!CONNECTABLE_TYPES.has(typeById.get(edge.from)!)) {
+      throw new Error(
+        `Edge ${edge.id}: source "${edge.from}" is a ${typeById.get(edge.from)} — arrows may only connect stickies.`,
+      );
+    }
+    if (!CONNECTABLE_TYPES.has(typeById.get(edge.to)!)) {
+      throw new Error(
+        `Edge ${edge.id}: target "${edge.to}" is a ${typeById.get(edge.to)} — arrows may only connect stickies.`,
+      );
     }
   }
 

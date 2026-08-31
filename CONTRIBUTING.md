@@ -46,10 +46,11 @@ Prefer a plain Vite server with no proxy? `npm run dev:webapp:plain` (or
 
 `npm run test:browser` (Vitest browser mode) and `npm run test:e2e` (Playwright, in `e2e/`) need a
 Chromium browser. Locally, run `npx playwright install chromium` once. In CI these two jobs run inside
-the official Playwright container (`mcr.microsoft.com/playwright`), which ships the browser + system
-libs pre-installed — so **when you bump `@playwright/test` in `e2e/package.json`, bump the matching
-image tag in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) too** (the version pin-check does
-not catch this).
+the official Playwright container (`mcr.microsoft.com/playwright`); its image tag is derived from the
+root `package.json` `playwright` devDependency (see the `playwright-version` job in
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml)) — so **when you bump `@playwright/test` in
+`e2e/package.json`, bump the root `playwright` devDependency to the identical version** (the version
+pin-check does not enforce that the two stay in sync).
 
 ## Pre-commit reality
 

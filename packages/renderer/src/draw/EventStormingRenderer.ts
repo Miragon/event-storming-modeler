@@ -5,6 +5,7 @@ import type { ElementLike, ShapeLike, ConnectionLike } from 'diagram-js/lib/mode
 import type { Point } from 'diagram-js/lib/util/Types';
 import {
   COLORS,
+  DRAWING_INK,
   FONT,
   NOTE_STYLE,
   STICKY_CHAR_WIDTH,
@@ -54,7 +55,7 @@ export default class EventStormingRenderer extends BaseRenderer {
     const path = svgAttr(svgCreate(shape.closed ? 'polygon' : 'polyline'), {
       points: pts.map((p) => `${p.x},${p.y}`).join(' '),
       fill: 'none',
-      stroke: shape.color ?? COLORS.ink,
+      stroke: shape.color ?? DRAWING_INK,
       'stroke-width': 2,
       'stroke-linecap': 'round',
       'stroke-linejoin': 'round',
@@ -150,6 +151,18 @@ function wrapParagraph(paragraph: string, maxChars: number): string[] {
   const lines: string[] = [];
   let current = '';
   for (const word of words) {
+    // Hard-break unbreakable over-long words (e.g. PascalCase identifiers) into maxChars chunks —
+    // an over-wide single line would spill outside the fixed sticky box.
+    if (word.length > maxChars) {
+      if (current) lines.push(current);
+      let rest = word;
+      while (rest.length > maxChars) {
+        lines.push(rest.slice(0, maxChars));
+        rest = rest.slice(maxChars);
+      }
+      current = rest;
+      continue;
+    }
     const candidate = current ? `${current} ${word}` : word;
     if (candidate.length <= maxChars || !current) current = candidate;
     else {

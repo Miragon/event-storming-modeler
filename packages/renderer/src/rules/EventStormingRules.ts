@@ -2,12 +2,13 @@ import RuleProvider from 'diagram-js/lib/features/rules/RuleProvider';
 import type EventBus from 'diagram-js/lib/core/EventBus';
 import { isSticky, type EventStormingShape } from '../model/di-types.js';
 
-/** Is there already a connection between the two shapes (in either direction)? */
+/**
+ * Is there already an arrow from `source` to `target` in this SAME direction? Arrows are
+ * directional — the reverse arrow (B -> A alongside A -> B) is a distinct DSL line that imports
+ * and round-trips, so it must stay drawable.
+ */
 function alreadyConnected(source: EventStormingShape, target: EventStormingShape): boolean {
-  return (
-    (source.outgoing ?? []).some((c) => c.target === (target as unknown)) ||
-    (source.incoming ?? []).some((c) => c.source === (target as unknown))
-  );
+  return (source.outgoing ?? []).some((c) => c.target === (target as unknown));
 }
 
 /**
@@ -29,8 +30,8 @@ export default class EventStormingRules extends RuleProvider {
       const { source, target } = context;
       if (!isSticky(source) || !isSticky(target)) return false;
       if (source === target) return false;
-      // Duplicate arrows between the same endpoints are never meaningful (and indistinguishable
-      // in the DSL) — prevent them instead of silently stacking.
+      // Same-direction duplicate arrows are never meaningful (and indistinguishable in the
+      // DSL) — prevent them instead of silently stacking.
       if (alreadyConnected(source, target)) return false;
       return { eventStormingType: 'arrow' };
     });

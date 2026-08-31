@@ -9,7 +9,7 @@ import type EventBus from 'diagram-js/lib/core/EventBus';
 import type Modeling from 'diagram-js/lib/features/modeling/Modeling';
 import type Selection from 'diagram-js/lib/features/selection/Selection';
 import type { Element, Shape } from 'diagram-js/lib/model/Types';
-import { COLORS } from '../draw/styles.js';
+import { COLORS, DRAWING_INK } from '../draw/styles.js';
 import type EventStormingElementFactory from '../model/EventStormingElementFactory.js';
 
 interface Point {
@@ -201,7 +201,7 @@ export default class EventStormingDrawTool {
       svgAttr(svgCreate('polyline'), {
         points: pts.map((p) => `${p.x},${p.y}`).join(' '),
         fill: 'none',
-        stroke: COLORS.ink,
+        stroke: DRAWING_INK,
         'stroke-width': 2,
         'stroke-linecap': 'round',
         'stroke-linejoin': 'round',
@@ -217,7 +217,7 @@ export default class EventStormingDrawTool {
         cy: first.y,
         r: this.points.length >= 3 ? 5 : 3,
         fill: COLORS.paper,
-        stroke: COLORS.ink,
+        stroke: DRAWING_INK,
         'stroke-width': 1.5,
       }),
     );
@@ -230,7 +230,7 @@ export default class EventStormingDrawTool {
           cy: last.y,
           r: 5,
           fill: COLORS.paper,
-          stroke: COLORS.ink,
+          stroke: DRAWING_INK,
           'stroke-width': 1.5,
         }),
       );

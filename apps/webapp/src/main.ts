@@ -31,8 +31,8 @@ command Place Order [240, 300]
 aggregate Order [420, 290]
 event Order Placed [620, 300]
 policy When order placed, ship it [800, 300]
-command Ship Order [980, 300]
-event Order Shipped [1160, 300]
+command Ship Order [980, 420]
+event Order Shipped [1160, 420]
 readmodel Order Status [620, 120]
 external Payment Provider [420, 520]
 hotspot Double payment on retry? [620, 520]
@@ -135,14 +135,15 @@ function onMenu(id: string, action: () => void): void {
 
 /*
  * Landing / empty state + URL sync (central: what happens when the model changes).
- * The "landing" is the start screen (empty board, user hasn't started yet): it shows only the start
- * card and hides the working chrome (palette, menu, share, zoom). Picking "New board" or "Show
- * example" — or loading any board — leaves it for good this session.
+ * The "landing" is the start screen (empty board, user hasn't started yet): it shows the start
+ * card and hides only the zoom control (menu, share and palette stay usable). Picking "New board"
+ * or "Show example" — or the presence of any non-empty board — leaves it for good this session.
  */
 const emptyState = document.getElementById('empty-state');
 const appEl = document.getElementById('app');
 let hasStarted = false;
 function updateLanding(): void {
+  if (!isEmptyBoard()) hasStarted = true;
   const landing = !hasStarted && isEmptyBoard();
   if (emptyState) emptyState.hidden = !landing;
   appEl?.classList.toggle('app--landing', landing);

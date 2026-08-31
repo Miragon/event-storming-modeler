@@ -1,5 +1,6 @@
 # Source & build tooling don't belong in the .vsix — only dist/ + manifest.
 src/**
+test/**
 node_modules/**
 esbuild.config.mjs
 tsconfig.json

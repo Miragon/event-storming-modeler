@@ -138,6 +138,39 @@ describe('Validation', () => {
     expect(() => loadBoard(bad)).toThrow(/references no element/);
   });
 
+  it('rejects an arrow targeting a note (only the 8 sticky kinds are connectable)', () => {
+    const bad = {
+      ...sample,
+      elements: [
+        ...sample.elements,
+        { id: 'note_1', elementType: 'note', label: 'A note', position: { x: 0, y: 0 } },
+      ],
+      edges: [{ id: 'arrow_bad', edgeType: 'arrow', from: 'event_order_placed', to: 'note_1' }],
+    };
+    expect(() => loadBoard(bad)).toThrow(/arrows may only connect stickies/);
+  });
+
+  it('rejects an arrow starting at a drawing', () => {
+    const bad = {
+      ...sample,
+      elements: [
+        ...sample.elements,
+        {
+          id: 'draw_1',
+          elementType: 'drawing',
+          label: '',
+          position: { x: 0, y: 0 },
+          points: [
+            { x: 0, y: 0 },
+            { x: 10, y: 10 },
+          ],
+        },
+      ],
+      edges: [{ id: 'arrow_bad', edgeType: 'arrow', from: 'draw_1', to: 'event_order_placed' }],
+    };
+    expect(() => loadBoard(bad)).toThrow(/arrows may only connect stickies/);
+  });
+
   it('accepts unbounded pixel coordinates (negative and large)', () => {
     const board = {
       ...sample,

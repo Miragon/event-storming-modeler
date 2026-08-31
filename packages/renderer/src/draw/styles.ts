@@ -47,11 +47,12 @@ export const STICKY_LINE_HEIGHT = 17;
 export const STICKY_CHAR_WIDTH = 7.5;
 /** Minimum note box edge length (so even empty notes stay clickable). */
 const NOTE_MIN_SIZE = 34;
-const NOTE_PAD_Y = 6;
 
 /**
  * Box dimensions of a note from its (possibly multi-line) text. The note shape grows as large as
- * its text -> the move/click hitbox grows with it (instead of a fixed minimum box).
+ * its text -> the move/click hitbox grows with it (instead of a fixed minimum box). Vertical
+ * padding matches the renderer's clip padding (`STICKY_PADDING`) — a smaller padding here would
+ * make the renderer's maxLines clip drop the last text line.
  */
 export function noteMetrics(label: string): { lines: string[]; width: number; height: number } {
   const lines = (label && label.length ? label : 'note').split('\n');
@@ -59,7 +60,7 @@ export function noteMetrics(label: string): { lines: string[]; width: number; he
   return {
     lines,
     width: Math.max(NOTE_MIN_SIZE, Math.round(maxLen * STICKY_CHAR_WIDTH) + STICKY_PADDING * 2),
-    height: Math.max(NOTE_MIN_SIZE, lines.length * STICKY_LINE_HEIGHT + NOTE_PAD_Y * 2),
+    height: Math.max(NOTE_MIN_SIZE, lines.length * STICKY_LINE_HEIGHT + STICKY_PADDING * 2),
   };
 }
 
@@ -82,6 +83,13 @@ export const COLORS = {
   /** Dark text inside every sticky. */
   stickyText: '#333333',
 } as const;
+
+/**
+ * Default stroke for freeform drawings and the draw-tool preview: theme-aware via CSS variable
+ * (dark boards flip it to a light ink — near-black on navy is invisible), with the light value as
+ * literal fallback so exported SVGs opened standalone (no stylesheet) stay stable.
+ */
+export const DRAWING_INK = `var(--event-storming-drawing-ink, ${MIRAGON.schwarz})`;
 
 export const FONT = {
   /**

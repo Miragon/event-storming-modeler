@@ -12,11 +12,12 @@ import { ROOT_ID, type ImportWarning, type RootBusinessObject } from './types.js
 /**
  * Z-order of the shapes among themselves: smaller number = further back. Drawings encircle
  * sticky clusters and must never swallow their clicks, so they sit at the very back; the
- * connections are inserted between drawings and stickies via parentIndex.
+ * connections are inserted between drawings and stickies via parentIndex. Stickies and notes
+ * share the top band in document order — the interactive ordering provider appends both, so a
+ * separate note band would make the stacking flip between a session and the re-imported board.
  */
 const TYPE_ORDER: Record<string, number> = {
   drawing: 0,
-  note: 1,
 };
 
 /**

@@ -15,6 +15,7 @@
   --event-storming-brand: #00e676;
   --event-storming-danger: #c92a2a;
   --event-storming-shadow: rgba(29, 29, 29, 0.1);
+  --event-storming-drawing-ink: #1d1d1d;
 
   --event-storming-radius-sm: 6px;
   --event-storming-radius: 12px;
@@ -27,6 +28,7 @@
    in-canvas floating chrome (palette, context-pad, colour-picker, label input) stays light too. */
 .event-storming-container.event-storming-dark {
   --event-storming-paper: #080a20;
+  --event-storming-drawing-ink: #f9f7f7;
 }
 
 .event-storming-container {
@@ -218,6 +220,7 @@
   line-height: 17px;
   white-space: pre;
   min-width: 120px;
+  text-align: center;
 }
 
 .event-storming-container.drag-over::after {
