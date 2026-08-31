@@ -1,0 +1,43 @@
+{
+  "name": "@miragon/wardley-schema-model",
+  "version": "0.5.0",
+  "description": "The Wardley map data model with types, validation, stage derivation, migrations and stable JSON serialization.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Miragon/wardley-maps-modeler.git",
+    "directory": "packages/schema-model"
+  },
+  "homepage": "https://github.com/Miragon/wardley-maps-modeler/tree/main/packages/schema-model#readme",
+  "bugs": "https://github.com/Miragon/wardley-maps-modeler/issues",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "tsup": "8.5.1",
+    "typescript": "6.0.3",
+    "vitest": "4.1.11"
+  }
+}

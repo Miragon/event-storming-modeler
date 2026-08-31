@@ -1,0 +1,14 @@
+"$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
+
+[scripts]
+setup = "npm install"
+run_mode = "concurrent"
+
+[scripts.run.webapp]
+command = "npm run dev:webapp"
+default = true
+icon = "globe"
+
+[scripts.run.vscode]
+command = "npm run dev:vscode"
+icon = "code"

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "node",
+  "bump-minor-pre-major": true,
+  "separate-pull-requests": false,
+  "include-component-in-tag": true,
+  "plugins": [{ "type": "node-workspace", "updatePeerDependencies": true }],
+  "packages": {
+    "packages/schema-model": { "component": "schema-model" },
+    "packages/dsl": { "component": "dsl" },
+    "packages/transforms": { "component": "transforms" },
+    "packages/renderer": { "component": "renderer" },
+    "apps/vscode": { "component": "vscode" },
+    "apps/webapp": { "component": "webapp" }
+  }
+}
