@@ -2,39 +2,39 @@ import { expect, type Locator, type Page } from '@playwright/test';
 
 /**
  * Structural handle to the app's debug surface (exposed in apps/webapp/src/main.ts). We never import
- * the renderer here — only the shape we call into — so @miragon/wardley-e2e stays free of
- * @miragon/wardley-* dependencies.
+ * the renderer here — only the shape we call into — so @miragon/event-storming-e2e stays free of
+ * @miragon/event-storming-* dependencies.
  */
-export interface WardleyMapElement {
+export interface EventStormingBoardElement {
   readonly id: string;
   readonly label: string;
   readonly elementType: string;
-  readonly position: { readonly evolution: number; readonly visibility: number };
+  readonly position: { readonly x: number; readonly y: number };
 }
 
-export interface WardleyMapEdge {
+export interface EventStormingBoardEdge {
   readonly id: string;
   readonly edgeType: string;
   readonly from: string;
   readonly to: string;
 }
 
-export interface WardleyMapExport {
+export interface EventStormingBoardExport {
   readonly config: { readonly title?: string };
-  readonly elements: ReadonlyArray<WardleyMapElement>;
-  readonly edges: ReadonlyArray<WardleyMapEdge>;
+  readonly elements: ReadonlyArray<EventStormingBoardElement>;
+  readonly edges: ReadonlyArray<EventStormingBoardEdge>;
 }
 
-export interface WardleyViewer {
+export interface EventStormingViewer {
   importDSL(text: string): Promise<unknown>;
-  exportMap(): WardleyMapExport;
+  exportMap(): EventStormingBoardExport;
   exportDSL(): string;
   saveSVG(): Promise<{ svg: string }>;
 }
 
 declare global {
   interface Window {
-    __wardleyViewer: WardleyViewer;
+    __eventStormingViewer: EventStormingViewer;
   }
 }
 
@@ -44,25 +44,25 @@ interface Point {
 }
 
 export async function waitForViewer(page: Page): Promise<void> {
-  await page.waitForFunction(() => typeof window.__wardleyViewer !== 'undefined');
+  await page.waitForFunction(() => typeof window.__eventStormingViewer !== 'undefined');
 }
 
 /** Open the app and leave the landing start-screen with an empty canvas + working chrome (palette). */
-export async function startNewMap(page: Page): Promise<void> {
+export async function startNewBoard(page: Page): Promise<void> {
   await page.goto('/');
   await waitForViewer(page);
   await page.locator('#btn-new').click();
   await expect(page.locator('.djs-palette')).toBeVisible();
 }
 
-export function exportMap(page: Page): Promise<WardleyMapExport> {
-  return page.evaluate(() => window.__wardleyViewer.exportMap());
+export function exportBoard(page: Page): Promise<EventStormingBoardExport> {
+  return page.evaluate(() => window.__eventStormingViewer.exportMap());
 }
 export function exportDSL(page: Page): Promise<string> {
-  return page.evaluate(() => window.__wardleyViewer.exportDSL());
+  return page.evaluate(() => window.__eventStormingViewer.exportDSL());
 }
 export function exportSvg(page: Page): Promise<string> {
-  return page.evaluate(async () => (await window.__wardleyViewer.saveSVG()).svg);
+  return page.evaluate(async () => (await window.__eventStormingViewer.saveSVG()).svg);
 }
 
 /** Absolute page coordinate at the given fraction of the #canvas bounding box. */
@@ -75,15 +75,15 @@ async function canvasPoint(page: Page, fractionX: number, fractionY: number): Pr
 /**
  * The diagram-js graphics group for a model element. `data-element-id` is the live diagram-js id
  * (e.g. `shape_12` / `connection_19`) — for UI-created elements this is NOT the label, so callers
- * pass the id returned by `createComponentAt`/`exportMap`.
+ * pass the id returned by `createStickyAt`/`exportBoard`.
  */
 export function elementGfx(page: Page, id: string): Locator {
   return page.locator(`#canvas [data-element-id="${id}"]`);
 }
 /**
- * The element's hit box (`.djs-hit` = element.width×height at the shape origin). For components this
- * is the 34px circle area, NOT the rightward label — so its center is a reliable click/drag target
- * (a naive element-center click would land on the label and miss the shape).
+ * The element's hit box (`.djs-hit` = element.width×height at the shape origin). For stickies this
+ * is the full note rectangle (the label text lives inside it), so its center is a reliable
+ * click/drag target.
  */
 function shapeHit(page: Page, id: string): Locator {
   return elementGfx(page, id).locator('.djs-hit');
@@ -114,7 +114,7 @@ export async function dropAt(page: Page, fractionX: number, fractionY: number): 
 /** Clear the selection so exported SVG/state does not depend on what happened to be selected. */
 export async function deselectAll(page: Page): Promise<void> {
   await page.evaluate(() => {
-    const viewer = window.__wardleyViewer as unknown as {
+    const viewer = window.__eventStormingViewer as unknown as {
       get(name: string): { select(element: unknown): void };
     };
     viewer.get('selection').select(null);
@@ -134,19 +134,21 @@ export async function settleForSnapshot(page: Page): Promise<void> {
 }
 
 /**
- * Create a component via the palette, drop it at the given canvas fraction, and return the new
- * element's diagram-js id (found by diffing the model before/after — creation auto-selects it too).
+ * Create a sticky of the given kind via its palette entry (`data-action="create.<kind>"`), drop it
+ * at the given canvas fraction, and return the new element's diagram-js id (found by diffing the
+ * model before/after — creation auto-selects it too).
  */
-export async function createComponentAt(
+export async function createStickyAt(
   page: Page,
+  kind: string,
   fractionX: number,
   fractionY: number,
 ): Promise<string> {
-  const before = new Set((await exportMap(page)).elements.map((element) => element.id));
-  await page.locator('.djs-palette [data-action="create.component"]').click();
+  const before = new Set((await exportBoard(page)).elements.map((element) => element.id));
+  await page.locator(`.djs-palette [data-action="create.${kind}"]`).click();
   await dropAtPoint(page, await canvasPoint(page, fractionX, fractionY));
-  await expect.poll(async () => (await exportMap(page)).elements.length).toBe(before.size + 1);
-  const created = (await exportMap(page)).elements.find((element) => !before.has(element.id));
+  await expect.poll(async () => (await exportBoard(page)).elements.length).toBe(before.size + 1);
+  const created = (await exportBoard(page)).elements.find((element) => !before.has(element.id));
   if (!created) throw new Error('no new element after create');
   return created.id;
 }
@@ -162,7 +164,7 @@ export async function selectShape(page: Page, id: string): Promise<void> {
 }
 
 /**
- * Draw a dependency from `sourceId` to `targetId` via the context pad "Connect" action: click the
+ * Draw an arrow from `sourceId` to `targetId` via the context pad "Connect" action: click the
  * entry to start diagram-js Connect, move onto the target (hovers it), then mousedown to drop.
  */
 export async function connectShapes(page: Page, sourceId: string, targetId: string): Promise<void> {
@@ -186,12 +188,15 @@ export async function dragShape(
   await page.mouse.up();
 }
 
-/** Rename a shape inline: double-click, replace the text in the overlay input, commit with Enter. */
+/**
+ * Rename a shape inline: double-click, replace the text in the overlay editor, commit with
+ * Ctrl+Enter (plain Enter inserts a line break — sticky text is multi-line).
+ */
 export async function renameShape(page: Page, id: string, newLabel: string): Promise<void> {
   await shapeHit(page, id).dblclick();
-  const input = page.locator('.wardley-label-input');
+  const input = page.locator('.event-storming-label-input');
   await expect(input).toBeVisible();
   await input.fill(newLabel);
-  await input.press('Enter');
+  await input.press('Control+Enter');
   await expect(input).toBeHidden();
 }

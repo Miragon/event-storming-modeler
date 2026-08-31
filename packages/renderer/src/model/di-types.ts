@@ -1,101 +1,96 @@
 import type { Shape, Connection } from 'diagram-js/lib/model/Types';
 import type {
-  AcceleratorDirection,
-  AttitudeKind,
-  ComponentDecorators,
+  BoardEdge,
+  BoardElement,
   DrawingStrokeStyle,
-  LabelOffset,
-  MapEdge,
-  MapElement,
-  Movement,
-} from '@miragon/wardley-schema-model';
+} from '@miragon/event-storming-schema-model';
 
 /**
- * diagram-js runtime model with Wardley extensions.
+ * diagram-js runtime model with Event Storming extensions.
  *
- * The positional truth while editing is `evolution`/`visibility` (normalized), NOT `x`/`y` (pixels)
- * and NOT the `businessObject` (concept doc §2.2, §5.6).
- * `businessObject` is the identity/metadata backref to the original model element.
+ * The positional truth while editing is the diagram-js pixel geometry (`x`/`y`/`width`/`height`)
+ * — there is no second coordinate system. `businessObject` is the identity/metadata backref to
+ * the original model element; every editable field lives as a flat DI property.
  */
 
-export type WardleyShapeType =
-  | 'component'
-  | 'anchor'
-  | 'pipeline'
+/** ID of the diagram-js root element of the Event Storming board. */
+export const ROOT_ID = 'event-storming-root';
+
+export type EventStormingShapeType =
+  | 'event'
+  | 'command'
+  | 'actor'
+  | 'aggregate'
+  | 'policy'
+  | 'readmodel'
+  | 'external'
+  | 'hotspot'
   | 'note'
-  | 'annotation'
-  | 'attitude'
-  | 'submap'
-  | 'accelerator'
   | 'drawing';
 
-export type WardleyConnectionType = 'dependency' | 'flow';
+export type EventStormingConnectionType = 'arrow';
 
-export interface WardleyShape extends Shape {
-  wardleyType: WardleyShapeType;
-  /** normalized [0,1] — runtime truth of the X position. */
-  evolution: number;
-  /** normalized [0,1] — runtime truth of the Y position. */
-  visibility: number;
+export interface EventStormingShape extends Shape {
+  eventStormingType: EventStormingShapeType;
   /** Display text (separate from diagram-js `label`, which references a label element). */
-  wardleyLabel: string;
-  /** OWM `label [dx, dy]` — px offset relative to the default label position. */
-  labelOffset?: LabelOffset;
-  decorators?: ComponentDecorators;
-  movement?: Movement;
-  /** pipeline only: evolution range. */
-  evolutionStart?: number;
-  evolutionEnd?: number;
-  /** component only: membership in a pipeline (id) — runtime truth, maintained via drag. */
-  pipelineId?: string;
-  /** annotation only. */
-  annotationNumber?: number;
-  /** attitude region only. */
-  attitudeKind?: AttitudeKind;
-  /** attitude only: opposite corner (normalized), maintained by the EvolutionConstraintBehavior. */
-  corner2?: { visibility: number; evolution: number };
-  /** accelerator only. */
-  acceleratorDirection?: AcceleratorDirection;
+  eventStormingLabel: string;
   /** drawing only: points in px RELATIVE to the shape's x/y (moving the shape moves them all). */
   drawingPoints?: Array<{ x: number; y: number }>;
   /** drawing only: closed polygon vs. open polyline. */
   closed?: boolean;
   /** drawing only. */
   strokeStyle?: DrawingStrokeStyle;
-  /** Optional element color (CSS color/hex from the swatch palette) — any element type. */
+  /** Optional color override (CSS color/hex from the swatch palette) — any element type. */
   color?: string;
-  businessObject?: MapElement;
+  businessObject?: BoardElement;
 }
 
-export interface WardleyConnection extends Connection {
-  wardleyType: WardleyConnectionType;
-  bidirectional?: boolean;
-  flowValue?: string;
-  /** annotation text after `;` (e.g. "limited by"). */
+export interface EventStormingConnection extends Connection {
+  eventStormingType: EventStormingConnectionType;
+  /** Arrow annotation text after `;` (e.g. "async"). */
   linkLabel?: string;
-  businessObject?: MapEdge;
+  businessObject?: BoardEdge;
 }
 
 function isObject(el: unknown): el is Record<string, unknown> {
   return typeof el === 'object' && el !== null;
 }
 
-export function isWardleyShape(el: unknown): el is WardleyShape {
-  return isObject(el) && typeof el['wardleyType'] === 'string' && 'evolution' in el;
+/** Shapes and connections both carry `eventStormingType` — only connections have waypoints. */
+export function isEventStormingShape(el: unknown): el is EventStormingShape {
+  return isObject(el) && typeof el['eventStormingType'] === 'string' && !('waypoints' in el);
 }
 
-export function isWardleyConnection(el: unknown): el is WardleyConnection {
-  return isObject(el) && typeof el['wardleyType'] === 'string' && 'waypoints' in el;
+export function isEventStormingConnection(el: unknown): el is EventStormingConnection {
+  return isObject(el) && typeof el['eventStormingType'] === 'string' && 'waypoints' in el;
 }
 
-export function isComponent(el: unknown): el is WardleyShape {
-  return isWardleyShape(el) && el.wardleyType === 'component';
+/** The eight sticky kinds — connectable, retypeable, always fixed-size (not note/drawing). */
+export const STICKY_KINDS = [
+  'event',
+  'command',
+  'actor',
+  'aggregate',
+  'policy',
+  'readmodel',
+  'external',
+  'hotspot',
+] as const;
+
+export type StickyKind = (typeof STICKY_KINDS)[number];
+
+export function isStickyKind(type: string): type is StickyKind {
+  return (STICKY_KINDS as readonly string[]).includes(type);
 }
 
-export function isPipeline(el: unknown): el is WardleyShape {
-  return isWardleyShape(el) && el.wardleyType === 'pipeline';
+export function isSticky(el: unknown): el is EventStormingShape {
+  return isEventStormingShape(el) && isStickyKind(el.eventStormingType);
 }
 
-export function isAttitude(el: unknown): el is WardleyShape {
-  return isWardleyShape(el) && el.wardleyType === 'attitude';
+export function isDrawing(el: unknown): el is EventStormingShape {
+  return isEventStormingShape(el) && el.eventStormingType === 'drawing';
+}
+
+export function isNote(el: unknown): el is EventStormingShape {
+  return isEventStormingShape(el) && el.eventStormingType === 'note';
 }

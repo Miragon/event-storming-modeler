@@ -14,8 +14,8 @@ function setOrDelete(obj: Record<string, unknown>, key: string, value: unknown):
 }
 
 /**
- * Generic, undoable command handler for setting arbitrary Wardley properties
- * (wardleyLabel, decorators, movement, evolutionStart/End, ...). Returns the changed element
+ * Generic, undoable command handler for setting arbitrary Event Storming properties
+ * (eventStormingLabel, eventStormingType, color, strokeStyle, ...). Returns the changed element
  * -> CommandStack fires `elements.changed` -> re-render.
  */
 export default class UpdatePropertiesHandler implements CommandHandler {

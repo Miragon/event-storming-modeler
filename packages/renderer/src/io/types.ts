@@ -1,15 +1,14 @@
-import type { MapConfig } from '@miragon/wardley-schema-model';
+import type { BoardConfig } from '@miragon/event-storming-schema-model';
 
-/** ID of the diagram-js root element of the Wardley map. */
-export const ROOT_ID = 'wardley-root';
+export { ROOT_ID } from '../model/di-types.js';
 
 export interface ImportWarning {
   readonly message: string;
   readonly elementId?: string;
 }
 
-/** Map metadata stored on the root element (config + lossless passthrough). */
+/** Board metadata stored on the root element (config + lossless passthrough). */
 export interface RootBusinessObject {
-  readonly config: MapConfig;
+  readonly config: BoardConfig;
   readonly rawPassthrough?: readonly string[];
 }

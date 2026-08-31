@@ -1,10 +1,10 @@
 import type { ModuleDeclaration } from 'didi';
-import WardleyElementFactory from './WardleyElementFactory.js';
+import EventStormingElementFactory from './EventStormingElementFactory.js';
 
-/** Custom ElementFactory with Wardley defaults and pixel projection. */
-export const wardleyModelModule: ModuleDeclaration = {
-  wardleyElementFactory: ['type', WardleyElementFactory],
+/** Custom ElementFactory with Event Storming sticky defaults. */
+export const eventStormingModelModule: ModuleDeclaration = {
+  eventStormingElementFactory: ['type', EventStormingElementFactory],
 };
 
-export { default as WardleyElementFactory } from './WardleyElementFactory.js';
+export { default as EventStormingElementFactory } from './EventStormingElementFactory.js';
 export * from './di-types.js';

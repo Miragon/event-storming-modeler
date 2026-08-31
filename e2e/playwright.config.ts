@@ -4,9 +4,10 @@ const PORT = process.env.E2E_PORT ?? '5180';
 const BASE_URL = `http://localhost:${PORT}`;
 
 /**
- * E2E for @miragon/wardley-webapp. The webapp dev server resolves @miragon/wardley-* via Vite source
- * aliases (apps/webapp/vite.config.ts), so no package build is required — the dev server is
- * self-contained. `cwd: '..'` runs the command from the repo root so the npm workspace resolves.
+ * E2E for @miragon/event-storming-webapp. The webapp dev server resolves @miragon/event-storming-*
+ * via Vite source aliases (apps/webapp/vite.config.ts), so no package build is required — the dev
+ * server is self-contained. `cwd: '..'` runs the command from the repo root so the npm workspace
+ * resolves.
  */
 export default defineConfig({
   testDir: './tests',

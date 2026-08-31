@@ -1,10 +1,10 @@
 import type { ModuleDeclaration } from 'didi';
-import StageSnapping from './StageSnapping.js';
+import ElementSnapping from './ElementSnapping.js';
 
-/** Snapping to the evolution stage boundaries (editor-only). */
-export const stageSnappingModule: ModuleDeclaration = {
-  __init__: ['stageSnapping'],
-  stageSnapping: ['type', StageSnapping],
+/** Center-to-center sticky snapping while moving/creating (editor-only). */
+export const elementSnappingModule: ModuleDeclaration = {
+  __init__: ['elementSnapping'],
+  elementSnapping: ['type', ElementSnapping],
 };
 
-export { default as StageSnapping } from './StageSnapping.js';
+export { default as ElementSnapping } from './ElementSnapping.js';

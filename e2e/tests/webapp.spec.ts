@@ -1,27 +1,40 @@
 import { test, expect } from '@playwright/test';
 import {
   connectShapes,
-  createComponentAt,
+  createStickyAt,
   dragShape,
   dropAt,
   elementGfx,
+  exportBoard,
   exportDSL,
-  exportMap,
   exportSvg,
   renameShape,
   selectShape,
   settleForSnapshot,
-  startNewMap,
+  startNewBoard,
   waitForViewer,
 } from './support/viewer.js';
 
 /**
  * End-to-end coverage for the webapp. Two groups:
- *  - "export round-trip": import/export correctness (DSL round-trip, SVG, Tea Shop render).
+ *  - "export round-trip": import/export correctness (DSL round-trip, SVG, Order Checkout render).
  *  - "modelling interactions": drive the real tool (palette, context pad, inline editing, keyboard)
- *    and assert the result through the `window.__wardleyViewer` debug surface.
+ *    and assert the result through the `window.__eventStormingViewer` debug surface.
  * All tests are independent and share no state.
  */
+
+/** Every palette-creatable sticky kind with its default label (drawing is a tool, not a create). */
+const STICKY_KINDS = [
+  { kind: 'event', label: 'Domain Event' },
+  { kind: 'command', label: 'Command' },
+  { kind: 'actor', label: 'Actor' },
+  { kind: 'aggregate', label: 'Aggregate' },
+  { kind: 'policy', label: 'Policy' },
+  { kind: 'readmodel', label: 'Read Model' },
+  { kind: 'external', label: 'External System' },
+  { kind: 'hotspot', label: 'Hotspot' },
+  { kind: 'note', label: 'Note' },
+] as const;
 
 test.describe('webapp export round-trip', () => {
   test.beforeEach(async ({ page }) => {
@@ -29,7 +42,7 @@ test.describe('webapp export round-trip', () => {
     await waitForViewer(page);
   });
 
-  test('loads the Tea Shop example and exports stable DSL + SVG', async ({ page }) => {
+  test('loads the Order Checkout example and exports stable DSL + SVG', async ({ page }) => {
     // Real UI: the app opens on the landing (empty canvas), which hides the working chrome and
     // offers a start card — load the example from its "Show example" button.
     await page.locator('#btn-example').click();
@@ -37,18 +50,18 @@ test.describe('webapp export round-trip', () => {
     // The renderer paints one .djs-element per node/edge once import.done fires.
     await expect(page.locator('#canvas .djs-element').first()).toBeVisible();
 
-    const map = await exportMap(page);
-    expect(map.elements.length).toBeGreaterThan(0);
-    expect(map.edges.length).toBeGreaterThan(0);
-    expect(map.config.title).toBe('Tea Shop');
+    const board = await exportBoard(page);
+    expect(board.elements.length).toBeGreaterThan(0);
+    expect(board.edges.length).toBeGreaterThan(0);
+    expect(board.config.title).toBe('Order Checkout');
 
-    const labels = map.elements.map((element) => element.label);
-    expect(labels).toContain('Cup of Tea');
-    expect(labels).toContain('Kettle');
+    const labels = board.elements.map((element) => element.label);
+    expect(labels).toContain('Order Placed');
+    expect(labels).toContain('Place Order');
 
     const dsl = await exportDSL(page);
-    expect(dsl).toContain('title Tea Shop');
-    expect(dsl).toMatch(/component Kettle \[/);
+    expect(dsl).toContain('title Order Checkout');
+    expect(dsl).toMatch(/event Order Placed \[/);
 
     const svg = await exportSvg(page);
     expect(svg).toContain('<svg');
@@ -57,13 +70,13 @@ test.describe('webapp export round-trip', () => {
   test('import -> export -> re-import is a lossless DSL fixed point', async ({ page }) => {
     const source = [
       'title Round Trip',
-      'component A [0.20, 0.80]',
-      'component B [0.60, 0.40]',
+      'event A [200, 300]',
+      'command B [400, 300]',
       'A -> B',
     ].join('\n');
 
     const result = await page.evaluate(async (dsl) => {
-      const viewer = window.__wardleyViewer;
+      const viewer = window.__eventStormingViewer;
       await viewer.importDSL(dsl);
       const first = viewer.exportDSL();
       await viewer.importDSL(first); // round-trip
@@ -76,72 +89,99 @@ test.describe('webapp export round-trip', () => {
     expect(result.second).toBe(result.first);
     expect(result.first).toContain('title Round Trip');
   });
+
+  test('exports the example board as an SVG matching the snapshot', async ({ page }) => {
+    await page.locator('#btn-example').click();
+    await expect(page.locator('#canvas .djs-element').first()).toBeVisible();
+    await settleForSnapshot(page);
+
+    const svg = await exportSvg(page);
+    expect(svg).toContain('<svg');
+    expect(svg).toMatchSnapshot('example-board.svg');
+  });
 });
 
 test.describe('webapp modelling interactions', () => {
   test.beforeEach(async ({ page }) => {
-    await startNewMap(page);
+    await startNewBoard(page);
   });
 
-  test('creates a component from the palette', async ({ page }) => {
-    const id = await createComponentAt(page, 0.45, 0.5);
+  test('creates every sticky kind from the palette with its default label', async ({ page }) => {
+    for (const [index, sticky] of STICKY_KINDS.entries()) {
+      // Spread the drops over a grid so stickies land apart from each other.
+      const fractionX = 0.15 + (index % 3) * 0.25;
+      const fractionY = 0.2 + Math.floor(index / 3) * 0.25;
+      const id = await createStickyAt(page, sticky.kind, fractionX, fractionY);
 
-    const map = await exportMap(page);
-    expect(map.elements.map((element) => element.label)).toEqual(['Component']);
-    expect(map.elements[0]?.elementType).toBe('component');
-    await expect(elementGfx(page, id)).toBeVisible();
+      const created = (await exportBoard(page)).elements.find((element) => element.id === id);
+      expect(created?.elementType).toBe(sticky.kind);
+      expect(created?.label).toBe(sticky.label);
+      await expect(elementGfx(page, id)).toBeVisible();
+    }
+    expect((await exportBoard(page)).elements).toHaveLength(STICKY_KINDS.length);
   });
 
-  test('moves a component and re-projects its coordinates', async ({ page }) => {
-    const id = await createComponentAt(page, 0.4, 0.5);
-    const before = (await exportMap(page)).elements[0]!.position;
+  test('moves a sticky freely and the position survives a DSL round-trip', async ({ page }) => {
+    const id = await createStickyAt(page, 'event', 0.3, 0.35);
+    const before = (await exportBoard(page)).elements[0]!.position;
 
-    // Drag right along the evolution axis; EvolutionConstraintBehavior re-projects the model coords.
-    await dragShape(page, id, 0.7, 0.5);
+    // Free canvas: a diagonal drag changes both coordinates — no axis re-projection.
+    await dragShape(page, id, 0.7, 0.65);
 
-    const after = (await exportMap(page)).elements[0]!.position;
-    expect(after.evolution).toBeGreaterThan(before.evolution);
-    expect(after.visibility).toBeCloseTo(before.visibility, 1);
+    const after = (await exportBoard(page)).elements[0]!.position;
+    expect(after.x).toBeGreaterThan(before.x);
+    expect(after.y).toBeGreaterThan(before.y);
+
+    // Export -> re-import: the dragged position is preserved by the DSL (3-decimal rounding).
+    const dsl = await exportDSL(page);
+    await page.evaluate((text) => window.__eventStormingViewer.importDSL(text), dsl);
+    const reimported = (await exportBoard(page)).elements[0]!.position;
+    expect(reimported.x).toBeCloseTo(after.x, 2);
+    expect(reimported.y).toBeCloseTo(after.y, 2);
   });
 
-  test('creates a dependency between two components', async ({ page }) => {
-    const source = await createComponentAt(page, 0.35, 0.4);
-    const target = await createComponentAt(page, 0.65, 0.6);
+  test('creates an arrow between two stickies', async ({ page }) => {
+    const source = await createStickyAt(page, 'command', 0.35, 0.4);
+    const target = await createStickyAt(page, 'event', 0.65, 0.6);
 
     await connectShapes(page, source, target);
 
-    const map = await exportMap(page);
-    expect(map.edges).toHaveLength(1);
-    const edge = map.edges[0]!;
-    expect(edge.edgeType).toBe('dependency');
+    const board = await exportBoard(page);
+    expect(board.edges).toHaveLength(1);
+    const edge = board.edges[0]!;
+    expect(edge.edgeType).toBe('arrow');
     expect([edge.from, edge.to].sort()).toEqual([source, target].sort());
   });
 
-  test('renames a component inline and the new label survives a round-trip', async ({ page }) => {
-    const id = await createComponentAt(page, 0.45, 0.5);
+  test('renames a sticky inline and the new label survives a round-trip', async ({ page }) => {
+    const id = await createStickyAt(page, 'event', 0.45, 0.5);
 
-    await renameShape(page, id, 'Kettle');
-    expect((await exportMap(page)).elements.map((element) => element.label)).toEqual(['Kettle']);
+    await renameShape(page, id, 'Order Placed');
+    expect((await exportBoard(page)).elements.map((element) => element.label)).toEqual([
+      'Order Placed',
+    ]);
 
     // Export -> re-import: the renamed label is stable.
     const dsl = await exportDSL(page);
-    expect(dsl).toMatch(/component Kettle \[/);
-    await page.evaluate((text) => window.__wardleyViewer.importDSL(text), dsl);
-    expect((await exportMap(page)).elements.map((element) => element.label)).toEqual(['Kettle']);
+    expect(dsl).toMatch(/event Order Placed \[/);
+    await page.evaluate((text) => window.__eventStormingViewer.importDSL(text), dsl);
+    expect((await exportBoard(page)).elements.map((element) => element.label)).toEqual([
+      'Order Placed',
+    ]);
   });
 
-  test('deletes a component', async ({ page }) => {
-    const id = await createComponentAt(page, 0.45, 0.5);
+  test('deletes a sticky', async ({ page }) => {
+    const id = await createStickyAt(page, 'event', 0.45, 0.5);
     await selectShape(page, id);
 
     await page.keyboard.press('Delete');
 
-    await expect.poll(async () => (await exportMap(page)).elements.length).toBe(0);
+    await expect.poll(async () => (await exportBoard(page)).elements.length).toBe(0);
     await expect(elementGfx(page, id)).toHaveCount(0);
   });
 
-  test('copies and pastes a component (labels stay unique)', async ({ page }) => {
-    const id = await createComponentAt(page, 0.4, 0.5);
+  test('copies and pastes a sticky (labels stay unique)', async ({ page }) => {
+    const id = await createStickyAt(page, 'event', 0.4, 0.5);
     await selectShape(page, id);
 
     await page.keyboard.press('ControlOrMeta+c');
@@ -149,19 +189,8 @@ test.describe('webapp modelling interactions', () => {
     // Paste attaches the clone to the cursor (like palette create) — drop it at a new spot.
     await dropAt(page, 0.65, 0.6);
 
-    await expect.poll(async () => (await exportMap(page)).elements.length).toBe(2);
-    const labels = (await exportMap(page)).elements.map((element) => element.label).sort();
-    expect(labels).toEqual(['Component', 'Component 2']);
-  });
-
-  test('builds a map through the UI and exports an SVG matching the snapshot', async ({ page }) => {
-    const source = await createComponentAt(page, 0.35, 0.4);
-    const target = await createComponentAt(page, 0.65, 0.6);
-    await connectShapes(page, source, target);
-    await settleForSnapshot(page);
-
-    const svg = await exportSvg(page);
-    expect(svg).toContain('<svg');
-    expect(svg).toMatchSnapshot('modelling-map.svg');
+    await expect.poll(async () => (await exportBoard(page)).elements.length).toBe(2);
+    const labels = (await exportBoard(page)).elements.map((element) => element.label).sort();
+    expect(labels).toEqual(['Domain Event', 'Domain Event 2']);
   });
 });

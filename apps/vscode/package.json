@@ -1,18 +1,18 @@
 {
-  "name": "wardley-mapping-modeler",
+  "name": "event-storming-modeler",
   "private": true,
-  "version": "0.6.1",
-  "displayName": "Wardley Mapping Modeler",
-  "description": "View and edit Wardley Maps directly in VS Code, including .wmap and .owm files.",
+  "version": "0.1.0",
+  "displayName": "Event Storming Modeler",
+  "description": "View and edit Event Storming boards directly in VS Code, backed by plain-text .storm files.",
   "publisher": "miragon-gmbh",
   "icon": "icon.png",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Miragon/wardley-maps-modeler.git",
+    "url": "git+https://github.com/Miragon/event-storming-modeler.git",
     "directory": "apps/vscode"
   },
-  "bugs": "https://github.com/Miragon/wardley-maps-modeler/issues",
-  "homepage": "https://github.com/Miragon/wardley-maps-modeler/tree/main/apps/vscode#readme",
+  "bugs": "https://github.com/Miragon/event-storming-modeler/issues",
+  "homepage": "https://github.com/Miragon/event-storming-modeler/tree/main/apps/vscode#readme",
   "license": "MIT",
   "engines": {
     "vscode": "^1.96.0"
@@ -22,42 +22,37 @@
     "Other"
   ],
   "keywords": [
-    "wardley",
-    "wardley map",
-    "strategy",
-    "diagram",
-    "owm"
+    "event storming",
+    "DDD",
+    "domain-driven design",
+    "workshop",
+    "modeling"
   ],
   "main": "./dist/extension.cjs",
   "type": "module",
   "activationEvents": [
-    "onCustomEditor:wardley.mapEditor"
+    "onCustomEditor:eventStorming.boardEditor"
   ],
   "contributes": {
     "languages": [
       {
-        "id": "wardley-owm",
+        "id": "event-storming-dsl",
         "aliases": [
-          "Wardley Map (OWM-DSL)",
-          "wardley"
+          "Event Storming DSL"
         ],
         "extensions": [
-          ".wmap",
-          ".owm"
+          ".storm"
         ],
         "configuration": "./language-configuration.json"
       }
     ],
     "customEditors": [
       {
-        "viewType": "wardley.mapEditor",
-        "displayName": "Wardley Map",
+        "viewType": "eventStorming.boardEditor",
+        "displayName": "Event Storming Board",
         "selector": [
           {
-            "filenamePattern": "*.wmap"
-          },
-          {
-            "filenamePattern": "*.owm"
+            "filenamePattern": "*.storm"
           }
         ],
         "priority": "default"
@@ -65,47 +60,47 @@
     ],
     "commands": [
       {
-        "command": "wardley.newMap",
-        "title": "New Empty Map",
-        "category": "Wardley",
-        "shortTitle": "Wardley Map"
+        "command": "eventStorming.newBoard",
+        "title": "New Empty Board",
+        "category": "Event Storming",
+        "shortTitle": "Event Storming Board"
       },
       {
-        "command": "wardley.newMapFromExample",
-        "title": "New Map from Example",
-        "category": "Wardley"
+        "command": "eventStorming.newBoardFromExample",
+        "title": "New Board from Example",
+        "category": "Event Storming"
       }
     ],
     "menus": {
       "file/newFile": [
         {
-          "command": "wardley.newMap",
-          "group": "wardley"
+          "command": "eventStorming.newBoard",
+          "group": "eventStorming"
         }
       ]
     },
     "walkthroughs": [
       {
         "id": "getStarted",
-        "title": "Get Started with Wardley Maps",
-        "description": "Wardley Maps chart the components of a business by user value and evolution, so you can see your landscape and reason about strategy. This extension lets you create and edit them in VS Code as plain-text .wmap / .owm files.",
+        "title": "Get Started with Event Storming",
+        "description": "Event Storming is a workshop format for exploring a business domain with sticky notes: domain events, the commands that trigger them, and the people and systems involved. This extension lets you create and edit Event Storming boards in VS Code as plain-text .storm files.",
         "steps": [
           {
             "id": "create",
-            "title": "Create your first map",
-            "description": "Open a ready-made example map, or start from a blank canvas.\n[Create map from example](command:wardley.newMapFromExample)",
+            "title": "Create your first board",
+            "description": "Open a ready-made example board, or start from a blank canvas.\n[Create board from example](command:eventStorming.newBoardFromExample)",
             "media": {
               "markdown": "media/walkthrough/create.md"
             },
             "completionEvents": [
-              "onCommand:wardley.newMapFromExample",
-              "onCommand:wardley.newMap"
+              "onCommand:eventStorming.newBoardFromExample",
+              "onCommand:eventStorming.newBoard"
             ]
           },
           {
             "id": "learn",
             "title": "Learn the basics",
-            "description": "Add and connect components, move and evolve them, then export the map as SVG or PNG.",
+            "description": "Add stickies for events, commands and aggregates, connect them with arrows, then export the board as SVG or PNG.",
             "media": {
               "markdown": "media/walkthrough/learn.md"
             },
@@ -122,14 +117,14 @@
     "watch": "node esbuild.config.mjs --watch",
     "typecheck": "tsc -p tsconfig.json",
     "vscode:prepublish": "node esbuild.config.mjs --production",
-    "package": "vsce package --no-dependencies -o wardley-mapping-modeler.vsix"
+    "package": "vsce package --no-dependencies -o event-storming-modeler.vsix"
   },
   "dependencies": {
     "@fontsource-variable/geist": "5.3.0",
     "@fontsource-variable/geist-mono": "5.3.0",
-    "@miragon/wardley-dsl": "0.5.1",
-    "@miragon/wardley-renderer": "0.6.1",
-    "@miragon/wardley-schema-model": "0.5.0"
+    "@miragon/event-storming-dsl": "0.1.0",
+    "@miragon/event-storming-renderer": "0.1.0",
+    "@miragon/event-storming-schema-model": "0.1.0"
   },
   "devDependencies": {
     "@types/node": "26.2.0",

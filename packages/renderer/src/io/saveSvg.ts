@@ -1,5 +1,5 @@
 import type Canvas from 'diagram-js/lib/core/Canvas';
-import { PLOT } from '../draw/styles.js';
+import { DEFAULT_BOARD_SIZE } from '@miragon/event-storming-schema-model';
 
 export interface SvgBounds {
   x: number;
@@ -10,9 +10,9 @@ export interface SvgBounds {
 
 /**
  * Serializes the current canvas into standalone SVG (snapshot/export).
- * `bounds` is the outer plot boundary (typically `EvolutionGrid.outerBounds()`), so that
- * maps enlarged via `config.size` are exported completely; if omitted, the default plot
- * area is used. Independent of the current zoom/scroll.
+ * `bounds` is the framing box (typically `BoardBounds.contentBounds()`), so the whole board is
+ * exported wherever its stickies sit on the free canvas; if omitted, the empty-board default
+ * framing is used. Independent of the current zoom/scroll.
  */
 export function saveSVG(canvas: Canvas, bounds?: SvgBounds): { svg: string } {
   const container = canvas.getContainer();
@@ -21,12 +21,7 @@ export function saveSVG(canvas: Canvas, bounds?: SvgBounds): { svg: string } {
 
   const clone = source.cloneNode(true) as SVGSVGElement;
 
-  const box = bounds ?? {
-    x: 0,
-    y: 0,
-    width: PLOT.marginLeft + PLOT.width + PLOT.marginRight,
-    height: PLOT.marginTop + PLOT.height + PLOT.marginBottom,
-  };
+  const box = bounds ?? { x: 0, y: 0, ...DEFAULT_BOARD_SIZE };
   clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
   clone.setAttribute('viewBox', `${box.x} ${box.y} ${box.width} ${box.height}`);
   clone.setAttribute('width', String(box.width));

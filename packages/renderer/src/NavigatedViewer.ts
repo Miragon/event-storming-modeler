@@ -4,11 +4,10 @@ import ZoomScrollModule from 'diagram-js/lib/navigation/zoomscroll';
 import MoveCanvasModule from 'diagram-js/lib/navigation/movecanvas';
 import KeyboardModule from 'diagram-js/lib/features/keyboard';
 import { Viewer } from './Viewer.js';
-import { PanConstraintModule } from './pan-constraint/index.js';
 
 /**
  * `keyboard-move-selection` depends on `modeling` and therefore belongs in the (later) Modeler,
- * not in the read-only NavigatedViewer.
+ * not in the read-only NavigatedViewer. Panning is unconstrained — the canvas is free.
  */
 export class NavigatedViewer extends Viewer {
   protected override _getModules(): ModuleDeclaration[] {
@@ -18,7 +17,6 @@ export class NavigatedViewer extends Viewer {
       ZoomScrollModule,
       MoveCanvasModule,
       KeyboardModule,
-      PanConstraintModule,
     ];
   }
 }

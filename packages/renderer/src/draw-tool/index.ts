@@ -1,15 +1,19 @@
 import type { ModuleDeclaration } from 'didi';
-import WardleyDrawTool from './WardleyDrawTool.js';
-import WardleyDrawingHandles from './WardleyDrawingHandles.js';
-import WardleyDrawingHitProvider from './WardleyDrawingHitProvider.js';
+import EventStormingDrawTool from './EventStormingDrawTool.js';
+import EventStormingDrawingHandles from './EventStormingDrawingHandles.js';
+import EventStormingDrawingHitProvider from './EventStormingDrawingHitProvider.js';
 
-export const wardleyDrawToolModule: ModuleDeclaration = {
-  __init__: ['wardleyDrawTool', 'wardleyDrawingHandles', 'wardleyDrawingHitProvider'],
-  wardleyDrawTool: ['type', WardleyDrawTool],
-  wardleyDrawingHandles: ['type', WardleyDrawingHandles],
-  wardleyDrawingHitProvider: ['type', WardleyDrawingHitProvider],
+export const eventStormingDrawToolModule: ModuleDeclaration = {
+  __init__: [
+    'eventStormingDrawTool',
+    'eventStormingDrawingHandles',
+    'eventStormingDrawingHitProvider',
+  ],
+  eventStormingDrawTool: ['type', EventStormingDrawTool],
+  eventStormingDrawingHandles: ['type', EventStormingDrawingHandles],
+  eventStormingDrawingHitProvider: ['type', EventStormingDrawingHitProvider],
 };
 
-export { default as WardleyDrawTool } from './WardleyDrawTool.js';
-export { default as WardleyDrawingHandles } from './WardleyDrawingHandles.js';
-export { default as WardleyDrawingHitProvider } from './WardleyDrawingHitProvider.js';
+export { default as EventStormingDrawTool } from './EventStormingDrawTool.js';
+export { default as EventStormingDrawingHandles } from './EventStormingDrawingHandles.js';
+export { default as EventStormingDrawingHitProvider } from './EventStormingDrawingHitProvider.js';

@@ -77,8 +77,9 @@ export default tseslint.config(
     },
   },
   {
-    // Grandfathered tech-debt: the hand-written OWM parser/serializer predate the caps and exceed
-    // them. Ceilings pin them at today's size so they cannot grow; splitting them is tracked debt.
+    // Grandfathered tech-debt: the hand-written Event Storming DSL parser/serializer predate the
+    // caps and exceed them. Ceilings pin them at today's size so they cannot grow; splitting them
+    // is tracked debt.
     files: ['packages/dsl/src/parser.ts', 'packages/dsl/src/serializer.ts'],
     rules: {
       complexity: ['error', 130],

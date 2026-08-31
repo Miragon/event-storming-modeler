@@ -1,38 +1,42 @@
-# @miragon/wardley-renderer
+# @miragon/event-storming-renderer
 
-[![npm](https://img.shields.io/npm/v/@miragon/wardley-renderer)](https://www.npmjs.com/package/@miragon/wardley-renderer)
-[![License: MIT](https://img.shields.io/github/license/Miragon/wardley-maps-modeler)](https://github.com/Miragon/wardley-maps-modeler/blob/main/LICENSE)
+[![npm](https://img.shields.io/npm/v/@miragon/event-storming-renderer)](https://www.npmjs.com/package/@miragon/event-storming-renderer)
+[![License: MIT](https://img.shields.io/github/license/Miragon/event-storming-modeler)](https://github.com/Miragon/event-storming-modeler/blob/main/LICENSE)
 
 [diagram-js](https://github.com/bpmn-io/diagram-js)-based renderer for
-[Wardley Maps](https://learnwardleymapping.com/): `Viewer`, `NavigatedViewer`, and a full editable
-`Modeler`, plus OWM / JSON / SVG / PNG import and export. Browser/DOM only.
+[Event Storming](https://www.eventstorming.com/) boards: `Viewer`, `NavigatedViewer`, and a full
+editable `Modeler`, plus `.storm` DSL / JSON / SVG import and export. Browser/DOM only.
 
 ## Install
 
 ```bash
-npm install @miragon/wardley-renderer
+npm install @miragon/event-storming-renderer
 ```
 
 ## Usage
 
 ```ts
-import { NavigatedViewer } from '@miragon/wardley-renderer';
-import '@miragon/wardley-renderer/assets/wardley.css';
+import { NavigatedViewer } from '@miragon/event-storming-renderer';
+import '@miragon/event-storming-renderer/assets/event-storming.css';
 
 const viewer = new NavigatedViewer({ container: document.querySelector('#canvas')! });
 
-await viewer.importDSL(`title Tea Shop
-anchor Business [0.95, 0.63]
-component Kettle [0.43, 0.35]
-evolve Kettle 0.62
-Business -> Kettle`);
+await viewer.importDSL(`title Order Checkout
+actor Customer [80, 300]
+command Place Order [240, 300]
+event Order Placed [620, 300]
+Customer -> Place Order
+Place Order -> Order Placed`);
 
-const map = viewer.exportMap(); // canonical JSON model
-const dsl = viewer.exportDSL(); // back to OWM text
+const board = viewer.exportMap(); // canonical JSON model
+const dsl = viewer.exportDSL(); // back to .storm text
 const { svg } = await viewer.saveSVG();
 ```
 
-Swap `NavigatedViewer` for `Modeler` to get the editable map (palette, context pad, undo/redo).
+Swap `NavigatedViewer` for `Modeler` to get the editable board (sticky palette, context pad,
+arrows, undo/redo). Stickies are colored per kind (`STICKY_STYLES`): domain event, command,
+actor, aggregate, policy, read model, external system, hotspot — plus free-text notes and
+freeform drawings on an unbounded canvas.
 
 ### Fonts
 
@@ -44,7 +48,7 @@ identity); provide it yourself — recommended self-hosted via [`@fontsource`](h
 import '@fontsource-variable/geist/wght.css';
 ```
 
-Part of the [Wardley Maps](https://github.com/Miragon/wardley-maps-modeler) monorepo.
+Part of the [Event Storming Modeler](https://github.com/Miragon/event-storming-modeler) monorepo.
 
 ## License
 

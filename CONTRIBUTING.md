@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping improve the Wardley Maps Modeler. This is an npm-workspaces monorepo
+Thanks for helping improve the Event Storming Modeler. This is an npm-workspaces monorepo
 (Node ≥ 22.13, npm, TypeScript ESM). Agent-oriented notes live in [`CLAUDE.md`](CLAUDE.md).
 
 ## Setup & inner loop
@@ -21,14 +21,14 @@ Useful extras: `npm run dev:webapp`, `npm run dev:vscode`, `npm run depcruise` (
 [Portless](https://portless.sh) at a stable, named `.localhost` URL instead of a Vite port
 (needs **Node ≥ 24**). Portless is a pinned **devDependency**, so `npm install` is all you need — no
 global install. Config lives in [`apps/webapp/portless.json`](apps/webapp/portless.json)
-(`{ "name": "wardley", "script": "dev:app" }`): `npm run dev:webapp` runs bare `portless`, which
-starts the real Vite server (the `dev:app` script) behind the proxy.
+(`{ "name": "event-storming", "script": "dev:app" }`): `npm run dev:webapp` runs bare `portless`,
+which starts the real Vite server (the `dev:app` script) behind the proxy.
 
 The URL is **per worktree** and Portless-derived — never hand-built: in a linked git worktree it
-prepends the branch as a subdomain, so you get `https://<branch>.wardley.localhost` in a Conductor
-workspace and `https://wardley.localhost` in the main checkout. Each worktree gets its own URL, so
-parallel apps never collide. On start Portless **opens your browser** there and prints it as a
-`➜ Portless:` line under Vite's output.
+prepends the branch as a subdomain, so you get `https://<branch>.event-storming.localhost` in a
+Conductor workspace and `https://event-storming.localhost` in the main checkout. Each worktree gets
+its own URL, so parallel apps never collide. On start Portless **opens your browser** there and
+prints it as a `➜ Portless:` line under Vite's output.
 
 Portless needs an HTTPS proxy daemon on port 443, installed once per machine (it binds 443 and
 trusts a local CA, so it needs **sudo** — which is also why Conductor's non-TTY Run button can't do
@@ -64,32 +64,32 @@ the hook — avoid it.
 `chore`, `docs`.
 
 ```
-feat(renderer): add inertia decorator
-fix(dsl): keep url keyword on round-trip
+feat(renderer): add hotspot sticky
+fix(dsl): keep comment lines on round-trip
 docs: add contributing guide
 ```
 
 ## Monorepo map & the DOM boundary (P1)
 
-| Package                         | Purpose                                               | DOM      |
-| ------------------------------- | ----------------------------------------------------- | -------- |
-| `@miragon/wardley-schema-model` | Metamodel, Zod validation, JSON serialization         | DOM-free |
-| `@miragon/wardley-dsl`          | OWM text DSL ↔ model (lossless round-trip)            | DOM-free |
-| `@miragon/wardley-transforms`   | Pure `WardleyMap → WardleyMap` transforms             | DOM-free |
-| `@miragon/wardley-renderer`     | diagram-js bootstrap, renderer, viewer, import/export | DOM      |
-| `apps/webapp`                   | Vite demo editor                                      | DOM      |
-| `apps/vscode`                   | VS Code custom editor for `.wmap`/`.owm`              | DOM      |
+| Package                                | Purpose                                                   | DOM      |
+| -------------------------------------- | --------------------------------------------------------- | -------- |
+| `@miragon/event-storming-schema-model` | Board metamodel, Zod validation, JSON serialization       | DOM-free |
+| `@miragon/event-storming-dsl`          | `.storm` text DSL ↔ model (lossless round-trip)           | DOM-free |
+| `@miragon/event-storming-transforms`   | Pure `EventStormingBoard → EventStormingBoard` transforms | DOM-free |
+| `@miragon/event-storming-renderer`     | diagram-js bootstrap, renderer, viewer, import/export     | DOM      |
+| `apps/webapp`                          | Vite demo editor                                          | DOM      |
+| `apps/vscode`                          | VS Code custom editor for `.storm`                        | DOM      |
 
 **P1 — the DOM boundary:** the DOM-free packages (`schema-model`, `dsl`, `transforms`) must **never**
 import `diagram-js`/DOM libraries (`tiny-svg`, `min-dom`) or use the DOM (`window`/`document`). This
 is enforced twice — by ESLint (`no-restricted-imports`/`no-restricted-globals`) **and** by
 dependency-cruiser — so a violating import fails `npm run lint` and `npm run depcruise`.
 
-Also keep the OWM-DSL round-trip lossless and JSON serialization deterministic.
+Also keep the `.storm` DSL round-trip lossless and JSON serialization deterministic.
 
 ## Pull requests
 
 - Keep PRs small and focused.
 - Make sure local gates are green: `npm run lint`, `npm test`, `npm run depcruise`, `npm run build`.
-- Working on map/domain semantics? See the Wardley-mapping skill in
-  [`.claude/skills/wardley-mapping/`](.claude/skills/wardley-mapping/).
+- Working on board/domain semantics? See the Event-Storming skill in
+  [`.claude/skills/event-storming/`](.claude/skills/event-storming/).

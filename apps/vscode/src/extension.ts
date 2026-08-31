@@ -1,36 +1,41 @@
 import * as vscode from 'vscode';
-import { WardleyEditorProvider } from './WardleyEditorProvider.js';
+import { EventStormingEditorProvider } from './EventStormingEditorProvider.js';
 
-const EMPTY_MAP = 'title New map\n';
+const EMPTY_BOARD = 'title New board\n';
 
-/** Tea shop example (identical to the demo webapp), as a starting point. */
-const EXAMPLE_MAP = `title Tea Shop
-anchor Business [0.95, 0.63]
-anchor Public [0.95, 0.78]
-component Cup of Tea [0.79, 0.61]
-component Cup [0.73, 0.78]
-component Tea [0.63, 0.81]
-component Hot Water [0.52, 0.80]
-component Water [0.38, 0.82]
-component Kettle [0.43, 0.35]
-evolve Kettle 0.62
-component Power [0.10, 0.71] (outsource)
-pipeline Kettle [0.30, 0.65]
-Business -> Cup of Tea
-Public -> Cup of Tea
-Cup of Tea -> Cup
-Cup of Tea -> Tea
-Cup of Tea -> Hot Water
-Hot Water -> Water
-Hot Water -> Kettle
-Kettle -> Power
+/** Order-checkout example (identical to the demo webapp), as a starting point. */
+const EXAMPLE_BOARD = `title Order Checkout
+
+actor Customer [80, 300]
+command Place Order [240, 300]
+aggregate Order [420, 290]
+event Order Placed [620, 300]
+policy When order placed, ship it [800, 300]
+command Ship Order [980, 300]
+event Order Shipped [1160, 300]
+readmodel Order Status [620, 120]
+external Payment Provider [420, 520]
+hotspot Double payment on retry? [620, 520]
+note Big-picture session: checkout flow [80, 80]
+
+Customer -> Place Order
+Place Order -> Order
+Place Order -> Payment Provider
+Order -> Order Placed
+Order Placed -> Order Status
+Order Placed -> When order placed, ship it
+When order placed, ship it -> Ship Order
+Ship Order -> Order
+Order -> Order Shipped
 `;
 
 export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
-    WardleyEditorProvider.register(context),
-    vscode.commands.registerCommand('wardley.newMap', () => createMap(EMPTY_MAP)),
-    vscode.commands.registerCommand('wardley.newMapFromExample', () => createMap(EXAMPLE_MAP)),
+    EventStormingEditorProvider.register(context),
+    vscode.commands.registerCommand('eventStorming.newBoard', () => createBoard(EMPTY_BOARD)),
+    vscode.commands.registerCommand('eventStorming.newBoardFromExample', () =>
+      createBoard(EXAMPLE_BOARD),
+    ),
   );
 }
 
@@ -39,23 +44,27 @@ export function deactivate(): void {
 }
 
 /** A real file URI rather than an untitled doc is most robust for CustomTextEditor. */
-async function createMap(initial: string): Promise<void> {
+async function createBoard(initial: string): Promise<void> {
   const options: vscode.SaveDialogOptions = {
-    title: 'New Wardley Map',
-    saveLabel: 'Create map',
-    filters: { 'Wardley Map': ['wmap', 'owm'] },
+    title: 'New Event Storming Board',
+    saveLabel: 'Create board',
+    filters: { 'Event Storming Board': ['storm'] },
   };
-  const defaultUri = defaultMapUri();
+  const defaultUri = defaultBoardUri();
   if (defaultUri) options.defaultUri = defaultUri;
 
   const target = await vscode.window.showSaveDialog(options);
   if (!target) return;
 
   await vscode.workspace.fs.writeFile(target, new TextEncoder().encode(initial));
-  await vscode.commands.executeCommand('vscode.openWith', target, WardleyEditorProvider.viewType);
+  await vscode.commands.executeCommand(
+    'vscode.openWith',
+    target,
+    EventStormingEditorProvider.viewType,
+  );
 }
 
-function defaultMapUri(): vscode.Uri | undefined {
+function defaultBoardUri(): vscode.Uri | undefined {
   const folder = vscode.workspace.workspaceFolders?.[0];
-  return folder ? vscode.Uri.joinPath(folder.uri, 'wardley-map.wmap') : undefined;
+  return folder ? vscode.Uri.joinPath(folder.uri, 'untitled.storm') : undefined;
 }

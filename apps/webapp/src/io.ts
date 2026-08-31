@@ -1,9 +1,9 @@
 /**
- * File IO for the webapp: open Wardley maps (.wmap / .owm / .json) and export them as pictures
- * (SVG / PNG). Sharing an editable map is done via the URL (see share.ts), not via the image.
+ * File IO for the webapp: open Event Storming boards (.storm / .json) and export them as pictures
+ * (SVG / PNG). Sharing an editable board is done via the URL (see share.ts), not via the image.
  */
-import { loadMap } from '@miragon/wardley-schema-model';
-import { COLORS, type ImportWarning, type Modeler } from '@miragon/wardley-renderer';
+import { loadBoard } from '@miragon/event-storming-schema-model';
+import { COLORS, type ImportWarning, type Modeler } from '@miragon/event-storming-renderer';
 
 // ---------------------------------------------------------------------------
 // Open
@@ -13,12 +13,12 @@ import { COLORS, type ImportWarning, type Modeler } from '@miragon/wardley-rende
 export async function openFile(file: File, viewer: Modeler): Promise<ImportWarning[]> {
   const name = file.name.toLowerCase();
   if (name.endsWith('.png') || name.endsWith('.svg')) {
-    throw new Error('Images cannot be opened as maps — open a .wmap, .owm or .json file.');
+    throw new Error('Images cannot be opened as boards — open a .storm or .json file.');
   }
   if (name.endsWith('.json')) {
-    return (await viewer.importMap(loadMap(JSON.parse(await file.text())))).warnings;
+    return (await viewer.importMap(loadBoard(JSON.parse(await file.text())))).warnings;
   }
-  // .wmap / .owm / .txt / unknown -> treat as OWM-DSL
+  // .storm / .txt / unknown -> treat as Event Storming DSL
   return (await viewer.importDSL(await file.text())).warnings;
 }
 

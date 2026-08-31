@@ -1,6 +1,12 @@
 {
-  "comments": {},
+  "comments": { "lineComment": "//" },
   "brackets": [["[", "]"]],
-  "autoClosingPairs": [{ "open": "[", "close": "]" }],
-  "surroundingPairs": [["[", "]"]]
+  "autoClosingPairs": [
+    { "open": "[", "close": "]" },
+    { "open": "\"", "close": "\"" }
+  ],
+  "surroundingPairs": [
+    ["[", "]"],
+    ["\"", "\""]
+  ]
 }

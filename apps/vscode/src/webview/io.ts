@@ -3,7 +3,7 @@
  * host shows the save dialog and writes the bytes.
  */
 
-import { COLORS } from '@miragon/wardley-renderer';
+import { COLORS } from '@miragon/event-storming-renderer';
 
 /** Rasterizes the SVG to a PNG picture. */
 export async function svgToPng(svg: string, scale = 2): Promise<Blob> {

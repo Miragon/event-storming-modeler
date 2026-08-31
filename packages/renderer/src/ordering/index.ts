@@ -1,10 +1,10 @@
 import type { ModuleDeclaration } from 'didi';
-import WardleyOrderingProvider from './WardleyOrderingProvider.js';
+import EventStormingOrderingProvider from './EventStormingOrderingProvider.js';
 
-/** Z-order for interactive edits: frames -> connections -> nodes (like the import). */
-export const wardleyOrderingModule: ModuleDeclaration = {
-  __init__: ['wardleyOrderingProvider'],
-  wardleyOrderingProvider: ['type', WardleyOrderingProvider],
+/** Z-order for interactive edits: drawings -> connections -> stickies (like the import). */
+export const eventStormingOrderingModule: ModuleDeclaration = {
+  __init__: ['eventStormingOrderingProvider'],
+  eventStormingOrderingProvider: ['type', EventStormingOrderingProvider],
 };
 
-export { default as WardleyOrderingProvider } from './WardleyOrderingProvider.js';
+export { default as EventStormingOrderingProvider } from './EventStormingOrderingProvider.js';

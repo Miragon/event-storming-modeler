@@ -1,10 +1,10 @@
 import type { ModuleDeclaration } from 'didi';
-import WardleyPaletteProvider from './WardleyPaletteProvider.js';
+import EventStormingPaletteProvider from './EventStormingPaletteProvider.js';
 
 /** Tool palette (drag-to-create). */
-export const wardleyPaletteModule: ModuleDeclaration = {
-  __init__: ['wardleyPaletteProvider'],
-  wardleyPaletteProvider: ['type', WardleyPaletteProvider],
+export const eventStormingPaletteModule: ModuleDeclaration = {
+  __init__: ['eventStormingPaletteProvider'],
+  eventStormingPaletteProvider: ['type', EventStormingPaletteProvider],
 };
 
-export { default as WardleyPaletteProvider } from './WardleyPaletteProvider.js';
+export { default as EventStormingPaletteProvider } from './EventStormingPaletteProvider.js';

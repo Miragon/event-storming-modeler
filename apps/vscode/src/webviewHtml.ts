@@ -2,9 +2,9 @@ import * as vscode from 'vscode';
 import { getNonce } from './util.js';
 
 /**
- * HTML scaffold of the Wardley webview (identical for the text and PNG editor — both load the same
- * bundle `dist/webview.js` and speak the same protocol). Strict CSP: scripts only via nonce, no
- * external sources (GDPR-compliant, fonts inlined as data: URLs in the CSS).
+ * HTML scaffold of the Event Storming webview (loads the bundle `dist/webview.js`). Strict CSP:
+ * scripts only via nonce, no external sources (GDPR-compliant, fonts inlined as data: URLs in the
+ * CSS).
  */
 export function getWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
   const nonce = getNonce();
@@ -28,11 +28,11 @@ export function getWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri
     <meta http-equiv="Content-Security-Policy" content="${csp}" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link href="${styleUri}" rel="stylesheet" />
-    <title>Wardley Map</title>
+    <title>Event Storming Board</title>
   </head>
   <body>
     <div id="app">
-      <div id="canvas" class="wardley-canvas"></div>
+      <div id="canvas" class="event-storming-canvas"></div>
       <div id="toolbar" class="toolbar"></div>
     </div>
     <script nonce="${nonce}" src="${scriptUri}"></script>

@@ -1,12 +1,12 @@
 import type { ModuleDeclaration } from 'didi';
 import LassoToolModule from 'diagram-js/lib/features/lasso-tool';
-import WardleyLassoBehavior from './WardleyLassoBehavior.js';
+import EventStormingLassoBehavior from './EventStormingLassoBehavior.js';
 
 /** Lasso multi-select: diagram-js lasso-tool plus Shift+drag activation on an empty canvas. */
-export const wardleyLassoModule: ModuleDeclaration = {
+export const eventStormingLassoModule: ModuleDeclaration = {
   __depends__: [LassoToolModule],
-  __init__: ['wardleyLassoBehavior'],
-  wardleyLassoBehavior: ['type', WardleyLassoBehavior],
+  __init__: ['eventStormingLassoBehavior'],
+  eventStormingLassoBehavior: ['type', EventStormingLassoBehavior],
 };
 
-export { default as WardleyLassoBehavior } from './WardleyLassoBehavior.js';
+export { default as EventStormingLassoBehavior } from './EventStormingLassoBehavior.js';

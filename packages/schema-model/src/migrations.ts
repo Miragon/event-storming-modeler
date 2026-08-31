@@ -1,5 +1,5 @@
 /**
- * Schema migrations as an ordered chain of pure functions (concept doc §7.2).
+ * Schema migrations as an ordered chain of pure functions.
  * `migrate(json)` reads `schemaVersion`, applies all necessary steps and returns the
  * object raised to the current version (not yet validated).
  */
@@ -15,7 +15,7 @@ const MIGRATIONS: ReadonlyArray<(json: Json) => Json> = [
 
 export function migrate(input: unknown): Json {
   if (typeof input !== 'object' || input === null) {
-    throw new Error('WardleyMap must be an object.');
+    throw new Error('EventStormingBoard must be an object.');
   }
   const obj = { ...(input as Json) };
   const rawVersion = obj['schemaVersion'];

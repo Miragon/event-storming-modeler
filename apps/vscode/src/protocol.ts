@@ -2,7 +2,7 @@
  * Message protocol between the extension host and the webview.
  *
  * Data flow (classic CustomTextEditor pattern):
- *  - Host -> webview: `init`/`update` with the current document text (OWM-DSL).
+ *  - Host -> webview: `init`/`update` with the current document text (Event Storming DSL).
  *  - Webview -> host: `edit` after every graphical change (serialized DSL) -> WorkspaceEdit.
  *  - Webview -> host: `export` (SVG text or Base64 PNG) -> save dialog + write file.
  *

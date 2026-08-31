@@ -17,6 +17,6 @@ __screenshots__/
 .claude/settings.local.json
 .claude/logs/
 # Locally installed third-party skills (e.g. from plugins) must not get committed —
-# only the project's own wardley-mapping skill is tracked.
+# only the project's own event-storming skill is tracked.
 .claude/skills/*
-!.claude/skills/wardley-mapping/
+!.claude/skills/event-storming/

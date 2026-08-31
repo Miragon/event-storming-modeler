@@ -21,17 +21,20 @@ export default defineConfig({
   resolve: {
     alias: [
       {
-        find: '@miragon/wardley-renderer/assets/wardley.css',
-        replacement: r('../../packages/renderer/src/assets/wardley.css'),
+        find: '@miragon/event-storming-renderer/assets/event-storming.css',
+        replacement: r('../../packages/renderer/src/assets/event-storming.css'),
       },
-      { find: '@miragon/wardley-renderer', replacement: r('../../packages/renderer/src/index.ts') },
       {
-        find: '@miragon/wardley-schema-model',
+        find: '@miragon/event-storming-renderer',
+        replacement: r('../../packages/renderer/src/index.ts'),
+      },
+      {
+        find: '@miragon/event-storming-schema-model',
         replacement: r('../../packages/schema-model/src/index.ts'),
       },
-      { find: '@miragon/wardley-dsl', replacement: r('../../packages/dsl/src/index.ts') },
+      { find: '@miragon/event-storming-dsl', replacement: r('../../packages/dsl/src/index.ts') },
       {
-        find: '@miragon/wardley-transforms',
+        find: '@miragon/event-storming-transforms',
         replacement: r('../../packages/transforms/src/index.ts'),
       },
     ],

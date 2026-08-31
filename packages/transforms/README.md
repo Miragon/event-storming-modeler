@@ -1,30 +1,35 @@
-# @miragon/wardley-transforms
+# @miragon/event-storming-transforms
 
-[![npm](https://img.shields.io/npm/v/@miragon/wardley-transforms)](https://www.npmjs.com/package/@miragon/wardley-transforms)
-[![License: MIT](https://img.shields.io/github/license/Miragon/wardley-maps-modeler)](https://github.com/Miragon/wardley-maps-modeler/blob/main/LICENSE)
+[![npm](https://img.shields.io/npm/v/@miragon/event-storming-transforms)](https://www.npmjs.com/package/@miragon/event-storming-transforms)
+[![License: MIT](https://img.shields.io/github/license/Miragon/event-storming-modeler)](https://github.com/Miragon/event-storming-modeler/blob/main/LICENSE)
 
-DOM-free, pure `WardleyMap → WardleyMap` transforms — evolve, method, inertia, pipeline. No undo
-stack: every transform returns a new map and leaves the input untouched.
+DOM-free, pure `EventStormingBoard → EventStormingBoard` transforms — move, kind, color, arrange.
+No undo stack: every transform returns a new board and leaves the input untouched.
 
 ## Install
 
 ```bash
-npm install @miragon/wardley-transforms
+npm install @miragon/event-storming-transforms
 ```
 
 ## Usage
 
 ```ts
-import { parseDSL } from '@miragon/wardley-dsl';
-import { evolveComponent } from '@miragon/wardley-transforms';
+import { parseDSL } from '@miragon/event-storming-dsl';
+import { moveElement, setStickyKind } from '@miragon/event-storming-transforms';
 
-const map = parseDSL('component Kettle [0.43, 0.35]');
-const [kettle] = map.elements;
+const board = parseDSL('event Order Placed [620, 300]');
+const [orderPlaced] = board.elements;
 
-const evolved = evolveComponent(map, kettle.id, 0.62); // returns a new map
+const moved = moveElement(board, orderPlaced.id, { x: 800, y: 300 }); // returns a new board
+const retyped = setStickyKind(moved, orderPlaced.id, 'policy');
 ```
 
-Part of the [Wardley Maps](https://github.com/Miragon/wardley-maps-modeler) monorepo.
+Also included: `moveBy` (delta translation), `setColor`/`clearColor` (sticky color override),
+`alignToRows` (snap stickies into per-kind swimlanes) and `spreadTimeline` (spread stickies
+evenly along the timeline).
+
+Part of the [Event Storming Modeler](https://github.com/Miragon/event-storming-modeler) monorepo.
 
 ## License
 

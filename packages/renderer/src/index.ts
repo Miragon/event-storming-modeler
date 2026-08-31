@@ -1,50 +1,53 @@
-import './assets/wardley.css';
+import './assets/event-storming.css';
 
 export { Viewer } from './Viewer.js';
 export { NavigatedViewer } from './NavigatedViewer.js';
 export { Modeler } from './Modeler.js';
-export { WardleyBaseViewer } from './WardleyBaseViewer.js';
-export type { WardleyViewerOptions, EventCallback } from './WardleyBaseViewer.js';
+export { EventStormingBaseViewer } from './EventStormingBaseViewer.js';
+export type { EventStormingViewerOptions, EventCallback } from './EventStormingBaseViewer.js';
 
-export { wardleyModelModule, WardleyElementFactory } from './model/index.js';
-export {
-  evolutionGridModule,
-  evolutionConstraintModule,
-  EvolutionGrid,
-} from './evolution-grid/index.js';
-export { wardleyDrawModule, WardleyRenderer } from './draw/index.js';
-export { COLORS, PLOT } from './draw/styles.js';
+export { eventStormingModelModule, EventStormingElementFactory } from './model/index.js';
+export { boardBoundsModule, BoardBounds } from './board-bounds/index.js';
+export { eventStormingDrawModule, EventStormingRenderer } from './draw/index.js';
+export { COLORS, STICKY_STYLES, NOTE_STYLE } from './draw/styles.js';
 
 /* Miragon brand tokens (single source of truth for colour) — for consumers theming their own chrome. */
 export { MIRAGON } from './theme/index.js';
-export { ioModule, WardleyImporter, WardleyExporter, saveSVG, ROOT_ID } from './io/index.js';
-export { wardleyModelingModule, WardleyModeling } from './modeling/index.js';
-export type { EvolveOptions } from './modeling/index.js';
-export { wardleyRulesModule, WardleyRules } from './rules/index.js';
-export { stageSnappingModule } from './snapping/index.js';
-export { PanConstraintModule, PanConstraint } from './pan-constraint/index.js';
-export { wardleyPaletteModule } from './palette/index.js';
-export { wardleyContextPadModule } from './context-pad/index.js';
-export { labelEditingModule, WardleyLabelEditing } from './label-editing/index.js';
-export { wardleyKeyboardModule } from './keyboard/index.js';
-export { wardleyEvolveModule, WardleyEvolveDragging } from './evolve/index.js';
 export {
-  wardleyPopupModule,
-  WardleyElementSettingsProvider,
+  ioModule,
+  EventStormingImporter,
+  EventStormingExporter,
+  saveSVG,
+  ROOT_ID,
+} from './io/index.js';
+export { eventStormingModelingModule, EventStormingModeling } from './modeling/index.js';
+export { eventStormingRulesModule, EventStormingRules } from './rules/index.js';
+export { elementSnappingModule } from './snapping/index.js';
+export { eventStormingPaletteModule } from './palette/index.js';
+export { eventStormingContextPadModule } from './context-pad/index.js';
+export { labelEditingModule, EventStormingLabelEditing } from './label-editing/index.js';
+export { eventStormingKeyboardModule } from './keyboard/index.js';
+export {
+  eventStormingPopupModule,
+  EventStormingElementSettingsProvider,
   POPUP_PROVIDER_ID,
 } from './popup/index.js';
-export { wardleyAppendModule, WardleyAppendBehavior } from './append/index.js';
-export { wardleyColorPickerModule, WardleyColorPicker } from './color-picker/index.js';
+export { eventStormingAppendModule, EventStormingAppendBehavior } from './append/index.js';
+export { eventStormingColorPickerModule, EventStormingColorPicker } from './color-picker/index.js';
 
-// Note color palette (canonical source for consumers / the Wardley-mapping skill).
-export { NOTE_COLORS } from './draw/styles.js';
-
-export { isWardleyShape, isWardleyConnection, isComponent, isPipeline } from './model/di-types.js';
+export {
+  isEventStormingShape,
+  isEventStormingConnection,
+  isSticky,
+  isStickyKind,
+  STICKY_KINDS,
+} from './model/di-types.js';
 export type {
-  WardleyShape,
-  WardleyConnection,
-  WardleyShapeType,
-  WardleyConnectionType,
+  EventStormingShape,
+  EventStormingConnection,
+  EventStormingShapeType,
+  EventStormingConnectionType,
+  StickyKind,
 } from './model/di-types.js';
 export type { ImportWarning, RootBusinessObject } from './io/index.js';
 
@@ -56,7 +59,6 @@ export {
   ICON_DATA_OBJECT,
   ICON_CODE,
   ICON_DOWNLOAD,
-  ICON_ASPECT_RATIO,
   ICON_EDIT,
   ICON_PERSON,
   ICON_SHARE,
@@ -65,6 +67,7 @@ export {
   ICON_IMAGE,
   ICON_NEW,
   ICON_MENU,
-  ICON_VISIBILITY,
+  ICON_EYE,
+  ICON_FIT,
   ICON_ADD,
 } from './draw/icons.js';

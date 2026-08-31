@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-TypeScript library for viewing and editing [Wardley Maps](https://learnwardleymapping.com/),
+TypeScript library for viewing and editing [Event Storming](https://www.eventstorming.com/) boards,
 built on [diagram-js](https://github.com/bpmn-io/diagram-js) (MIT). Shared core for two targets:
 a web app and a VS Code extension.
 
@@ -8,20 +8,20 @@ a web app and a VS Code extension.
 
 Workspaces are declared in the root `package.json` (`workspaces` array, listed in topological
 build order). **All** versions are pinned to exact values inline in each package's `package.json`
-(`.npmrc` sets `save-exact=true`) — including internal `@miragon/wardley-*` deps, which pin to the
-**current shared version** (e.g. `0.2.1`; npm links them to the local workspace because the local
-version satisfies the pin). Exact pinning is enforced in CI by
+(`.npmrc` sets `save-exact=true`) — including internal `@miragon/event-storming-*` deps, which pin
+to the referenced package's **current version** (npm links them to the local workspace because the
+local version satisfies the pin). Exact pinning is enforced in CI by
 [`miragon/pin-npm-dependencies`](https://github.com/Miragon/pin-npm-dependencies) (the `pin-check`
 job).
 
-| Package                         | Purpose                                                         | DOM |
-| ------------------------------- | --------------------------------------------------------------- | --- |
-| `@miragon/wardley-schema-model` | Metamodel, Zod validation, stage derivation, JSON serialization | no  |
-| `@miragon/wardley-dsl`          | OWM text DSL ↔ model (lossless round-trip)                      | no  |
-| `@miragon/wardley-transforms`   | Pure `WardleyMap → WardleyMap` transforms (evolve, inertia, …)  | no  |
-| `@miragon/wardley-renderer`     | diagram-js bootstrap, renderer, viewer, import/export, CSS      | yes |
-| `apps/webapp`                   | Vite demo editor                                                | yes |
-| `apps/vscode`                   | VS Code extension: custom editor for `.wmap`/`.owm`             | yes |
+| Package                                | Purpose                                                             | DOM |
+| -------------------------------------- | ------------------------------------------------------------------- | --- |
+| `@miragon/event-storming-schema-model` | Board metamodel, Zod validation, timeline sort, JSON serialization  | no  |
+| `@miragon/event-storming-dsl`          | `.storm` text DSL ↔ model (lossless round-trip)                     | no  |
+| `@miragon/event-storming-transforms`   | Pure `EventStormingBoard → EventStormingBoard` transforms (move, …) | no  |
+| `@miragon/event-storming-renderer`     | diagram-js bootstrap, renderer, viewer, import/export, CSS          | yes |
+| `apps/webapp`                          | Vite demo editor                                                    | yes |
+| `apps/vscode`                          | VS Code extension: custom editor for `.storm`                       | yes |
 
 **P1 — DOM boundary:** the DOM-free packages (`schema-model`, `dsl`, `transforms`) must **never**
 import `diagram-js`/DOM libraries (`tiny-svg`, `min-dom`) or use the DOM (`window`/`document`).
@@ -32,10 +32,10 @@ Enforced twice — ESLint (`no-restricted-imports`/`no-restricted-globals`) **an
 
 - `npm run build` — all packages · `npm run build:webapp` · `npm run build:vscode`
 - `npm run dev:webapp` (alias: `npm run dev`) serves the webapp via [Portless](https://portless.sh)
-  at a per-worktree `https://<branch>.wardley.localhost` URL (Portless-derived from the git worktree;
-  config in [`apps/webapp/portless.json`](apps/webapp/portless.json); one-time `npx portless service
-install` — see [`CONTRIBUTING.md`](CONTRIBUTING.md)). `npm run dev:webapp:plain` for plain Vite on
-  `:5180`. · `npm run dev:vscode`
+  at a per-worktree `https://<branch>.event-storming.localhost` URL (Portless-derived from the git
+  worktree; config in [`apps/webapp/portless.json`](apps/webapp/portless.json); one-time `npx
+portless service install` — see [`CONTRIBUTING.md`](CONTRIBUTING.md)). `npm run dev:webapp:plain`
+  for plain Vite on `:5180`. · `npm run dev:vscode`
 - `npm test` — Vitest · `npm run typecheck` · `npm run lint` (ESLint + typecheck)
 - `npm run format` — Prettier · `npm run depcruise` — check the module graph
 
@@ -46,34 +46,34 @@ Requirements: Node ≥ 22.13, npm. Build packages before running tests (workspac
 ## Git
 
 Everything is managed via **Conventional Commits** — primarily `feat`, `fix`, `refactor`, `chore`,
-`docs`. Example: `feat(renderer): add inertia decorator`.
+`docs`. Example: `feat(renderer): add hotspot sticky`.
 
 ## Releases
 
-One shared version for the whole monorepo, one tag (`vX.Y.Z`), one GitHub release, one root
-[`CHANGELOG.md`](CHANGELOG.md) — driven by [release-please](https://github.com/googleapis/release-please)
-on push to `main` ([`.github/workflows/release-please.yml`](.github/workflows/release-please.yml)).
-The config ([`release-please-config.json`](release-please-config.json)) uses a **single root
-component** (`"."`, `include-component-in-tag: false`); its `extra-files` list bumps `$.version` in
-every sub-package's `package.json` **and** every internal `@miragon/wardley-*` dependency reference,
-keeping all versions in lockstep. Merging the release PR tags the repo and publishes the four
-`packages/*` libraries to npm and the VS Code extension to the Marketplace.
-
-**Adding a new internal dependency edge** (`@miragon/wardley-*` referenced by another package)
-requires a new `extra-files` entry for that `$.dependencies['@miragon/wardley-…']` path, or the
-reference will not be bumped on release and will go stale. Likewise add `$.version` (and any internal
-dep) entries when adding a whole new package.
+Releases are driven by [release-please](https://github.com/googleapis/release-please) on push to
+`main` ([`.github/workflows/release-please.yml`](.github/workflows/release-please.yml)). The config
+([`release-please-config.json`](release-please-config.json)) declares a **component per package**
+(`schema-model`, `dsl`, `transforms`, `renderer`, `vscode`, `webapp`) with
+`include-component-in-tag: true`, so each released package gets its own version, tag (e.g.
+`renderer-v0.1.1`) and changelog; versions are tracked in
+[`.release-please-manifest.json`](.release-please-manifest.json). The **`node-workspace` plugin**
+automatically bumps every internal `@miragon/event-storming-*` dependency pin (including peer
+dependencies) when a workspace dependency is released — no manual config entries per dependency
+edge are needed. Merging the release PR tags the repo and publishes the released `packages/*`
+libraries to npm (with provenance) and the VS Code extension
+(`miragon-gmbh.event-storming-modeler`) to the VS Code Marketplace and Open VSX.
 
 ## Conventions
 
 - Keep core packages (`schema-model`, `dsl`, `transforms`) strictly DOM-free (P1, above).
-- The OWM-DSL round-trip must stay lossless; JSON serialization must be deterministic.
+- The `.storm` DSL round-trip must stay lossless (unknown lines survive via `rawPassthrough`);
+  board JSON serialization must be deterministic. Board transforms are pure functions.
 - Pin **all** dependencies to exact versions — no version ranges (`^`/`~`/`>=`/`*`), internal
-  workspace deps included (pinned to the current shared version, kept in sync by release-please).
+  workspace deps included (kept in sync by release-please's `node-workspace` plugin).
   CI-enforced via `miragon/pin-npm-dependencies`. See
   [`.claude/rules/package-json-fixed-versions.md`](.claude/rules/package-json-fixed-versions.md).
-- For Wardley-map domain work, use the skill in
-  [`.claude/skills/wardley-mapping/`](.claude/skills/wardley-mapping/).
+- For Event-Storming domain work, use the skill in
+  [`.claude/skills/event-storming/`](.claude/skills/event-storming/).
 - Contributor onboarding in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Design system (mandatory)
@@ -92,8 +92,8 @@ re-copy from the skill to update. Reference implementation in this repo: tokens
 [`packages/renderer/src/theme/palette.ts`](packages/renderer/src/theme/palette.ts) · drift test
 [`packages/renderer/test/theme.sync.test.ts`](packages/renderer/test/theme.sync.test.ts) · canvas
 colours [`packages/renderer/src/draw/styles.ts`](packages/renderer/src/draw/styles.ts) · in-canvas
-chrome [`packages/renderer/src/assets/wardley.css`](packages/renderer/src/assets/wardley.css) · app
-chrome + toast `apps/webapp/src/{style.css,toast.ts,main.ts}` · VS Code webview
+chrome [`packages/renderer/src/assets/event-storming.css`](packages/renderer/src/assets/event-storming.css)
+· app chrome + toast `apps/webapp/src/{style.css,toast.ts,main.ts}` · VS Code webview
 [`apps/vscode/src/webview/style.css`](apps/vscode/src/webview/style.css).
 
 ## Code Style

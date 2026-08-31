@@ -8,5 +8,5 @@ export default defineConfig({
   sourcemap: true,
   treeshake: true,
   target: 'es2022',
-  external: ['@miragon/wardley-schema-model'],
+  external: ['@miragon/event-storming-schema-model'],
 });

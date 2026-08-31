@@ -1,10 +1,10 @@
 import type { ModuleDeclaration } from 'didi';
-import WardleyContextPadProvider from './WardleyContextPadProvider.js';
+import EventStormingContextPadProvider from './EventStormingContextPadProvider.js';
 
 /** Context actions per element. */
-export const wardleyContextPadModule: ModuleDeclaration = {
-  __init__: ['wardleyContextPadProvider'],
-  wardleyContextPadProvider: ['type', WardleyContextPadProvider],
+export const eventStormingContextPadModule: ModuleDeclaration = {
+  __init__: ['eventStormingContextPadProvider'],
+  eventStormingContextPadProvider: ['type', EventStormingContextPadProvider],
 };
 
-export { default as WardleyContextPadProvider } from './WardleyContextPadProvider.js';
+export { default as EventStormingContextPadProvider } from './EventStormingContextPadProvider.js';

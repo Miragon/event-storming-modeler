@@ -1,9 +1,8 @@
 import * as vscode from 'vscode';
 
 /**
- * Image export (SVG/PNG) to disk via a save dialog — the scene (OWM-DSL) is embedded in the file,
- * so exported images can later be reopened as a map. Shared by the text and PNG editor (hence
- * generic over the source URI rather than a document type).
+ * Image export (SVG/PNG) to disk via a save dialog. The image is a plain picture of the board —
+ * generic over the source URI so it works with or without a backing file.
  */
 export async function exportImageToFile(
   sourceUri: vscode.Uri | undefined,
@@ -23,22 +22,22 @@ export async function exportImageToFile(
   await vscode.workspace.fs.writeFile(target, bytes);
 
   const action = await vscode.window.showInformationMessage(
-    `Wardley map exported as ${format.toUpperCase()}.`,
+    `Event Storming board exported as ${format.toUpperCase()}.`,
     'Reveal',
   );
   if (action === 'Reveal') void vscode.commands.executeCommand('revealFileInOS', target);
 }
 
-/** `<mapname>.<format>` next to the source file (if no file: in the first workspace folder). */
+/** `<boardname>.<format>` next to the source file (if no file: in the first workspace folder). */
 function exportDefaultUri(
   sourceUri: vscode.Uri | undefined,
   format: 'svg' | 'png',
 ): vscode.Uri | undefined {
   if (sourceUri && sourceUri.scheme === 'file') {
-    // Strip the map extension so `map.wmap` -> `map.svg`.
+    // Strip the board extension so `board.storm` -> `board.svg`.
     const path = sourceUri.path.replace(/\.[^./]+$/i, '');
     return sourceUri.with({ path: `${path}.${format}` });
   }
   const folder = vscode.workspace.workspaceFolders?.[0];
-  return folder ? vscode.Uri.joinPath(folder.uri, `wardley-map.${format}`) : undefined;
+  return folder ? vscode.Uri.joinPath(folder.uri, `event-storming-board.${format}`) : undefined;
 }

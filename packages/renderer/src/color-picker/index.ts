@@ -1,10 +1,10 @@
 import type { ModuleDeclaration } from 'didi';
-import WardleyColorPicker from './WardleyColorPicker.js';
+import EventStormingColorPicker from './EventStormingColorPicker.js';
 
-/** Note color picker (3x3 swatch popover). */
-export const wardleyColorPickerModule: ModuleDeclaration = {
-  __init__: ['wardleyColorPicker'],
-  wardleyColorPicker: ['type', WardleyColorPicker],
+/** Sticky color picker (3x3 swatch popover). */
+export const eventStormingColorPickerModule: ModuleDeclaration = {
+  __init__: ['eventStormingColorPicker'],
+  eventStormingColorPicker: ['type', EventStormingColorPicker],
 };
 
-export { default as WardleyColorPicker } from './WardleyColorPicker.js';
+export { default as EventStormingColorPicker } from './EventStormingColorPicker.js';

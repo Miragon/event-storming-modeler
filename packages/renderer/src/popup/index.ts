@@ -1,13 +1,13 @@
 import type { ModuleDeclaration } from 'didi';
-import WardleyElementSettingsProvider from './WardleyElementSettingsProvider.js';
+import EventStormingElementSettingsProvider from './EventStormingElementSettingsProvider.js';
 
-/** Popup submenu for element settings (type/sourcing/inertia). */
-export const wardleyPopupModule: ModuleDeclaration = {
-  __init__: ['wardleyElementSettings'],
-  wardleyElementSettings: ['type', WardleyElementSettingsProvider],
+/** Popup submenu for retyping a sticky ("Change type"). */
+export const eventStormingPopupModule: ModuleDeclaration = {
+  __init__: ['eventStormingElementSettings'],
+  eventStormingElementSettings: ['type', EventStormingElementSettingsProvider],
 };
 
 export {
-  default as WardleyElementSettingsProvider,
+  default as EventStormingElementSettingsProvider,
   POPUP_PROVIDER_ID,
-} from './WardleyElementSettingsProvider.js';
+} from './EventStormingElementSettingsProvider.js';

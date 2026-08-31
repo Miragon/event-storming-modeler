@@ -1,123 +1,162 @@
 import { describe, it, expect } from 'vitest';
 import {
-  createEmptyMap,
-  type ComponentElement,
-  type PipelineElement,
-  type WardleyMap,
-} from '@miragon/wardley-schema-model';
+  createEmptyBoard,
+  type ActorElement,
+  type AggregateElement,
+  type CommandElement,
+  type DomainEventElement,
+  type DrawingElement,
+  type EventStormingBoard,
+  type NoteElement,
+  type ReadModelElement,
+} from '@miragon/event-storming-schema-model';
 import {
-  evolveComponent,
-  setMethod,
-  toggleInertia,
-  setPipelineRange,
-  assignToPipeline,
-  removeFromPipeline,
-  recomputePipelineRange,
+  moveElement,
+  moveBy,
+  setStickyKind,
+  setColor,
+  clearColor,
+  alignToRows,
+  spreadTimeline,
 } from '../src/index.js';
 
-function mapWith(...elements: WardleyMap['elements']): WardleyMap {
-  return { ...createEmptyMap('T'), elements };
+function boardWith(...elements: EventStormingBoard['elements']): EventStormingBoard {
+  return { ...createEmptyBoard('T'), elements };
 }
 
-const comp: ComponentElement = {
-  id: 'cmp_x',
-  elementType: 'component',
-  label: 'X',
-  position: { visibility: 0.5, evolution: 0.3 },
+const event: DomainEventElement = {
+  id: 'event_x',
+  elementType: 'event',
+  label: 'Order Placed',
+  position: { x: 620, y: 300 },
+};
+
+const note: NoteElement = {
+  id: 'note_1',
+  elementType: 'note',
+  label: 'Big-picture session',
+  position: { x: 80, y: 80 },
 };
 
 describe('transforms', () => {
-  it('evolveComponent sets movement immutably', () => {
-    const before = mapWith(comp);
-    const after = evolveComponent(before, 'cmp_x', 0.8, { method: 'buy' });
-    expect(before.elements[0]).toBe(comp);
+  it('moveElement sets the position immutably', () => {
+    const before = boardWith(event);
+    const after = moveElement(before, 'event_x', { x: 100, y: -40 });
+    expect(before.elements[0]).toBe(event);
+    expect(after.elements[0]?.position).toEqual({ x: 100, y: -40 });
+  });
+
+  it('moveBy shifts the position by the delta and keeps the other fields', () => {
+    const colored: DomainEventElement = { ...event, color: '#ff0000' };
+    const after = moveBy(boardWith(colored), 'event_x', { dx: -20, dy: 35 });
     const x = after.elements[0];
-    expect(x?.elementType === 'component' && x.movement).toEqual({
-      targetEvolution: 0.8,
-      method: 'buy',
-    });
+    expect(x?.position).toEqual({ x: 600, y: 335 });
+    expect(x?.label).toBe('Order Placed');
+    expect(x?.color).toBe('#ff0000');
   });
 
-  it('evolveComponent rejects values outside [0,1]', () => {
-    expect(() => evolveComponent(mapWith(comp), 'cmp_x', 1.4)).toThrow();
-  });
-
-  it('setMethod sets and removes the method', () => {
-    const set = setMethod(mapWith(comp), 'cmp_x', 'outsource');
-    const x = set.elements[0];
-    expect(x?.elementType === 'component' && x.decorators?.method).toBe('outsource');
-    const cleared = setMethod(set, 'cmp_x', undefined);
-    const y = cleared.elements[0];
-    expect(y?.elementType === 'component' && y.decorators).toBeUndefined();
-  });
-
-  it('toggleInertia toggles', () => {
-    const on = toggleInertia(mapWith(comp), 'cmp_x');
-    const x = on.elements[0];
-    expect(x?.elementType === 'component' && x.decorators?.inertia).toBe(true);
-    const off = toggleInertia(on, 'cmp_x');
-    const y = off.elements[0];
-    expect(y?.elementType === 'component' && y.decorators).toBeUndefined();
-  });
-
-  it('setPipelineRange validates the range', () => {
-    const pipe: WardleyMap['elements'][number] = {
-      id: 'pipe_1',
-      elementType: 'pipeline',
-      label: 'P',
-      position: { visibility: 0.5, evolution: 0.5 },
-      evolutionStart: 0.2,
-      evolutionEnd: 0.6,
-      childIds: [],
+  it("moveBy translates a drawing's points together with its position", () => {
+    const drawing: DrawingElement = {
+      id: 'draw_1',
+      elementType: 'drawing',
+      label: '',
+      position: { x: 100, y: 100 },
+      points: [
+        { x: 100, y: 100 },
+        { x: 200, y: 150 },
+      ],
+      strokeStyle: 'dashed',
     };
-    const out = setPipelineRange(mapWith(pipe), 'pipe_1', 0.1, 0.9);
-    const p = out.elements[0];
-    expect(p?.elementType === 'pipeline' && p.evolutionEnd).toBe(0.9);
-    expect(() => setPipelineRange(mapWith(pipe), 'pipe_1', 0.9, 0.1)).toThrow();
+    const after = moveBy(boardWith(drawing), 'draw_1', { dx: 10, dy: -10 });
+    const d = after.elements[0];
+    expect(d?.elementType === 'drawing' && d.points).toEqual([
+      { x: 110, y: 90 },
+      { x: 210, y: 140 },
+    ]);
+    expect(d?.position).toEqual({ x: 110, y: 90 });
   });
 
-  describe('pipeline membership', () => {
-    const pipe: PipelineElement = {
-      id: 'pipe_1',
-      elementType: 'pipeline',
-      label: 'P',
-      position: { visibility: 0.7, evolution: 0.5 },
-      evolutionStart: 0.2,
-      evolutionEnd: 0.6,
-      childIds: [],
+  it('moveElement throws for unknown ids', () => {
+    expect(() => moveElement(boardWith(event), 'missing', { x: 0, y: 0 })).toThrow(
+      'Element "missing" not found.',
+    );
+  });
+
+  it('setStickyKind retypes a sticky preserving id, label, position and color', () => {
+    const command: CommandElement = {
+      id: 'cmd_1',
+      elementType: 'command',
+      label: 'Place Order',
+      position: { x: 240, y: 300 },
+      color: '#00ff00',
     };
-
-    it('assignToPipeline sets pipelineId, inherits visibility and maintains childIds', () => {
-      const out = assignToPipeline(mapWith(pipe, comp), 'cmp_x', 'pipe_1');
-      const c = out.elements.find((e) => e.id === 'cmp_x');
-      expect(c?.elementType === 'component' && c.pipelineId).toBe('pipe_1');
-      expect(c?.position.visibility).toBe(0.7);
-      const p = out.elements.find((e) => e.id === 'pipe_1');
-      expect(p?.elementType === 'pipeline' && p.childIds).toEqual(['cmp_x']);
+    const after = setStickyKind(boardWith(command), 'cmd_1', 'event');
+    expect(after.elements[0]).toEqual({
+      id: 'cmd_1',
+      elementType: 'event',
+      label: 'Place Order',
+      position: { x: 240, y: 300 },
+      color: '#00ff00',
     });
+  });
 
-    it('removeFromPipeline clears the membership including childIds', () => {
-      const assigned = assignToPipeline(mapWith(pipe, comp), 'cmp_x', 'pipe_1');
-      const out = removeFromPipeline(assigned, 'cmp_x');
-      const c = out.elements.find((e) => e.id === 'cmp_x');
-      expect(c?.elementType === 'component' && c.pipelineId).toBeUndefined();
-      const p = out.elements.find((e) => e.id === 'pipe_1');
-      expect(p?.elementType === 'pipeline' && p.childIds).toEqual([]);
-    });
+  it('setStickyKind throws on notes and drawings', () => {
+    expect(() => setStickyKind(boardWith(note), 'note_1', 'event')).toThrow(
+      'setStickyKind only applies to stickies; "note_1" is note.',
+    );
+  });
 
-    it('recomputePipelineRange derives the range from the child maturities', () => {
-      const child2: ComponentElement = {
-        id: 'cmp_y',
-        elementType: 'component',
-        label: 'Y',
-        position: { visibility: 0.7, evolution: 0.85 },
-      };
-      let map = assignToPipeline(mapWith(pipe, comp, child2), 'cmp_x', 'pipe_1');
-      map = assignToPipeline(map, 'cmp_y', 'pipe_1');
-      const out = recomputePipelineRange(map, 'pipe_1');
-      const p = out.elements.find((e) => e.id === 'pipe_1');
-      expect(p?.elementType === 'pipeline' && p.evolutionStart).toBe(0.3);
-      expect(p?.elementType === 'pipeline' && p.evolutionEnd).toBe(0.85);
-    });
+  it('setColor sets and clearColor removes the override', () => {
+    const set = setColor(boardWith(event), 'event_x', '#123456');
+    expect(set.elements[0]?.color).toBe('#123456');
+    const cleared = clearColor(set, 'event_x');
+    const x = cleared.elements[0];
+    expect(x && 'color' in x).toBe(false);
+  });
+
+  it('alignToRows snaps sticky y to per-kind lanes and leaves notes and drawings untouched', () => {
+    const readmodel: ReadModelElement = {
+      id: 'read_1',
+      elementType: 'readmodel',
+      label: 'Order Status',
+      position: { x: 600, y: 95 },
+    };
+    const aggregate: AggregateElement = {
+      id: 'agg_1',
+      elementType: 'aggregate',
+      label: 'Order',
+      position: { x: 400, y: 280 },
+    };
+    const after = alignToRows(boardWith(readmodel, aggregate, event, note));
+    expect(after.elements.find((e) => e.id === 'read_1')?.position).toEqual({ x: 600, y: 120 });
+    expect(after.elements.find((e) => e.id === 'agg_1')?.position).toEqual({ x: 400, y: 320 });
+    expect(after.elements.find((e) => e.id === 'event_x')?.position).toEqual({ x: 620, y: 420 });
+    expect(after.elements.find((e) => e.id === 'note_1')).toBe(note);
+  });
+
+  it('spreadTimeline redistributes sticky x in timeline order starting at the minimum x', () => {
+    const actor: ActorElement = {
+      id: 'actor_1',
+      elementType: 'actor',
+      label: 'Customer',
+      position: { x: 100, y: 220 },
+    };
+    const command: CommandElement = {
+      id: 'cmd_1',
+      elementType: 'command',
+      label: 'Place Order',
+      position: { x: 500, y: 320 },
+    };
+    const bunched: DomainEventElement = { ...event, position: { x: 300, y: 420 } };
+    const board = boardWith(command, actor, bunched, note);
+    const after = spreadTimeline(board);
+    expect(after.elements.find((e) => e.id === 'actor_1')?.position).toEqual({ x: 100, y: 220 });
+    expect(after.elements.find((e) => e.id === 'event_x')?.position).toEqual({ x: 280, y: 420 });
+    expect(after.elements.find((e) => e.id === 'cmd_1')?.position).toEqual({ x: 460, y: 320 });
+    expect(after.elements.find((e) => e.id === 'note_1')).toBe(note);
+    // Input stays untouched and a custom gap is honored.
+    expect(board.elements.find((e) => e.id === 'cmd_1')?.position.x).toBe(500);
+    const tight = spreadTimeline(board, { gap: 10 });
+    expect(tight.elements.find((e) => e.id === 'cmd_1')?.position.x).toBe(120);
   });
 });

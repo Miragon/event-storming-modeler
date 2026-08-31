@@ -6,7 +6,7 @@
   # Force base to the repo root (overrides any base possibly set in the Netlify UI such as
   # "packages/renderer", otherwise publish resolves wrong). publish is relative to base.
   base = "/"
-  # The webapp bundles the @miragon/wardley-* packages from source via Vite aliases (see vite.config.ts),
+  # The webapp bundles the @miragon/event-storming-* packages from source via Vite aliases (see vite.config.ts),
   # so it is self-contained -> no prior lib build needed.
   command = "npm run build:webapp"
   publish = "apps/webapp/dist"
@@ -15,7 +15,7 @@
   # Vite 8 requires Node 20.19+ / 22.12+.
   NODE_VERSION = "22"
 
-# Single-page app: the map lives in the URL hash (#m=...), routing is hash-based.
+# Single-page app: the board lives in the URL hash (#m=...), routing is hash-based.
 # The catch-all serves index.html for any path (robust against deep links).
 [[redirects]]
   from = "/*"

@@ -1,6 +1,6 @@
 /* Chrome of the webview. The canvas itself carries the Miragon look (renderer CSS); the floating
-   toolbar/dialogs adopt the VS Code theme (--vscode-*) so the editor blends natively into the IDE,
-   with Miragon fallbacks (Geist, interactive blue #2b50d4) when a theme var is absent. */
+   toolbar adopts the VS Code theme (--vscode-*) so the editor blends natively into the IDE, with
+   Miragon fallbacks (Geist, interactive blue #2b50d4) when a theme var is absent. */
 
 html,
 body {
@@ -27,7 +27,7 @@ body {
   height: 100vh;
 }
 
-.wardley-canvas {
+.event-storming-canvas {
   position: absolute;
   inset: 0;
 }
@@ -62,8 +62,7 @@ body {
   display: block;
 }
 .menu-btn:focus-visible,
-.menu-item:focus-visible,
-.menu-select:focus-visible {
+.menu-item:focus-visible {
   outline: 1px solid var(--vscode-focusBorder, #2b50d4);
   outline-offset: 1px;
 }
@@ -113,106 +112,4 @@ body {
   height: 1px;
   margin: 6px 4px;
   background: var(--vscode-editorWidget-border, rgba(0, 0, 0, 0.14));
-}
-
-.menu-field {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 7px 10px;
-  font: inherit;
-}
-
-.menu-select {
-  height: 28px;
-  padding: 0 6px;
-  border-radius: 6px;
-  border: 1px solid var(--vscode-dropdown-border, rgba(0, 0, 0, 0.18));
-  background: var(--vscode-dropdown-background, #fff);
-  color: var(--vscode-dropdown-foreground, inherit);
-  font: inherit;
-  cursor: pointer;
-}
-
-.overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.35);
-}
-.overlay[hidden] {
-  display: none;
-}
-
-.panel {
-  width: min(440px, 92vw);
-  border-radius: 10px;
-  overflow: hidden;
-  background: var(--vscode-editorWidget-background, #fff);
-  color: var(--vscode-editorWidget-foreground, var(--vscode-foreground, #1d1d1d));
-  border: 1px solid var(--vscode-editorWidget-border, rgba(0, 0, 0, 0.16));
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
-}
-.panel-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  font-weight: 600;
-  border-bottom: 1px solid var(--vscode-editorWidget-border, rgba(0, 0, 0, 0.12));
-}
-.panel-body {
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.row,
-.stage {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
-}
-.stages {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-.foot {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.panel input,
-.panel select {
-  height: 30px;
-  padding: 0 8px;
-  border-radius: 6px;
-  border: 1px solid var(--vscode-input-border, var(--vscode-dropdown-border, rgba(0, 0, 0, 0.2)));
-  background: var(--vscode-input-background, #fff);
-  color: var(--vscode-input-foreground, inherit);
-  font: inherit;
-}
-.panel input:focus,
-.panel select:focus {
-  outline: 1px solid var(--vscode-focusBorder, #2b50d4);
-  outline-offset: 0;
-}
-
-.ghost {
-  border: none;
-  background: transparent;
-  color: var(--vscode-textLink-foreground, #2b50d4);
-  cursor: pointer;
-  font: inherit;
-  padding: 4px 6px;
-  border-radius: 6px;
-}
-.ghost:hover {
-  background: var(--vscode-toolbar-hoverBackground, rgba(0, 0, 0, 0.08));
 }

@@ -1,15 +1,15 @@
 {
-  "name": "@miragon/wardley-renderer",
-  "version": "0.6.1",
-  "description": "Render and display Wardley maps in the browser, with a viewer and modeler built on diagram-js.",
+  "name": "@miragon/event-storming-renderer",
+  "version": "0.1.0",
+  "description": "Render and edit Event Storming boards in the browser, with a viewer and modeler built on diagram-js.",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Miragon/wardley-maps-modeler.git",
+    "url": "git+https://github.com/Miragon/event-storming-modeler.git",
     "directory": "packages/renderer"
   },
-  "homepage": "https://github.com/Miragon/wardley-maps-modeler/tree/main/packages/renderer#readme",
-  "bugs": "https://github.com/Miragon/wardley-maps-modeler/issues",
+  "homepage": "https://github.com/Miragon/event-storming-modeler/tree/main/packages/renderer#readme",
+  "bugs": "https://github.com/Miragon/event-storming-modeler/issues",
   "type": "module",
   "sideEffects": [
     "**/*.css"
@@ -19,7 +19,7 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./assets/wardley.css": "./dist/wardley.css",
+    "./assets/event-storming.css": "./dist/event-storming.css",
     "./package.json": "./package.json"
   },
   "module": "./dist/index.js",
@@ -36,8 +36,8 @@
     "test:browser": "npm --prefix ../.. run test:browser"
   },
   "dependencies": {
-    "@miragon/wardley-dsl": "0.5.1",
-    "@miragon/wardley-schema-model": "0.5.0",
+    "@miragon/event-storming-dsl": "0.1.0",
+    "@miragon/event-storming-schema-model": "0.1.0",
     "clsx": "2.1.1",
     "diagram-js": "15.24.1",
     "didi": "11.0.0",

@@ -1,14 +1,14 @@
 import type { ModuleDeclaration } from 'didi';
-import WardleyImporter from './WardleyImporter.js';
-import WardleyExporter from './WardleyExporter.js';
+import EventStormingImporter from './EventStormingImporter.js';
+import EventStormingExporter from './EventStormingExporter.js';
 
 export const ioModule: ModuleDeclaration = {
-  wardleyImporter: ['type', WardleyImporter],
-  wardleyExporter: ['type', WardleyExporter],
+  eventStormingImporter: ['type', EventStormingImporter],
+  eventStormingExporter: ['type', EventStormingExporter],
 };
 
-export { default as WardleyImporter } from './WardleyImporter.js';
-export { default as WardleyExporter } from './WardleyExporter.js';
+export { default as EventStormingImporter } from './EventStormingImporter.js';
+export { default as EventStormingExporter } from './EventStormingExporter.js';
 export { saveSVG } from './saveSvg.js';
 export { ROOT_ID } from './types.js';
 export type { ImportWarning, RootBusinessObject } from './types.js';

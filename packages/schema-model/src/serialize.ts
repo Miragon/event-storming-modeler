@@ -1,8 +1,8 @@
-import { wardleyMapSchema } from './schema.js';
+import { eventStormingBoardSchema } from './schema.js';
 import { migrate, CURRENT_SCHEMA_VERSION } from './migrations.js';
-import type { MapConfig, WardleyMap } from './types.js';
+import type { BoardConfig, EventStormingBoard } from './types.js';
 
-/** Number of decimal places for coordinates in serialization (concept doc §7.1). */
+/** Number of decimal places for coordinates in serialization. */
 const COORD_PRECISION = 3;
 
 function round(n: number, digits = COORD_PRECISION): number {
@@ -14,8 +14,8 @@ function round(n: number, digits = COORD_PRECISION): number {
  * Validates arbitrary data against the schema plus additional cross-field invariants
  * (unique IDs, edge endpoints exist). Throws on violation.
  */
-export function validateMap(data: unknown): WardleyMap {
-  const parsed = wardleyMapSchema.parse(data);
+export function validateBoard(data: unknown): EventStormingBoard {
+  const parsed = eventStormingBoardSchema.parse(data);
 
   const ids = new Set<string>();
   for (const el of parsed.elements) {
@@ -38,34 +38,34 @@ export function validateMap(data: unknown): WardleyMap {
     }
   }
 
-  return parsed as unknown as WardleyMap;
+  return parsed as unknown as EventStormingBoard;
 }
 
-export function loadMap(data: unknown): WardleyMap {
-  return validateMap(migrate(data));
+export function loadBoard(data: unknown): EventStormingBoard {
+  return validateBoard(migrate(data));
 }
 
-export function parseMapJSON(json: string): WardleyMap {
-  return loadMap(JSON.parse(json) as unknown);
+export function parseBoardJSON(json: string): EventStormingBoard {
+  return loadBoard(JSON.parse(json) as unknown);
 }
 
 /**
  * Deterministic serialization: stable (alphabetical) key order, elements/edges sorted by `id`,
  * coordinates rounded to 3 decimal places. Produces clean Git diffs and reliable change
- * detection (concept doc §7.1).
+ * detection.
  */
-export function serializeMap(map: WardleyMap): string {
-  return stableStringify(canonicalize(map));
+export function serializeBoard(board: EventStormingBoard): string {
+  return stableStringify(canonicalize(board));
 }
 
-function canonicalize(map: WardleyMap): WardleyMap {
-  const elements = [...map.elements]
+function canonicalize(board: EventStormingBoard): EventStormingBoard {
+  const elements = [...board.elements]
     .sort((a, b) => a.id.localeCompare(b.id))
-    .map((el) => roundNumbers(el) as WardleyMap['elements'][number]);
-  const edges = [...map.edges].sort((a, b) => a.id.localeCompare(b.id));
+    .map((el) => roundNumbers(el) as EventStormingBoard['elements'][number]);
+  const edges = [...board.edges].sort((a, b) => a.id.localeCompare(b.id));
   return {
-    ...map,
-    config: roundNumbers(map.config) as MapConfig,
+    ...board,
+    config: roundNumbers(board.config) as BoardConfig,
     elements,
     edges,
   };
@@ -89,7 +89,7 @@ function stableStringify(value: unknown): string {
   const sortDeep = (v: unknown): unknown => {
     if (Array.isArray(v)) return v.map(sortDeep);
     if (v && typeof v === 'object') {
-      if (seen.has(v as object)) throw new Error('Cyclic reference in WardleyMap.');
+      if (seen.has(v as object)) throw new Error('Cyclic reference in EventStormingBoard.');
       seen.add(v as object);
       const out: Record<string, unknown> = {};
       for (const key of Object.keys(v as Record<string, unknown>).sort()) {
@@ -102,7 +102,7 @@ function stableStringify(value: unknown): string {
   return JSON.stringify(sortDeep(value), null, 2) + '\n';
 }
 
-export function createEmptyMap(title = 'Untitled Map'): WardleyMap {
+export function createEmptyBoard(title = 'Untitled Board'): EventStormingBoard {
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
     config: { title },

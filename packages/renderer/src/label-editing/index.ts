@@ -1,10 +1,10 @@
 import type { ModuleDeclaration } from 'didi';
-import WardleyLabelEditing from './WardleyLabelEditing.js';
+import EventStormingLabelEditing from './EventStormingLabelEditing.js';
 
 /** Custom inline label editing (HTML overlay). */
 export const labelEditingModule: ModuleDeclaration = {
-  __init__: ['wardleyLabelEditing'],
-  wardleyLabelEditing: ['type', WardleyLabelEditing],
+  __init__: ['eventStormingLabelEditing'],
+  eventStormingLabelEditing: ['type', EventStormingLabelEditing],
 };
 
-export { default as WardleyLabelEditing } from './WardleyLabelEditing.js';
+export { default as EventStormingLabelEditing } from './EventStormingLabelEditing.js';

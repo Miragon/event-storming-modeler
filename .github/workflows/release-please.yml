@@ -94,10 +94,10 @@ jobs:
       - run: npm run build:vscode
       - name: Package extension
         working-directory: apps/vscode
-        run: npx vsce package --no-dependencies -o wardley-mapping-modeler.vsix
+        run: npx vsce package --no-dependencies -o event-storming-modeler.vsix
       - name: Publish to VS Code Marketplace
         working-directory: apps/vscode
-        run: npx vsce publish --packagePath wardley-mapping-modeler.vsix
+        run: npx vsce publish --packagePath event-storming-modeler.vsix
         env:
           VSCE_PAT: ${{ secrets.VSCE_PUBLISH }}
 
@@ -117,10 +117,10 @@ jobs:
       - run: npm run build:vscode
       - name: Package extension
         working-directory: apps/vscode
-        run: npx vsce package --no-dependencies -o wardley-mapping-modeler.vsix
+        run: npx vsce package --no-dependencies -o event-storming-modeler.vsix
       - name: Publish to Open VSX Marketplace
         working-directory: apps/vscode
-        run: npx ovsx --pat "$OVSX_PAT" publish --packagePath wardley-mapping-modeler.vsix
+        run: npx ovsx --pat "$OVSX_PAT" publish --packagePath event-storming-modeler.vsix
         env:
           OVSX_PAT: ${{ secrets.OVSX_PUBLISH }}
 
@@ -139,4 +139,4 @@ jobs:
       - run: npm run build:vscode
       - name: Package extension
         working-directory: apps/vscode
-        run: npx vsce package --no-dependencies -o wardley-mapping-modeler.vsix
+        run: npx vsce package --no-dependencies -o event-storming-modeler.vsix

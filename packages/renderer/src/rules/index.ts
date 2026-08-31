@@ -1,10 +1,10 @@
 import type { ModuleDeclaration } from 'didi';
-import WardleyRules from './WardleyRules.js';
+import EventStormingRules from './EventStormingRules.js';
 
-/** Allowed Wardley operations (RuleProvider). */
-export const wardleyRulesModule: ModuleDeclaration = {
-  __init__: ['wardleyRules'],
-  wardleyRules: ['type', WardleyRules],
+/** Allowed Event Storming operations (RuleProvider). */
+export const eventStormingRulesModule: ModuleDeclaration = {
+  __init__: ['eventStormingRules'],
+  eventStormingRules: ['type', EventStormingRules],
 };
 
-export { default as WardleyRules } from './WardleyRules.js';
+export { default as EventStormingRules } from './EventStormingRules.js';

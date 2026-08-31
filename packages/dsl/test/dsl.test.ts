@@ -1,537 +1,283 @@
 import { describe, it, expect } from 'vitest';
 import { parseDSL, parseDSLWithDiagnostics, serializeDSL } from '../src/index.js';
 
-const TEA_SHOP = `title Tea Shop
-anchor Business [0.95, 0.63]
-component Cup of Tea [0.79, 0.61]
-component Cup [0.73, 0.78]
-component Tea [0.63, 0.81]
-component Hot Water [0.52, 0.80]
-component Kettle [0.43, 0.35]
-evolve Kettle 0.62
-component Power [0.1, 0.7] (outsource)
-Business -> Cup of Tea
-Cup of Tea -> Cup
-Cup of Tea -> Tea
-Cup of Tea -> Hot Water
-Hot Water -> Kettle
-Kettle -> Power`;
+/** Canonical example board (spec §7) — kept verbatim in webapp/vscode/e2e. */
+const ORDER_CHECKOUT = `title Order Checkout
+
+actor Customer [80, 300]
+command Place Order [240, 300]
+aggregate Order [420, 290]
+event Order Placed [620, 300]
+policy When order placed, ship it [800, 300]
+command Ship Order [980, 300]
+event Order Shipped [1160, 300]
+readmodel Order Status [620, 120]
+external Payment Provider [420, 520]
+hotspot Double payment on retry? [620, 520]
+note Big-picture session: checkout flow [80, 80]
+
+Customer -> Place Order
+Place Order -> Order
+Place Order -> Payment Provider
+Order -> Order Placed
+Order Placed -> Order Status
+Order Placed -> When order placed, ship it
+When order placed, ship it -> Ship Order
+Ship Order -> Order
+Order -> Order Shipped`;
+
+const ALL_KINDS = `title Every Kind
+event Order Placed [620, 300]
+command Place Order [240, 300]
+actor Customer [80, 300]
+aggregate Order [420, 290]
+policy When order placed, ship it [800, 300]
+readmodel Order Status [620, 120]
+external Payment Provider [420, 520]
+hotspot Double payment on retry? [620, 520]
+note Big-picture session [80, 80]
+line [[100, 100], [200, 150], [180, 240]] (dashed)`;
 
 describe('parseDSL', () => {
-  it('parses the Tea Shop map (nodes, edges, axis convention)', () => {
-    const map = parseDSL(TEA_SHOP);
-    expect(map.config.title).toBe('Tea Shop');
-    const kettle = map.elements.find((e) => e.label === 'Kettle');
-    expect(kettle?.elementType).toBe('component');
-    // [visibility, maturity] -> visibility=0.43, evolution=0.35
-    expect(kettle?.position).toEqual({ visibility: 0.43, evolution: 0.35 });
-    expect(map.edges.filter((e) => e.edgeType === 'dependency')).toHaveLength(6);
+  it('parses the Order Checkout board (stickies, arrows, coordinate convention)', () => {
+    const board = parseDSL(ORDER_CHECKOUT);
+    expect(board.config.title).toBe('Order Checkout');
+    const placed = board.elements.find((e) => e.label === 'Order Placed');
+    expect(placed?.elementType).toBe('event');
+    // [x, y] -> x FIRST: x=620, y=300 (board pixels)
+    expect(placed?.position).toEqual({ x: 620, y: 300 });
+    expect(board.edges).toHaveLength(9);
+    expect(board.edges.every((e) => e.edgeType === 'arrow')).toBe(true);
   });
 
-  it('reads evolve as movement', () => {
-    const map = parseDSL(TEA_SHOP);
-    const kettle = map.elements.find((e) => e.label === 'Kettle');
-    expect(kettle?.elementType === 'component' && kettle.movement?.targetEvolution).toBe(0.62);
+  it('allocates slug-based ids with per-kind prefixes', () => {
+    const board = parseDSL(ORDER_CHECKOUT);
+    const idOf = (label: string) => board.elements.find((e) => e.label === label)?.id;
+    expect(idOf('Customer')).toBe('actor_customer');
+    expect(idOf('Place Order')).toBe('cmd_place_order');
+    expect(idOf('Order')).toBe('agg_order');
+    expect(idOf('Order Placed')).toBe('event_order_placed');
+    expect(idOf('When order placed, ship it')).toBe('policy_when_order_placed_ship_it');
+    expect(idOf('Order Status')).toBe('read_order_status');
+    expect(idOf('Payment Provider')).toBe('ext_payment_provider');
+    expect(idOf('Double payment on retry?')).toBe('hot_double_payment_on_retry');
+    expect(board.elements.some((e) => e.id.startsWith('note_'))).toBe(true);
+    expect(board.edges[0]!.id).toBe('arrow_1');
   });
 
-  it('reads modern decorator syntax (outsource)', () => {
-    const map = parseDSL(TEA_SHOP);
-    const power = map.elements.find((e) => e.label === 'Power');
-    expect(power?.elementType === 'component' && power.decorators?.method).toBe('outsource');
-  });
-
-  it('reads combined decorators (market, outsource) + inertia', () => {
-    const map = parseDSL('title T\ncomponent X [0.1, 0.2] (market, outsource) inertia');
-    const x = map.elements[0];
-    expect(x?.elementType === 'component' && x.decorators).toEqual({
-      market: true,
-      method: 'outsource',
-      inertia: true,
-    });
-  });
-
-  it('treats pipeline coordinates as [maturityStart, maturityEnd] (NOT visibility)', () => {
-    const map = parseDSL('title P\ncomponent Platform [0.5, 0.4]\npipeline Platform [0.05, 0.95]');
-    const pipe = map.elements.find((e) => e.elementType === 'pipeline');
-    expect(pipe?.elementType).toBe('pipeline');
-    if (pipe?.elementType === 'pipeline') {
-      expect(pipe.evolutionStart).toBe(0.05);
-      expect(pipe.evolutionEnd).toBe(0.95);
-      // visibility from the component of the same name
-      expect(pipe.position.visibility).toBe(0.5);
-    }
+  it('defaults missing coordinates to [0, 0]', () => {
+    const board = parseDSL('title T\nevent Order Placed');
+    expect(board.elements[0]!.position).toEqual({ x: 0, y: 0 });
+    const once = serializeDSL(board);
+    expect(once).toContain('event Order Placed [0, 0]');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
   });
 
   it('preserves unknown lines in rawPassthrough', () => {
-    const map = parseDSL('title T\nsomeFutureKeyword foo bar\ncomponent X [0.1, 0.2]');
-    expect(map.rawPassthrough).toContain('someFutureKeyword foo bar');
+    const board = parseDSL('title T\nsomeFutureKeyword foo bar\nevent X [100, 200]');
+    expect(board.rawPassthrough).toContain('someFutureKeyword foo bar');
   });
 });
 
-const RICH = `title Strategy
-component A [0.8, 0.3]
-component B [0.5, 0.6]
-A +> B
-B +<> A
-annotation 1 [0.9, 0.4] First note
-annotations [0.2, 0.8]
-pioneers [0.9, 0.1, 0.7, 0.4]
-accelerator Boost [0.7, 0.5]
-deaccelerator Brake [0.3, 0.5]
-submap Detail [0.4, 0.7]`;
-
-describe('parseDSL – M4 types', () => {
-  it('reads annotation (number, text, position) and the annotations legend box', () => {
-    const map = parseDSL(RICH);
-    const anno = map.elements.find((e) => e.elementType === 'annotation');
-    expect(anno?.elementType === 'annotation' && anno.number).toBe(1);
-    expect(anno?.elementType === 'annotation' && anno.text).toBe('First note');
-    expect(map.config.annotationsBoxPosition).toEqual({ visibility: 0.2, evolution: 0.8 });
-  });
-
-  it('reads attitude (pioneers) with two normalized corners', () => {
-    const map = parseDSL(RICH);
-    const att = map.elements.find((e) => e.elementType === 'attitude');
-    expect(att?.elementType).toBe('attitude');
-    if (att?.elementType === 'attitude') {
-      expect(att.kind).toBe('pioneers');
-      expect(att.position).toEqual({ visibility: 0.9, evolution: 0.1 });
-      expect(att.corner2).toEqual({ visibility: 0.7, evolution: 0.4 });
-    }
-  });
-
-  it('legacy px form `pioneers [v,m] w h` lands in rawPassthrough (hard cut)', () => {
-    const map = parseDSL('title T\npioneers [0.9, 0.1] 120 30');
-    expect(map.elements.find((e) => e.elementType === 'attitude')).toBeUndefined();
-    expect(map.rawPassthrough).toContain('pioneers [0.9, 0.1] 120 30');
-  });
-
-  it('reads the canonical attitude form [vis1, mat1, vis2, mat2] (OWM)', () => {
-    const map = parseDSL('title T\nsettlers [0.59, 0.43, 0.49, 0.63]');
-    const att = map.elements.find((e) => e.elementType === 'attitude');
-    expect(att?.elementType).toBe('attitude');
-    if (att?.elementType === 'attitude') {
-      expect(att.kind).toBe('settlers');
-      expect(att.position).toEqual({ visibility: 0.59, evolution: 0.43 });
-      expect(att.corner2).toEqual({ visibility: 0.49, evolution: 0.63 });
-    }
-    const out = serializeDSL(map);
-    expect(out).toContain('settlers [0.59, 0.43, 0.49, 0.63]');
-    expect(serializeDSL(parseDSL(out))).toBe(out);
-  });
-
-  it('reads accelerator and deaccelerator', () => {
-    const map = parseDSL(RICH);
-    const acc = map.elements.filter((e) => e.elementType === 'accelerator');
-    expect(acc).toHaveLength(2);
-    const dirs = acc.map((a) => (a.elementType === 'accelerator' ? a.direction : '')).sort();
-    expect(dirs).toEqual(['accelerate', 'deaccelerate']);
-  });
-
-  it('reads flow links (+> and +<> bidirectional)', () => {
-    const map = parseDSL(RICH);
-    const flows = map.edges.filter((e) => e.edgeType === 'flow');
-    expect(flows).toHaveLength(2);
-    const bidi = flows.find((f) => f.edgeType === 'flow' && f.bidirectional);
-    expect(bidi).toBeDefined();
-  });
-});
-
-describe('parseDSL – reverse flow & link labels (OWM)', () => {
-  const base = 'title T\ncomponent A [0.8, 0.3]\ncomponent B [0.5, 0.6]\n';
-
-  it('reverse flow A +< B reverses the direction (B -> A)', () => {
-    const map = parseDSL(base + 'A +< B');
-    const flow = map.edges.find((e) => e.edgeType === 'flow');
-    const aId = map.elements.find((e) => e.label === 'A')!.id;
-    const bId = map.elements.find((e) => e.label === 'B')!.id;
-    expect(flow?.from).toBe(bId);
-    expect(flow?.to).toBe(aId);
-  });
-
-  it('dependency link with ; annotation', () => {
-    const map = parseDSL(base + 'A -> B; limited by');
-    const dep = map.edges.find((e) => e.edgeType === 'dependency');
-    expect(dep?.edgeType === 'dependency' && dep.label).toBe('limited by');
-    const out = serializeDSL(map);
-    expect(out).toContain('A -> B; limited by');
-    expect(serializeDSL(parseDSL(out))).toBe(out);
-  });
-
-  it('flow with value AND ; annotation', () => {
-    const map = parseDSL(base + "A +'$0.10'> B; constrained");
-    const flow = map.edges.find((e) => e.edgeType === 'flow');
-    expect(flow?.edgeType === 'flow' && flow.flowValue).toBe('$0.10');
-    expect(flow?.edgeType === 'flow' && flow.label).toBe('constrained');
-    const out = serializeDSL(map);
-    expect(out).toContain("+'$0.10'>");
-    expect(out).toContain('; constrained');
-    expect(serializeDSL(parseDSL(out))).toBe(out);
-  });
-});
-
-describe('parseDSL – axis config & labeled flow', () => {
-  it('reads custom evolution labels and the y-axis label', () => {
-    const map = parseDSL(
-      'title T\nevolution Novel->Emerging->Good->Best\ny-axis Value chain->Invisible->Visible',
-    );
-    expect(map.config.evolutionLabels).toEqual(['Novel', 'Emerging', 'Good', 'Best']);
-    expect(map.config.yAxisLabel).toBe('Value chain');
-  });
-
-  it('keeps the y-axis end labels losslessly through the round-trip', () => {
-    const src = 'title T\ny-axis Value chain->Invisible->Visible';
-    const map = parseDSL(src);
-    expect(map.config.yAxisEndLabels).toEqual(['Invisible', 'Visible']);
-    const once = serializeDSL(map);
-    expect(once).toContain('y-axis Value chain->Invisible->Visible');
-    expect(serializeDSL(parseDSL(once))).toBe(once);
-  });
-
-  it('custom evolution labels survive the serialize round-trip', () => {
-    const src = 'title T\nevolution Unmodelled->Divergent->Convergent->Modelled';
-    const map = parseDSL(src);
-    expect(map.config.evolutionLabels).toEqual([
-      'Unmodelled',
-      'Divergent',
-      'Convergent',
-      'Modelled',
+describe('parseDSL – all element kinds', () => {
+  it('reads every sticky kind plus note and drawing with its elementType', () => {
+    const board = parseDSL(ALL_KINDS);
+    const types = board.elements.map((e) => e.elementType);
+    expect(types).toEqual([
+      'event',
+      'command',
+      'actor',
+      'aggregate',
+      'policy',
+      'readmodel',
+      'external',
+      'hotspot',
+      'note',
+      'drawing',
     ]);
-    const once = serializeDSL(map);
-    expect(once).toContain('evolution Unmodelled->Divergent->Convergent->Modelled');
-    expect(serializeDSL(parseDSL(once))).toBe(once);
+    const drawing = board.elements.find((e) => e.elementType === 'drawing');
+    expect(drawing?.id).toBe('draw_line');
+    if (drawing?.elementType === 'drawing') {
+      expect(drawing.points).toEqual([
+        { x: 100, y: 100 },
+        { x: 200, y: 150 },
+        { x: 180, y: 240 },
+      ]);
+      expect(drawing.strokeStyle).toBe('dashed');
+    }
+  });
+});
+
+describe('parseDSL – arrows', () => {
+  const base = 'title T\nevent A [800, 300]\ncommand B [500, 600]\n';
+
+  it('arrow with ; annotation', () => {
+    const board = parseDSL(base + 'A -> B; async');
+    const arrow = board.edges[0];
+    expect(arrow?.label).toBe('async');
+    const out = serializeDSL(board);
+    expect(out).toContain('A -> B; async');
+    expect(serializeDSL(parseDSL(out))).toBe(out);
   });
 
-  it('custom evolution labels with an empty stage survive the round-trip (no filter(Boolean))', () => {
-    const map = parseDSL('title T\nevolution Genesis->->Product->Commodity');
-    expect(map.config.evolutionLabels).toEqual(['Genesis', '', 'Product', 'Commodity']);
-    const once = serializeDSL(map);
-    expect(once).toContain('evolution Genesis->->Product->Commodity');
-    expect(serializeDSL(parseDSL(once))).toBe(once);
+  it('an arrow between stickies with keyword-prefix names ("Command") is preserved', () => {
+    // Default name "Command" starts with the keyword `command`; the arrow line must NOT be
+    // misread as a declaration (otherwise the arrow disappears on reload).
+    const src =
+      'title T\ncommand Command [800, 300]\ncommand Command 2 [500, 600]\nCommand -> Command 2';
+    const board = parseDSL(src);
+    expect(board.elements.filter((e) => e.elementType === 'command')).toHaveLength(2);
+    expect(board.edges).toHaveLength(1);
+    expect(board.edges[0]!.from).not.toBe(board.edges[0]!.to);
+    const out = serializeDSL(board);
+    expect(parseDSL(out).edges).toHaveLength(1); // arrow survives the re-parse
+    expect(serializeDSL(parseDSL(out))).toBe(out);
   });
 
-  it('an unparsable evolution line is not emitted twice when config.evolutionLabels is set', () => {
-    // 3-part `evolution` line -> lands in rawPassthrough, evolutionLabels stays undefined.
-    const map = parseDSL('title T\nevolution A->B->C');
-    expect(map.config.evolutionLabels).toBeUndefined();
-    expect(map.rawPassthrough).toContain('evolution A->B->C');
-    // Now the editor sets valid labels: the stale line must NOT survive as a duplicate.
-    const withLabels = {
-      ...map,
-      config: { ...map.config, evolutionLabels: ['W', 'X', 'Y', 'Z'] as const },
-    };
-    const out = serializeDSL(withLabels);
-    expect(out.match(/^evolution /gm)).toHaveLength(1);
-    expect(out).toContain('evolution W->X->Y->Z');
-  });
-
-  it('duplicate component labels do not lose an edge (the serializer disambiguates names)', () => {
-    const base = parseDSL('title T\ncomponent A [0.8, 0.3]\ncomponent B [0.5, 0.6]\nA -> B');
-    // Set both components to the same name (as after a colliding rename).
-    const dup = { ...base, elements: base.elements.map((e) => ({ ...e, label: 'X' })) };
+  it('duplicate sticky labels do not lose an arrow (the serializer disambiguates names)', () => {
+    const board = parseDSL(base + 'A -> B');
+    // Set both stickies to the same name (as after a colliding rename).
+    const dup = { ...board, elements: board.elements.map((e) => ({ ...e, label: 'X' })) };
     const out = serializeDSL(dup);
-    const comps = out.split('\n').filter((l) => l.startsWith('component'));
-    expect(comps).toHaveLength(2);
-    expect(comps[0]).not.toBe(comps[1]); // names were disambiguated (X / X 2)
-    // Re-import: the edge connects TWO DIFFERENT nodes (no self-reference -> arrow stays).
+    // Names were disambiguated (X / X 2).
+    expect(out).toContain('event X [800, 300]');
+    expect(out).toContain('command X 2 [500, 600]');
+    // Re-import: the arrow connects TWO DIFFERENT stickies (no self-reference -> arrow stays).
     const round = parseDSL(out);
-    expect(round.elements.filter((e) => e.elementType === 'component')).toHaveLength(2);
+    expect(round.elements).toHaveLength(2);
     expect(round.edges).toHaveLength(1);
     expect(round.edges[0]!.from).not.toBe(round.edges[0]!.to);
     expect(serializeDSL(round)).toBe(out);
   });
 
-  it('an edge between components with keyword-prefix names ("Component") is preserved', () => {
-    // Default name "Component" starts with the keyword `component`; the edge line must NOT be
-    // misread as a declaration (otherwise the arrow disappears on reload).
-    const src =
-      'title T\ncomponent Component [0.8, 0.3]\ncomponent Component 2 [0.5, 0.6]\nComponent -> Component 2';
-    const map = parseDSL(src);
-    expect(map.elements.filter((e) => e.elementType === 'component')).toHaveLength(2);
-    expect(map.edges).toHaveLength(1);
-    expect(map.edges[0]!.from).not.toBe(map.edges[0]!.to);
-    const out = serializeDSL(map);
-    expect(parseDSL(out).edges).toHaveLength(1); // edge survives the re-parse
+  it('empty labels fall back to the per-kind default name', () => {
+    const board = parseDSL(base + 'A -> B');
+    const blank = { ...board, elements: board.elements.map((e) => ({ ...e, label: '' })) };
+    const out = serializeDSL(blank);
+    expect(out).toContain('event Domain Event [800, 300]');
+    expect(out).toContain('command Command [500, 600]');
+    expect(out).toContain('Domain Event -> Command');
     expect(serializeDSL(parseDSL(out))).toBe(out);
   });
 
-  it('a flow between components with keyword-prefix names is preserved', () => {
-    const map = parseDSL(
-      'title T\ncomponent Component [0.8, 0.3]\ncomponent Anchor X [0.5, 0.6]\nComponent +> Anchor X',
-    );
-    expect(map.edges.filter((e) => e.edgeType === 'flow')).toHaveLength(1);
-  });
-
-  it("reads labeled flow (+'value'>) including round-trip", () => {
-    const src = "title T\ncomponent A [0.8, 0.3]\ncomponent B [0.5, 0.6]\nA +'120ms'> B";
-    const map = parseDSL(src);
-    const flow = map.edges.find((e) => e.edgeType === 'flow');
-    expect(flow?.edgeType === 'flow' && flow.flowValue).toBe('120ms');
-    const once = serializeDSL(map);
-    expect(once).toContain("+'120ms'>");
-    expect(serializeDSL(parseDSL(once))).toBe(once);
+  it('sanitizes `->` in sticky labels to `→` (names stay arrow-safe)', () => {
+    const board = parseDSL(base + 'A -> B');
+    const renamed = {
+      ...board,
+      elements: board.elements.map((e) => (e.label === 'A' ? { ...e, label: 'go -> there' } : e)),
+    };
+    const out = serializeDSL(renamed);
+    expect(out).toContain('event go → there [800, 300]');
+    expect(out).toContain('go → there -> B');
+    expect(parseDSL(out).edges).toHaveLength(1);
+    expect(serializeDSL(parseDSL(out))).toBe(out);
   });
 });
 
 describe('parseDSL – comments', () => {
-  it('does NOT parse commented-out components as elements', () => {
-    const map = parseDSL('title T\n// component Ghost [0.5, 0.5]\ncomponent Real [0.4, 0.4]');
-    expect(map.elements.map((e) => e.label)).toEqual(['Real']);
-    expect(map.rawPassthrough).toContain('// component Ghost [0.5, 0.5]');
+  it('does NOT parse commented-out stickies as elements', () => {
+    const board = parseDSL('title T\n// event Ghost [500, 500]\nevent Real [400, 400]');
+    expect(board.elements.map((e) => e.label)).toEqual(['Real']);
+    expect(board.rawPassthrough).toContain('// event Ghost [500, 500]');
   });
 
   it('separates trailing // comments from content (label stays clean)', () => {
-    const map = parseDSL('title T\ncomponent Kettle [0.43, 0.35] // replace soon');
-    const kettle = map.elements[0]!;
-    expect(kettle.label).toBe('Kettle');
-    expect(map.rawPassthrough).toContain('// replace soon');
+    const board = parseDSL('title T\nevent Order Placed [620, 300] // double-check');
+    const placed = board.elements[0]!;
+    expect(placed.label).toBe('Order Placed');
+    expect(board.rawPassthrough).toContain('// double-check');
   });
 
   it('skips /* ... */ blocks spanning multiple lines', () => {
-    const map = parseDSL(
-      'title T\n/* everything\ncomponent Ghost [0.5, 0.5]\ngone */\ncomponent Real [0.4, 0.4]',
+    const board = parseDSL(
+      'title T\n/* everything\nevent Ghost [500, 500]\ngone */\nevent Real [400, 400]',
     );
-    expect(map.elements.map((e) => e.label)).toEqual(['Real']);
+    expect(board.elements.map((e) => e.label)).toEqual(['Real']);
   });
 
-  it('leaves // in quoted flow values untouched', () => {
-    const map = parseDSL(
-      "title T\ncomponent A [0.8, 0.3]\ncomponent B [0.5, 0.6]\nA +'http://x'> B",
+  it('leaves // after a URL scheme separator untouched', () => {
+    const board = parseDSL('title T\nnote see https://example.org/docs [80, 80]');
+    expect(board.elements[0]!.label).toBe('see https://example.org/docs');
+  });
+
+  it('leaves // inside quotes untouched (arrow annotations)', () => {
+    const board = parseDSL(
+      "title T\nevent A [800, 300]\ncommand B [500, 600]\nA -> B; read '//notes' first",
     );
-    const flow = map.edges.find((e) => e.edgeType === 'flow');
-    expect(flow?.edgeType === 'flow' && flow.flowValue).toBe('http://x');
+    expect(board.edges[0]!.label).toBe("read '//notes' first");
   });
 
   it('comments survive the round-trip (rawPassthrough)', () => {
-    const src = 'title T\n// important note\ncomponent Real [0.4, 0.4]';
+    const src = 'title T\n// important note\nevent Real [400, 400]';
     const once = serializeDSL(parseDSL(src));
     expect(once).toContain('// important note');
     expect(serializeDSL(parseDSL(once))).toBe(once);
   });
 });
 
-describe('parseDSL – evolve with label offset', () => {
-  it('reads evolve X 0.62 label [16, 5] as movement with labelOffset', () => {
-    const map = parseDSL(
-      'title T\ncomponent Kettle [0.43, 0.35]\nevolve Kettle 0.62 label [16, 5]',
-    );
-    const kettle = map.elements.find((e) => e.label === 'Kettle');
-    expect(kettle?.elementType === 'component' && kettle.movement?.targetEvolution).toBe(0.62);
-    expect(kettle?.elementType === 'component' && kettle.movement?.labelOffset).toEqual({
-      dx: 16,
-      dy: 5,
-    });
-    const out = serializeDSL(map);
-    expect(out).toContain('evolve Kettle 0.62 label [16, 5]');
-    expect(serializeDSL(parseDSL(out))).toBe(out);
+describe('parseDSL – names with parentheses', () => {
+  it('leaves parentheses in names untouched (color only after coordinates)', () => {
+    const board = parseDSL('title T\nevent Payment (retry) [620, 300]');
+    const el = board.elements[0]!;
+    expect(el.label).toBe('Payment (retry)');
+    expect(el.color).toBeUndefined();
+  });
+
+  it('still reads the color after the coordinates', () => {
+    const board = parseDSL('title T\nevent X [100, 200] (color #ff0000)');
+    expect(board.elements[0]!.color).toBe('#ff0000');
   });
 });
 
-describe('parseDSL – multi-position annotations', () => {
-  it('reads annotation 1 [[y,x],[y,x]] text losslessly', () => {
-    const src = 'title T\nannotation 1 [[0.9, 0.4], [0.5, 0.6]] Two spots';
-    const map = parseDSL(src);
-    const anno = map.elements.find((e) => e.elementType === 'annotation');
-    expect(anno?.elementType === 'annotation' && anno.positions).toEqual([
-      { visibility: 0.9, evolution: 0.4 },
-      { visibility: 0.5, evolution: 0.6 },
-    ]);
-    expect(anno?.elementType === 'annotation' && anno.text).toBe('Two spots');
-    const out = serializeDSL(map);
-    expect(out).toContain('annotation 1 [[0.9, 0.4], [0.5, 0.6]] Two spots');
-    expect(serializeDSL(parseDSL(out))).toBe(out);
-  });
-});
-
-describe('parseDSL – names with parentheses/keywords', () => {
-  it('leaves parentheses in names untouched (decorators only after coordinates)', () => {
-    const map = parseDSL('title T\ncomponent Tea (green) [0.6, 0.8]');
-    const tea = map.elements[0]!;
-    expect(tea.label).toBe('Tea (green)');
-    expect(tea.elementType === 'component' && tea.decorators).toBeUndefined();
-  });
-
-  it('leaves the word "inertia" in names untouched', () => {
-    const map = parseDSL('title T\ncomponent inertia dampener [0.6, 0.8]');
-    expect(map.elements[0]!.label).toBe('inertia dampener');
-  });
-
-  it('still reads decorators after the coordinates', () => {
-    const map = parseDSL('title T\ncomponent X [0.1, 0.2] (market, outsource) inertia');
-    const x = map.elements[0]!;
-    expect(x.elementType === 'component' && x.decorators).toEqual({
-      market: true,
-      method: 'outsource',
-      inertia: true,
-    });
-  });
-});
-
-describe('parseDSL – Legacy build/buy/outsource', () => {
-  it('sets the method on an existing component (buy Kettle)', () => {
-    const map = parseDSL('title T\ncomponent Kettle [0.43, 0.35]\nbuy Kettle');
-    const kettle = map.elements.find((e) => e.label === 'Kettle');
-    expect(kettle?.elementType === 'component' && kettle.decorators?.method).toBe('buy');
-  });
-
-  it('creates a component with a method when coordinates are given (outsource Power [y,x])', () => {
-    const map = parseDSL('title T\noutsource Power [0.1, 0.7]');
-    const power = map.elements.find((e) => e.label === 'Power');
-    expect(power?.elementType === 'component' && power.decorators?.method).toBe('outsource');
-  });
-
-  it('an unknown reference stays in rawPassthrough', () => {
-    const map = parseDSL('title T\nbuy Ghost');
-    expect(map.rawPassthrough).toContain('buy Ghost');
-  });
-});
-
-describe('parseDSL – pipeline block (OWM v2)', () => {
-  const SRC = `title P
-component Kettle [0.43, 0.35]
-pipeline Kettle [0.1, 0.9]
-{
-  component Campfire Kettle [0.35]
-  component Electric Kettle [0.7] (buy)
-}
-Campfire Kettle -> Electric Kettle`;
-
-  it('reads block children with visibility inheritance and pipelineId', () => {
-    const map = parseDSL(SRC);
-    const pipe = map.elements.find((e) => e.elementType === 'pipeline');
-    expect(pipe?.elementType).toBe('pipeline');
-    const kids = map.elements.filter((e) => e.elementType === 'component' && e.pipelineId);
-    expect(kids.map((k) => k.label)).toEqual(['Campfire Kettle', 'Electric Kettle']);
-    for (const k of kids) {
-      expect(k.elementType === 'component' && k.pipelineId).toBe(pipe!.id);
-      expect(k.position.visibility).toBe(0.43); // inherited from the Kettle component
-    }
-    expect(kids[0]!.position.evolution).toBe(0.35);
-    expect(kids[1]!.elementType === 'component' && kids[1]!.decorators?.method).toBe('buy');
-    if (pipe?.elementType === 'pipeline') expect(pipe.childIds).toHaveLength(2);
-    // edges to block children work
-    expect(map.edges).toHaveLength(1);
-  });
-
-  it('derives the range from the children when no coordinates are given', () => {
-    const map = parseDSL(
-      'title P\npipeline Power Source\n{\n  component Solar [0.4]\n  component Grid [0.8]\n}',
-    );
-    const pipe = map.elements.find((e) => e.elementType === 'pipeline');
-    if (pipe?.elementType === 'pipeline') {
-      expect(pipe.evolutionStart).toBe(0.4);
-      expect(pipe.evolutionEnd).toBe(0.8);
-    }
-  });
-
-  it('serializes the block form and round-trips stably', () => {
-    const once = serializeDSL(parseDSL(SRC));
-    expect(once).toContain('pipeline Kettle [0.1, 0.9]');
-    expect(once).toContain('{');
-    expect(once).toContain('  component Campfire Kettle [0.35]');
-    expect(once).toContain('  component Electric Kettle [0.7] (buy)');
-    expect(once).toContain('}');
-    // children must NOT additionally appear as top-level component
-    expect(once.match(/^component Campfire Kettle/m)).toBeNull();
+describe('parseDSL – style config', () => {
+  it('reads style classic|dark', () => {
+    const board = parseDSL('title T\nstyle dark');
+    expect(board.config.style).toBe('dark');
+    const once = serializeDSL(board);
+    expect(once).toContain('style dark');
     expect(serializeDSL(parseDSL(once))).toBe(once);
   });
 
-  it('keeps the height of a standalone pipeline via the `(y …)` extension', () => {
-    const src = 'title P\npipeline Options [0.2, 0.6] (y 0.75)';
-    const map = parseDSL(src);
-    const pipe = map.elements.find((e) => e.elementType === 'pipeline');
-    expect(pipe?.position.visibility).toBe(0.75);
-    const once = serializeDSL(map);
-    expect(once).toContain('pipeline Options [0.2, 0.6] (y 0.75)');
-    expect(serializeDSL(parseDSL(once))).toBe(once);
+  it('keeps an unknown style losslessly in rawPassthrough', () => {
+    const board = parseDSL('title T\nstyle neon');
+    expect(board.config.style).toBeUndefined();
+    expect(board.rawPassthrough).toContain('style neon');
   });
 
-  it('writes NO (y …) when the height matches the anchor component (canonical OWM stays clean)', () => {
-    const src = 'title P\ncomponent Kettle [0.43, 0.35]\npipeline Kettle [0.3, 0.65]';
-    const once = serializeDSL(parseDSL(src));
-    expect(once).toContain('pipeline Kettle [0.3, 0.65]');
-    expect(once).not.toContain('(y ');
-    expect(serializeDSL(parseDSL(once))).toBe(once);
-  });
-
-  it('a standalone pipeline (no anchor component) is an edge endpoint itself', () => {
-    const src = `title P
-anchor consumer [0.95, 0.5]
-pipeline GOOD [0.3, 0.7]
-{
-  component physical [0.4]
-}
-consumer -> GOOD`;
-    const map = parseDSL(src);
-    const pipe = map.elements.find((e) => e.elementType === 'pipeline');
-    const edge = map.edges[0];
-    expect(edge?.to).toBe(pipe!.id);
-    const once = serializeDSL(map);
-    expect(once).toContain('consumer -> GOOD');
-    expect(serializeDSL(parseDSL(once))).toBe(once);
-  });
-
-  it('with an anchor component the edge still binds to the component (OWM convention)', () => {
-    const src = `title P
-anchor consumer [0.95, 0.5]
-component GOOD [0.8, 0.5]
-pipeline GOOD [0.3, 0.7]
-consumer -> GOOD`;
-    const map = parseDSL(src);
-    const comp = map.elements.find((e) => e.elementType === 'component' && e.label === 'GOOD');
-    expect(map.edges[0]?.to).toBe(comp!.id);
-  });
-});
-
-describe('parseDSL – url keyword', () => {
-  it('resolves url definition + url(Name) reference on submap/component', () => {
-    const src = `title T
-url TeamMap [https://example.org/team#m=abc]
-submap Platform [0.4, 0.7] url(TeamMap)
-component API [0.6, 0.5] url(https://api.example.org/docs)`;
-    const map = parseDSL(src);
-    const sub = map.elements.find((e) => e.elementType === 'submap');
-    expect(sub?.elementType === 'submap' && sub.urlRef).toBe('https://example.org/team#m=abc');
-    const api = map.elements.find((e) => e.label === 'API');
-    expect(api?.elementType === 'component' && api.url).toBe('https://api.example.org/docs');
-  });
-
-  it('round-trips definition + reference stably', () => {
-    const src =
-      'title T\nurl TeamMap [https://example.org/x]\nsubmap Platform [0.4, 0.7] url(TeamMap)';
-    const once = serializeDSL(parseDSL(src));
-    expect(once).toContain('url Platform URL [https://example.org/x]');
-    expect(once).toContain('url(Platform URL)');
-    expect(serializeDSL(parseDSL(once))).toBe(once);
-  });
-
-  it('keeps unreferenced url definitions in rawPassthrough', () => {
-    const map = parseDSL('title T\nurl Orphaned [https://example.org/y]');
-    expect(map.rawPassthrough).toContain('url Orphaned [https://example.org/y]');
+  it('an unparsable style line is not emitted twice when config.style is set', () => {
+    // Unknown style -> lands in rawPassthrough, config.style stays undefined.
+    const board = parseDSL('title T\nstyle neon');
+    // Now the editor sets a valid style: the stale line must NOT survive as a duplicate.
+    const withStyle = { ...board, config: { ...board.config, style: 'classic' as const } };
+    const out = serializeDSL(withStyle);
+    expect(out.match(/^style /gm)).toHaveLength(1);
+    expect(out).toContain('style classic');
   });
 });
 
 describe('parseDSLWithDiagnostics', () => {
   it('reports unparsable lines with line numbers', () => {
-    const { diagnostics } = parseDSLWithDiagnostics('title T\ncomponent broken [oops]\n');
+    const { diagnostics } = parseDSLWithDiagnostics('title T\nevent broken [oops]\n');
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.line).toBe(2);
-    expect(diagnostics[0]!.text).toContain('component broken');
+    expect(diagnostics[0]!.text).toContain('event broken');
   });
 
-  it('clamps out-of-range coordinates instead of throwing', () => {
-    const { map, diagnostics } = parseDSLWithDiagnostics('title T\ncomponent X [1.4, -0.2]');
-    const x = map.elements[0]!;
-    expect(x.position).toEqual({ visibility: 1, evolution: 0 });
-    expect(diagnostics.some((d) => d.message.includes('clamped'))).toBe(true);
+  it('keeps a line with malformed coordinates losslessly in rawPassthrough', () => {
+    const { board } = parseDSLWithDiagnostics('title T\nevent broken [oops]');
+    expect(board.elements).toHaveLength(0);
+    expect(board.rawPassthrough).toContain('event broken [oops]');
   });
 
-  it('reports unresolved references (evolve/edges) with line numbers', () => {
-    const { diagnostics } = parseDSLWithDiagnostics(
-      'title T\ncomponent A [0.5, 0.5]\nevolve Ghost 0.8\nA -> Ghost',
-    );
+  it('accepts unbounded pixel coordinates (negative, large) without clamping', () => {
+    const { board, diagnostics } = parseDSLWithDiagnostics('title T\nevent X [-500, 1400.5]');
+    expect(board.elements[0]!.position).toEqual({ x: -500, y: 1400.5 });
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  it('reports unresolved arrow references with line numbers', () => {
+    const { diagnostics } = parseDSLWithDiagnostics('title T\nevent A [500, 500]\nA -> Ghost');
     expect(diagnostics.some((d) => d.line === 3 && d.message.includes('Ghost'))).toBe(true);
-    expect(diagnostics.some((d) => d.line === 4 && d.message.includes('Ghost'))).toBe(true);
   });
 
   it('comments produce NO diagnostics', () => {
@@ -540,32 +286,44 @@ describe('parseDSLWithDiagnostics', () => {
   });
 });
 
-describe('serializeDSL Round-Trip', () => {
-  it('is stable for the M4 types (annotation/attitude/accelerator/flow/submap)', () => {
-    const once = serializeDSL(parseDSL(RICH));
+describe('serializeDSL round-trip', () => {
+  it('is stable for the full kind set (stickies/note/drawing)', () => {
+    const once = serializeDSL(parseDSL(ALL_KINDS));
     const twice = serializeDSL(parseDSL(once));
     expect(twice).toBe(once);
   });
 
-  it('is stable across two cycles (incl. spaces in names, evolve, decorators)', () => {
-    const once = serializeDSL(parseDSL(TEA_SHOP));
+  it('is stable across two cycles (incl. spaces and punctuation in names)', () => {
+    const once = serializeDSL(parseDSL(ORDER_CHECKOUT));
     const twice = serializeDSL(parseDSL(once));
     expect(twice).toBe(once);
   });
 
-  it('round-trip with an asymmetric pipeline range', () => {
-    const src = 'title P\ncomponent Platform [0.5, 0.4]\npipeline Platform [0.05, 0.95]';
-    const once = serializeDSL(parseDSL(src));
-    const twice = serializeDSL(parseDSL(once));
-    expect(twice).toBe(once);
-    expect(once).toContain('pipeline Platform [0.05, 0.95]');
+  it('the canonical Order Checkout example survives with 11 elements and 9 arrows', () => {
+    const board = parseDSL(ORDER_CHECKOUT);
+    expect(board.elements).toHaveLength(11);
+    expect(board.edges).toHaveLength(9);
+    // Fixed point after ONE canonicalization: parse -> serialize -> parse.
+    const once = serializeDSL(board);
+    const reparsed = parseDSL(once);
+    expect(reparsed.elements).toHaveLength(11);
+    expect(reparsed.edges).toHaveLength(9);
+    expect(reparsed.elements.map((e) => e.label)).toEqual(board.elements.map((e) => e.label));
+    expect(serializeDSL(reparsed)).toBe(once);
+  });
+
+  it('rounds coordinates to 3 decimals deterministically', () => {
+    const board = parseDSL('title T\nevent X [100.00049, 200.0006]');
+    const once = serializeDSL(board);
+    expect(once).toContain('event X [100, 200.001]');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
   });
 });
 
 describe('notes – color & multiline', () => {
   it('parses color `(color …)` and a literal `\\n` as a real line break', () => {
     const src =
-      'title T\nnote Looks good [0.8, 0.3] (color #15803d)\nnote Line1\\nLine2 [0.4, 0.6]';
+      'title T\nnote Looks good [800, 300] (color #15803d)\nnote Line1\\nLine2 [400, 600]';
     const notes = parseDSL(src).elements.filter((e) => e.elementType === 'note') as Array<{
       label: string;
       color?: string;
@@ -578,73 +336,74 @@ describe('notes – color & multiline', () => {
   });
 
   it('round-trip is stable (color stays, line break stays escaped)', () => {
-    const src = 'title T\nnote Risk here [0.8, 0.3] (color #b91c1c)\nnote A\\nB [0.4, 0.6]';
+    const src = 'title T\nnote Risk here [800, 300] (color #b91c1c)\nnote A\\nB [400, 600]';
     const once = serializeDSL(parseDSL(src));
-    expect(once).toContain('note Risk here [0.8, 0.3] (color #b91c1c)');
-    expect(once).toContain('note A\\nB [0.4, 0.6]');
+    expect(once).toContain('note Risk here [800, 300] (color #b91c1c)');
+    expect(once).toContain('note A\\nB [400, 600]');
     expect(serializeDSL(parseDSL(once))).toBe(once);
   });
 });
 
 describe('note color (project extension: `(color …)`)', () => {
   it('parses the color and keeps the text clean', () => {
-    const map = parseDSL('title T\nnote Looks good [0.8, 0.6] (color #15803d)');
-    const note = map.elements.find((e) => e.elementType === 'note');
+    const board = parseDSL('title T\nnote Looks good [800, 600] (color #15803d)');
+    const note = board.elements.find((e) => e.elementType === 'note');
     expect(note).toMatchObject({ label: 'Looks good', color: '#15803d' });
   });
 
   it('also accepts CSS color names', () => {
-    const map = parseDSL('title T\nnote Risk here [0.3, 0.2] (color red)');
-    const note = map.elements.find((e) => e.elementType === 'note');
+    const board = parseDSL('title T\nnote Risk here [300, 200] (color red)');
+    const note = board.elements.find((e) => e.elementType === 'note');
     expect(note).toMatchObject({ label: 'Risk here', color: 'red' });
   });
 
   it('serializes the color and is round-trip stable', () => {
-    const src = 'title T\nnote Watch this [0.5, 0.5] (color #b45309)';
+    const src = 'title T\nnote Watch this [500, 500] (color #b45309)';
     const once = serializeDSL(parseDSL(src));
-    expect(once).toContain('note Watch this [0.5, 0.5] (color #b45309)');
+    expect(once).toContain('note Watch this [500, 500] (color #b45309)');
     expect(serializeDSL(parseDSL(once))).toBe(once);
   });
 
   it('notes without a color stay unchanged (no empty parentheses)', () => {
-    const out = serializeDSL(parseDSL('title T\nnote Plain [0.5, 0.5]'));
-    expect(out).toContain('note Plain [0.5, 0.5]');
+    const out = serializeDSL(parseDSL('title T\nnote Plain [500, 500]'));
+    expect(out).toContain('note Plain [500, 500]');
     expect(out).not.toContain('(color');
   });
 });
 
-describe('element color on every type (project extension: `(color …)`)', () => {
-  it('parses and round-trips the color on all element lines', () => {
+describe('element color on every kind (project extension: `(color …)`)', () => {
+  it('parses and round-trips the color on all sticky lines', () => {
     const src = `title T
-anchor consumer [0.9, 0.5] (color #b45309)
-component Shop [0.7, 0.4] (market) (color #15803d)
-submap Detail [0.6, 0.2] (color #6d28d9)
-accelerator Boost [0.5, 0.6] (color #0e7c74)
-pioneers [0.8, 0.1, 0.6, 0.3] (color #be123c)
-pipeline Shop [0.3, 0.7] (color #1d4ed8)`;
-    const map = parseDSL(src);
-    const colorOf = (type: string) => map.elements.find((e) => e.elementType === type)?.color;
-    expect(colorOf('anchor')).toBe('#b45309');
-    expect(colorOf('component')).toBe('#15803d');
-    expect(colorOf('submap')).toBe('#6d28d9');
-    expect(colorOf('accelerator')).toBe('#0e7c74');
-    expect(colorOf('attitude')).toBe('#be123c');
-    expect(colorOf('pipeline')).toBe('#1d4ed8');
-    // Decorators survive next to the color.
-    const comp = map.elements.find((e) => e.elementType === 'component');
-    expect(comp && 'decorators' in comp && comp.decorators?.market).toBe(true);
-    const once = serializeDSL(map);
-    expect(once).toContain('component Shop [0.7, 0.4] (market) (color #15803d)');
-    expect(once).toContain('pipeline Shop [0.3, 0.7] (color #1d4ed8)');
+event Order Placed [620, 300] (color #b45309)
+command Place Order [240, 300] (color #15803d)
+actor Customer [80, 300] (color #6d28d9)
+aggregate Order [420, 290] (color #0e7c74)
+policy Ship it [800, 300] (color #be123c)
+readmodel Order Status [620, 120] (color #1d4ed8)
+external Payment Provider [420, 520] (color #a21caf)
+hotspot Retry storm? [620, 520] (color #713f12)`;
+    const board = parseDSL(src);
+    const colorOf = (type: string) => board.elements.find((e) => e.elementType === type)?.color;
+    expect(colorOf('event')).toBe('#b45309');
+    expect(colorOf('command')).toBe('#15803d');
+    expect(colorOf('actor')).toBe('#6d28d9');
+    expect(colorOf('aggregate')).toBe('#0e7c74');
+    expect(colorOf('policy')).toBe('#be123c');
+    expect(colorOf('readmodel')).toBe('#1d4ed8');
+    expect(colorOf('external')).toBe('#a21caf');
+    expect(colorOf('hotspot')).toBe('#713f12');
+    const once = serializeDSL(board);
+    expect(once).toContain('command Place Order [240, 300] (color #15803d)');
+    expect(once).toContain('hotspot Retry storm? [620, 520] (color #713f12)');
     expect(serializeDSL(parseDSL(once))).toBe(once);
   });
 
   it('round-trips freeform drawings (`line` project extension)', () => {
     const src = `title T
-line [[0.8, 0.2], [0.6, 0.35], [0.7, 0.5]] (closed) (dashed) (color #b45309)
-line [[0.3, 0.1], [0.25, 0.4]]`;
-    const map = parseDSL(src);
-    const drawings = map.elements.filter((e) => e.elementType === 'drawing');
+line [[800, 200], [600, 350], [700, 500]] (closed) (dashed) (color #b45309)
+line [[300, 100], [250, 400]]`;
+    const board = parseDSL(src);
+    const drawings = board.elements.filter((e) => e.elementType === 'drawing');
     expect(drawings).toHaveLength(2);
     const shape = drawings[0]!;
     if (shape.elementType === 'drawing') {
@@ -658,25 +417,11 @@ line [[0.3, 0.1], [0.25, 0.4]]`;
       expect(open.closed).toBeUndefined();
       expect(open.strokeStyle).toBeUndefined();
     }
-    const once = serializeDSL(map);
+    const once = serializeDSL(board);
     expect(once).toContain(
-      'line [[0.8, 0.2], [0.6, 0.35], [0.7, 0.5]] (closed) (dashed) (color #b45309)',
+      'line [[800, 200], [600, 350], [700, 500]] (closed) (dashed) (color #b45309)',
     );
-    expect(once).toContain('line [[0.3, 0.1], [0.25, 0.4]]');
-    expect(serializeDSL(parseDSL(once))).toBe(once);
-  });
-
-  it('keeps the color on pipeline block children', () => {
-    const src = `title T
-pipeline GOOD [0.3, 0.7]
-{
-  component physical [0.4] (color #b45309)
-}`;
-    const map = parseDSL(src);
-    const child = map.elements.find((e) => e.label === 'physical');
-    expect(child?.color).toBe('#b45309');
-    const once = serializeDSL(map);
-    expect(once).toContain('  component physical [0.4] (color #b45309)');
+    expect(once).toContain('line [[300, 100], [250, 400]]');
     expect(serializeDSL(parseDSL(once))).toBe(once);
   });
 });

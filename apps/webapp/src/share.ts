@@ -1,7 +1,7 @@
 /**
- * URL/sharing helpers: encode the map (OWM-DSL) compressed (deflate-raw, browser-native — no CDN, GDPR)
- * as URL-safe Base64 in the hash. Uncompressed legacy links (`#m=`) are still read. This is the
- * webapp's way to share an editable map — a link, not an image.
+ * URL/sharing helpers: encode the board (Event Storming DSL) compressed (deflate-raw,
+ * browser-native — no CDN, GDPR) as URL-safe Base64 in the hash. Uncompressed legacy links (`#m=`)
+ * are still read. This is the webapp's way to share an editable board — a link, not an image.
  */
 
 /** Bytes -> URL-safe Base64 (A-Za-z0-9-_, no padding). */
@@ -34,7 +34,7 @@ export function decodeMap(b64: string): string {
   return new TextDecoder().decode(fromBase64Url(b64));
 }
 
-/** UTF-8 -> deflate-raw -> URL-safe Base64. Real-world maps shrink by ~5-8x. */
+/** UTF-8 -> deflate-raw -> URL-safe Base64. Real-world boards shrink by ~5-8x. */
 export async function encodeMapCompressed(text: string): Promise<string> {
   const deflated = await pipe(new TextEncoder().encode(text), new CompressionStream('deflate-raw'));
   return toBase64Url(deflated);

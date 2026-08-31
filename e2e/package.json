@@ -1,5 +1,5 @@
 {
-  "name": "@miragon/wardley-e2e",
+  "name": "@miragon/event-storming-e2e",
   "version": "0.0.0",
   "private": true,
   "type": "module",
