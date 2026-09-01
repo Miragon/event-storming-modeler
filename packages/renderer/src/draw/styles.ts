@@ -15,19 +15,21 @@ export interface StickyStyle {
 /**
  * The canonical sticky-note look per kind (Brandolini's color grammar): default label, fixed
  * size and fill/border. Single source for the renderer, element factory, palette previews and
- * the color-picker swatches.
+ * the color-picker swatches. Aggregate, policy and external system share the large block format —
+ * they occupy the same slot in the grammar (receive commands / react to events); actors are the
+ * small corner stickies.
  */
 export const STICKY_STYLES: Record<StickyKind, StickyStyle> = {
   event: { label: 'Domain Event', width: 130, height: 90, fill: '#FFB84D', stroke: '#E89A2E' },
   command: { label: 'Command', width: 130, height: 90, fill: '#7EC8F0', stroke: '#4FA8D8' },
   actor: { label: 'Actor', width: 100, height: 65, fill: '#FFF9B1', stroke: '#E6DB7A' },
   aggregate: { label: 'Aggregate', width: 180, height: 110, fill: '#FFE066', stroke: '#E0BE3F' },
-  policy: { label: 'Policy', width: 130, height: 90, fill: '#C9A0DC', stroke: '#A97CC4' },
+  policy: { label: 'Policy', width: 180, height: 110, fill: '#C9A0DC', stroke: '#A97CC4' },
   readmodel: { label: 'Read Model', width: 130, height: 90, fill: '#A8D08D', stroke: '#7FB35D' },
   external: {
     label: 'External System',
-    width: 130,
-    height: 90,
+    width: 180,
+    height: 110,
     fill: '#F4A6C0',
     stroke: '#DE7EA2',
   },

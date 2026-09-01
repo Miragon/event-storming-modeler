@@ -59,9 +59,9 @@ const { svg } = await viewer.saveSVG();
 | Command         | `command`   | 130×90       | `#7EC8F0` |
 | Actor           | `actor`     | 100×65       | `#FFF9B1` |
 | Aggregate       | `aggregate` | 180×110      | `#FFE066` |
-| Policy          | `policy`    | 130×90       | `#C9A0DC` |
+| Policy          | `policy`    | 180×110      | `#C9A0DC` |
 | Read Model      | `readmodel` | 130×90       | `#A8D08D` |
-| External System | `external`  | 130×90       | `#F4A6C0` |
+| External System | `external`  | 180×110      | `#F4A6C0` |
 | Hotspot         | `hotspot`   | 130×90       | `#E85D75` |
 | Note            | `note`      | auto         | `#ECECEC` |
 
