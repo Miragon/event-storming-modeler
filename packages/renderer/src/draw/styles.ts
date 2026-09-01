@@ -36,8 +36,11 @@ export const STICKY_STYLES: Record<StickyKind, StickyStyle> = {
   hotspot: { label: 'Hotspot', width: 130, height: 90, fill: '#E85D75', stroke: '#C43B55' },
 } as const;
 
-/** Free-text note: auto-sizes to its text (see `noteMetrics`), neutral grey. */
+/** Free-text note: auto-sizes to its text (see `noteMetrics`) unless resized by hand, neutral grey. */
 export const NOTE_STYLE = { label: 'Note', fill: '#ECECEC', stroke: '#C4C4C4' } as const;
+
+/** Smallest hand-resized note box — keeps a shrunken note grabbable and its handles apart. */
+export const NOTE_MIN_RESIZE = { width: 60, height: 40 } as const;
 
 /** Corner radius shared by all stickies (and the palette previews). */
 export const STICKY_RADIUS = 6;
@@ -64,6 +67,17 @@ export function noteMetrics(label: string): { lines: string[]; width: number; he
     width: Math.max(NOTE_MIN_SIZE, Math.round(maxLen * STICKY_CHAR_WIDTH) + STICKY_PADDING * 2),
     height: Math.max(NOTE_MIN_SIZE, lines.length * STICKY_LINE_HEIGHT + STICKY_PADDING * 2),
   };
+}
+
+/**
+ * The auto-vs-manual rule: a note box is MANUAL iff it differs from `noteMetrics(label)`.
+ * Single comparison shared by the exporter (emit `size` only for manual boxes), relabel
+ * (preserve manual boxes) and copy-paste (recompute only auto clones) — divergence between
+ * these callers would make boards change on a plain reload.
+ */
+export function isManualNoteBox(label: string, box: { width: number; height: number }): boolean {
+  const metrics = noteMetrics(label);
+  return box.width !== metrics.width || box.height !== metrics.height;
 }
 
 /**

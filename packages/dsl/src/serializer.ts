@@ -148,10 +148,14 @@ function elementLine(el: BoardElement, name: string, attach: string): string {
     case 'external':
     case 'hotspot':
       return `${el.elementType} ${name} [${r(p.x)}, ${r(p.y)}]${colorSuffix(el)}${attach}`;
-    case 'note':
+    case 'note': {
       // Escape line breaks/comment starters -> the line-based DSL stays single-line. `->` is
       // fine in note text (notes are never arrow endpoints), so no `→` replacement here.
-      return `note ${escapeText(name)} [${r(p.x)}, ${r(p.y)}]${colorSuffix(el)}`;
+      // `(size WxH)` is ALWAYS the last suffix on note lines and only present for manually
+      // sized notes — auto-sized boards stay byte-identical.
+      const size = el.size ? ` (size ${r(el.size.width)}x${r(el.size.height)})` : '';
+      return `note ${escapeText(name)} [${r(p.x)}, ${r(p.y)}]${colorSuffix(el)}${size}`;
+    }
     case 'drawing': {
       // Project extension (freeform drawing): tuple list + style flags.
       const pts = el.points.map((q) => `[${r(q.x)}, ${r(q.y)}]`).join(', ');

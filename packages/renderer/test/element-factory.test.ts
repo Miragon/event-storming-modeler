@@ -68,6 +68,34 @@ describe('EventStormingElementFactory.createNew: per-kind defaults', () => {
   });
 });
 
+describe('EventStormingElementFactory.createNote: auto vs manual size', () => {
+  it('uses the text metrics when no size is stored', () => {
+    const shape = factory([]).createNote({
+      id: 'note_hint',
+      elementType: 'note',
+      label: 'Hint',
+      position: { x: 100, y: 100 },
+    });
+    const { width, height } = noteMetrics('Hint');
+    expect(shape.width).toBe(width);
+    expect(shape.height).toBe(height);
+  });
+
+  it('honors a manual size (user resized by hand), centered on the position', () => {
+    const shape = factory([]).createNote({
+      id: 'note_kickoff',
+      elementType: 'note',
+      label: 'Kickoff',
+      position: { x: 300, y: 200 },
+      size: { width: 240, height: 160 },
+    });
+    expect(shape.width).toBe(240);
+    expect(shape.height).toBe(160);
+    expect(shape.x).toBe(300 - 240 / 2);
+    expect(shape.y).toBe(200 - 160 / 2);
+  });
+});
+
 describe('EventStormingElementFactory.createSticky: center -> top-left', () => {
   it('places the shape so the schema position is its center', () => {
     const shape = factory([]).createSticky({

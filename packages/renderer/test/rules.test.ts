@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type EventBus from 'diagram-js/lib/core/EventBus';
 import { ATTACHABLE_STICKY_KINDS, HOST_STICKY_KINDS } from '@miragon/event-storming-schema-model';
 import EventStormingRules from '../src/rules/EventStormingRules.js';
+import { STICKY_KINDS } from '../src/model/di-types.js';
 
 type RuleHandler = (event: { context: Record<string, unknown> }) => unknown;
 
@@ -18,7 +19,9 @@ function ruleHarness() {
     handlers.get('commandStack.connection.create.canExecute')!({ context: { source, target } });
   const canMoveElements = (shapes: unknown[], target?: unknown) =>
     handlers.get('commandStack.elements.move.canExecute')!({ context: { shapes, target } });
-  return { canCreateConnection, canMoveElements };
+  const canResizeShape = (shape: unknown, newBounds?: { width: number; height: number }) =>
+    handlers.get('commandStack.shape.resize.canExecute')!({ context: { shape, newBounds } });
+  return { canCreateConnection, canMoveElements, canResizeShape };
 }
 
 function sticky(id: string, eventStormingType = 'command') {
@@ -99,5 +102,27 @@ describe('EventStormingRules: attach (pinning)', () => {
     expect(canMoveElements([sticky('hot_a', 'hotspot')], host)).toBe('attach');
     expect(canMoveElements([sticky('evt_a', 'event')], host)).toBe(true);
     expect(canMoveElements([sticky('a', 'actor'), sticky('b', 'hotspot')], host)).toBe(true);
+  });
+});
+
+describe('EventStormingRules: shape.resize', () => {
+  const note = { id: 'note_x', eventStormingType: 'note', eventStormingLabel: 'Hint' };
+
+  it('allows resizing notes ONLY — stickies keep fixed sizes, drawings their vertex handles', () => {
+    const { canResizeShape } = ruleHarness();
+    expect(canResizeShape(note)).toBe(true);
+    for (const kind of STICKY_KINDS) {
+      expect(canResizeShape(sticky(`s_${kind}`, kind)), kind).toBe(false);
+    }
+    expect(canResizeShape({ id: 'draw_x', eventStormingType: 'drawing' })).toBe(false);
+    expect(canResizeShape(undefined)).toBe(false);
+  });
+
+  it('rejects boxes below the 60x40 minimum on the newBounds re-check', () => {
+    const { canResizeShape } = ruleHarness();
+    expect(canResizeShape(note, { width: 60, height: 40 })).toBe(true);
+    expect(canResizeShape(note, { width: 59, height: 40 })).toBe(false);
+    expect(canResizeShape(note, { width: 60, height: 39 })).toBe(false);
+    expect(canResizeShape(note, { width: 240, height: 160 })).toBe(true);
   });
 });

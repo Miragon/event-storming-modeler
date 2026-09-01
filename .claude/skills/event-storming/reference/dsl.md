@@ -36,6 +36,7 @@ reported as a diagnostic.
 <kind> <Name> [x, y]
 <kind> <Name> [x, y] (color #rrggbb)
 <kind> <Name> [x, y] (color #rrggbb) (on <Host Name>)
+note <Text> [x, y] (color #rrggbb) (size <w>x<h>)
 ```
 
 - `<kind>` is one of: `event`, `command`, `actor`, `aggregate`, `policy`, `readmodel`,
@@ -50,10 +51,16 @@ reported as a diagnostic.
   with the host while keeping its own absolute coordinates. Always the **last** suffix — the host
   name runs to the line's final `)`, so names containing parentheses work. An unresolved or
   invalid host is reported as a diagnostic and the sticky stays unpinned.
+- `(size <w>x<h>)` — `note` only: the note's manual size in board pixels (the note was resized
+  by hand). Absent = the note auto-sizes to its text. Always the **last** suffix on note lines;
+  the serializer writes no spaces around the `x`, the parser tolerates them. A malformed size,
+  or a size on any other kind, is reported as a diagnostic and ignored — the element is still
+  created.
 
 ```
 command Approve Order [240, 300]
 actor Manager [250, 280] (on Approve Order)
+note Kickoff agenda [80, 80] (size 240x160)
 ```
 
 Freeform drawings use `line` with a list of points and optional suffixes:

@@ -317,6 +317,34 @@ describe('Validation', () => {
   });
 });
 
+describe('Note size (manual resize)', () => {
+  const withNote = (size: unknown) => ({
+    ...sample,
+    elements: [
+      ...sample.elements,
+      { id: 'note_1', elementType: 'note', label: 'Kickoff', position: { x: 80, y: 80 }, size },
+    ],
+  });
+
+  it('accepts a note with a manual size and round-trips it through the JSON serialization', () => {
+    const board = loadBoard(withNote({ width: 240, height: 160 }));
+    const note = board.elements.find((el) => el.id === 'note_1');
+    expect(note).toMatchObject({ size: { width: 240, height: 160 } });
+    const out = serializeBoard(board);
+    expect(out).toContain('"width": 240');
+    expect(out).toContain('"height": 160');
+    expect(serializeBoard(parseBoardJSON(out))).toBe(out);
+  });
+
+  it('rejects a zero width', () => {
+    expect(() => loadBoard(withNote({ width: 0, height: 160 }))).toThrow();
+  });
+
+  it('rejects a negative height', () => {
+    expect(() => loadBoard(withNote({ width: 240, height: -1 }))).toThrow();
+  });
+});
+
 describe('Attachments (pinning)', () => {
   it('pins the exact attachable and host kind sets', () => {
     expect(ATTACHABLE_STICKY_KINDS).toEqual(['actor', 'hotspot']);

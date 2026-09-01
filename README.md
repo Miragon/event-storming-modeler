@@ -100,6 +100,13 @@ command Approve Order [240, 300]
 actor Manager [250, 280] (on Approve Order)
 ```
 
+Notes auto-size to their text; a hand-resized note records its box with the trailing
+`(size <w>x<h>)` suffix:
+
+```
+note Kickoff agenda [80, 80] (size 240x160)
+```
+
 The full example board
 ([`example/order-checkout.storm`](example/order-checkout.storm)):
 

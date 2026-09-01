@@ -26,10 +26,12 @@ import { eventStormingAppendModule } from './append/index.js';
 import { eventStormingColorPickerModule } from './color-picker/index.js';
 import { eventStormingOrderingModule } from './ordering/index.js';
 import { eventStormingDrawToolModule } from './draw-tool/index.js';
+import { eventStormingResizeModule } from './resize/index.js';
 
 /**
  * Full Event Storming editor: palette/create, free move with sticky-center snapping, connect
- * with rules, context pad, inline label editing, undo/redo, pinning of actor/hotspot stickies.
+ * with rules, context pad, inline label editing, undo/redo, pinning of actor/hotspot stickies,
+ * free resizing of notes.
  */
 export class Modeler extends NavigatedViewer {
   protected override _getModules(): ModuleDeclaration[] {
@@ -58,6 +60,7 @@ export class Modeler extends NavigatedViewer {
       eventStormingLassoModule,
       eventStormingOrderingModule,
       eventStormingDrawToolModule,
+      eventStormingResizeModule,
     ];
   }
 

@@ -67,6 +67,27 @@ describe('EventStormingCopyPaste: pasted note auto-size', () => {
     expect(clone.y + clone.height / 2).toBe(note.y + note.height / 2);
   });
 
+  it('keeps a MANUALLY sized box on the clone (only auto boxes track the suffixed label)', () => {
+    const note = {
+      eventStormingType: 'note',
+      eventStormingLabel: 'Risk',
+      x: 100,
+      y: 100,
+      width: 240,
+      height: 160,
+    };
+    const { copyPaste, created } = harness([note]);
+
+    expect(copyPaste.duplicate()).toBe(true);
+
+    const clone = created[0]![0]!;
+    expect(clone.eventStormingLabel).toBe('Risk 2');
+    expect(clone.width).toBe(240);
+    expect(clone.height).toBe(160);
+    expect(clone.x).toBe(note.x);
+    expect(clone.y).toBe(note.y);
+  });
+
   it('keeps the snapshot size for fixed-size stickies', () => {
     const sticky = {
       eventStormingType: 'event',

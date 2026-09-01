@@ -69,8 +69,9 @@ export default class EventStormingElementFactory {
 
   createNote(el: NoteElement): EventStormingShape {
     // Note box grows with the (possibly multiline) text -> move/click hitbox covers the text.
+    // A manual `size` (the user resized the note by hand) wins over the text metrics.
     // Centered on the position (consistent with the center back-calculation on export).
-    const { width, height } = noteMetrics(el.label);
+    const { width, height } = el.size ?? noteMetrics(el.label);
     const shape = this.elementFactory.createShape({
       id: el.id,
       x: el.position.x - width / 2,

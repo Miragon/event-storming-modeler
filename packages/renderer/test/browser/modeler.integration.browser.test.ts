@@ -3,6 +3,7 @@ import type ElementRegistry from 'diagram-js/lib/core/ElementRegistry';
 import type CommandStack from 'diagram-js/lib/command/CommandStack';
 import type Modeling from 'diagram-js/lib/features/modeling/Modeling';
 import { Modeler } from '../../src/index.js';
+import type EventStormingModeling from '../../src/modeling/EventStormingModeling.js';
 import { isEventStormingShape, type EventStormingShape } from '../../src/model/di-types.js';
 // Pull the real stylesheet in so layout (getBBox) matches production. src/index.ts also imports it.
 import '../../src/assets/event-storming.css';
@@ -17,6 +18,11 @@ Customer -> Place Order`;
 const PINNED_DSL = `title Attachment Fixture
 command Place Order [420, 320]
 actor Customer [430, 300] (on Place Order)`;
+
+// Manual resize: the first note carries a hand-picked box via `(size …)`, the second stays auto.
+const RESIZED_DSL = `title Resize Fixture
+note Kickoff agenda [300, 200] (size 240x160)
+note Hint [500, 200]`;
 
 function findByLabel(registry: ElementRegistry, label: string): EventStormingShape {
   const shape = registry.find(
@@ -141,6 +147,68 @@ describe('Modeler integration (real browser DOM)', () => {
     const moved = modeler.exportMap().elements.find((e) => e.label === 'Customer');
     expect(moved?.position.x).toBeCloseTo(430 + 150, 2);
     expect(moved?.position.y).toBeCloseTo(300 + 40, 2);
+  });
+
+  it('round-trips a manually resized note via (size …) and keeps the box on relabel', async () => {
+    const { warnings } = await modeler.importDSL(RESIZED_DSL);
+    expect(warnings).toEqual([]);
+    // The stock diagram-js resize feature is wired into the Modeler (handles + shape.resize).
+    expect(modeler.get('resize')).toBeDefined();
+
+    const registry = modeler.get<ElementRegistry>('elementRegistry');
+    const kickoff = findByLabel(registry, 'Kickoff agenda');
+    expect(kickoff.width).toBe(240);
+    expect(kickoff.height).toBe(160);
+    expect(kickoff.x + kickoff.width / 2).toBeCloseTo(300, 2);
+    expect(kickoff.y + kickoff.height / 2).toBeCloseTo(200, 2);
+
+    // Export: manual box -> `size` in the board and `(size …)` in the DSL; auto note stays bare.
+    const exported = modeler.exportMap().elements.find((e) => e.label === 'Kickoff agenda');
+    if (exported?.elementType !== 'note') throw new Error('note missing in export');
+    expect(exported.size).toEqual({ width: 240, height: 160 });
+    expect(modeler.exportDSL()).toContain('(size 240x160)');
+    const hint = modeler.exportMap().elements.find((e) => e.label === 'Hint');
+    if (hint?.elementType !== 'note') throw new Error('note missing in export');
+    expect('size' in hint).toBe(false);
+
+    // Growing further via the stock shape.resize command (what a handle drag executes) is
+    // exported and undoable back to the imported box.
+    const modeling = modeler.get<Modeling>('modeling');
+    modeling.resizeShape(kickoff, { x: kickoff.x, y: kickoff.y, width: 300, height: 200 });
+    expect(modeler.exportDSL()).toContain('(size 300x200)');
+    modeler.undo();
+    expect(kickoff.width).toBe(240);
+    expect(kickoff.height).toBe(160);
+
+    // Relabel must NOT snap the manual box back to the text metrics.
+    modeler
+      .get<EventStormingModeling>('eventStormingModeling')
+      .updateLabel(kickoff, 'Kickoff agenda v2');
+    expect(kickoff.width).toBe(240);
+    expect(kickoff.height).toBe(160);
+    expect(modeler.exportDSL()).toContain('(size 240x160)');
+
+    // The full DSL round-trip keeps the manual box.
+    await modeler.importDSL(modeler.exportDSL());
+    const reloaded = findByLabel(
+      modeler.get<ElementRegistry>('elementRegistry'),
+      'Kickoff agenda v2',
+    );
+    expect(reloaded.width).toBe(240);
+    expect(reloaded.height).toBe(160);
+  });
+
+  it('shows resize handles on a selected note ONLY — stickies stay handle-free', async () => {
+    await modeler.importDSL(PINNED_DSL + '\nnote Hint [600, 200]');
+    const registry = modeler.get<ElementRegistry>('elementRegistry');
+    const selection = modeler.get<{ select(el: unknown): void }>('selection');
+
+    // ResizeHandles renders one .djs-resizer per direction the shape.resize rule allows.
+    selection.select(findByLabel(registry, 'Hint'));
+    expect(container.querySelectorAll('.djs-resizer').length).toBe(8);
+
+    selection.select(findByLabel(registry, 'Place Order'));
+    expect(container.querySelectorAll('.djs-resizer').length).toBe(0);
   });
 
   it('deletes attachers with their host in ONE undoable step and restores the pinning on undo', async () => {

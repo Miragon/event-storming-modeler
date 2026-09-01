@@ -10,6 +10,8 @@ export interface EventStormingBoardElement {
   readonly label: string;
   readonly elementType: string;
   readonly position: { readonly x: number; readonly y: number };
+  /** Manual note box: present only when a note's size differs from its text-derived metrics. */
+  readonly size?: { readonly width: number; readonly height: number };
   /** Pinning: id of the host sticky an actor/hotspot is attached to (absent when detached). */
   readonly attachedTo?: string;
 }
@@ -206,6 +208,23 @@ export async function dragShapeTo(
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
   await page.mouse.move(target.x + offset.x, target.y + offset.y, { steps: 10 });
+  await page.mouse.up();
+}
+
+/**
+ * Resize a shape by dragging its south-east resize handle by a pixel delta (a real mouse drag →
+ * diagram-js Resize → the resize command). Handles exist only while the shape is the single
+ * selection and the resize rule allows it, so select first (mirrors selectShape) and wait for the
+ * handle — diagram-js ResizeHandles tags each handle group with the element id + direction.
+ */
+export async function resizeShapeBy(page: Page, id: string, delta: Point): Promise<void> {
+  await selectShape(page, id);
+  const handle = page.locator(`#canvas .djs-resizer-${id}.djs-resizer-se`);
+  await expect(handle).toBeVisible();
+  const from = await centerOf(handle);
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move(from.x + delta.x, from.y + delta.y, { steps: 10 });
   await page.mouse.up();
 }
 

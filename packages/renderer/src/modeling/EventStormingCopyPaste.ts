@@ -12,7 +12,7 @@ import {
   type EventStormingConnection,
   type EventStormingShape,
 } from '../model/di-types.js';
-import { noteMetrics } from '../draw/styles.js';
+import { isManualNoteBox, noteMetrics } from '../draw/styles.js';
 
 /** Offset (px) accumulated per paste operation. */
 const PASTE_OFFSET = 24;
@@ -160,9 +160,10 @@ export default class EventStormingCopyPaste {
     const shapes = clipboard.shapes.map((snap, i) => {
       const label = labels[i]!;
       let { x, y, width, height } = snap;
-      // Note boxes are text-derived everywhere else (factory, updateLabel) — the unique-suffixed
-      // label needs a recomputed box (recentered), or the suffix is clipped invisible on canvas.
-      if (snap.props['eventStormingType'] === 'note') {
+      // AUTO note boxes are text-derived everywhere else (factory, updateLabel) — the
+      // unique-suffixed label needs a recomputed box (recentered), or the suffix is clipped
+      // invisible on canvas. A MANUAL box was the user's choice and survives the clone as-is.
+      if (snap.props['eventStormingType'] === 'note' && !isManualNoteBox(snap.label, snap)) {
         const metrics = noteMetrics(label);
         x = snap.x + snap.width / 2 - metrics.width / 2;
         y = snap.y + snap.height / 2 - metrics.height / 2;

@@ -177,7 +177,7 @@ function wrapParagraph(paragraph: string, maxChars: number): string[] {
 /**
  * Centered multi-line text inside the sticky: explicit line breaks are honored, long lines are
  * word-wrapped into the padded box, and overflowing lines are clipped (fixed-size stickies never
- * grow; notes auto-size via noteMetrics so they never clip).
+ * grow; auto-sized notes fit via noteMetrics — only hand-shrunken note boxes clip).
  */
 function drawStickyText(parent: SVGElement, shape: EventStormingShape, italic: boolean): void {
   const innerWidth = shape.width - 2 * STICKY_PADDING;

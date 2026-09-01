@@ -37,7 +37,17 @@ const externalSystemSchema = z.object({ ...baseFields, elementType: z.literal('e
 
 const hotspotSchema = z.object({ ...baseFields, elementType: z.literal('hotspot'), attachedTo });
 
-const noteSchema = z.object({ ...baseFields, elementType: z.literal('note') });
+// Manual resize override — absent = auto-size from text (decided in the renderer).
+const noteSizeSchema = z.object({
+  width: z.number().positive(),
+  height: z.number().positive(),
+});
+
+const noteSchema = z.object({
+  ...baseFields,
+  elementType: z.literal('note'),
+  size: noteSizeSchema.optional(),
+});
 
 const drawingSchema = z.object({
   ...baseFields,

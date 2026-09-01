@@ -21,6 +21,7 @@ import {
   parseCoords,
   parseMultiCoords,
   parseOn,
+  parseSize,
   slug,
   splitAtCoords,
   splitLineComment,
@@ -282,6 +283,9 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
             diag(`Attachment: a ${kw} cannot be pinned — only actor/hotspot support (on …)`);
           }
         }
+        if (node.sizeSuffix) {
+          diag(`Size: a ${kw} cannot be resized — only notes support (size …)`);
+        }
         break;
       }
 
@@ -291,9 +295,15 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
           failed(line);
           break;
         }
-        // Color ONLY from the suffix after the coordinates (mirrors parseSticky) — notes are
-        // free text, so `(color …)` may legitimately appear inside it.
-        const col = split ? parseColor(split.suffix) : parseColor(after);
+        // Color/size ONLY from the suffix after the coordinates (mirrors parseSticky) — notes
+        // are free text, so `(color …)` or `(size 1x1)` may legitimately appear inside it.
+        const sz = parseSize(split ? split.suffix : after);
+        const col = parseColor(sz.rest);
+        if (sz.invalid) {
+          diag(
+            `Size: could not read "${sz.invalid.trim()}" — expected (size <w>x<h>) with positive numbers`,
+          );
+        }
         // Literal `\n` back into real line breaks (multi-line notes).
         const textPart = decodeName((split ? split.name : col.rest).trim());
         const id = ids.alloc('note', textPart || 'note');
@@ -303,6 +313,7 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
           label: textPart,
           position: split ? pos(split.coords.a, split.coords.b) : pos(0, 0),
           color: col.color,
+          size: sz.size,
         }) as NoteElement;
         elements.push(note);
         break;
@@ -315,6 +326,10 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
         if (!multi || multi.tuples.length < 2) {
           failed(line);
           break;
+        }
+        const szDrawing = parseSize(multi.rest);
+        if (szDrawing.size || szDrawing.invalid) {
+          diag('Size: a drawing cannot be resized — only notes support (size …)');
         }
         const flags = multi.rest.toLowerCase();
         const strokeStyle: DrawingStrokeStyle | undefined = flags.includes('(dashed)')
@@ -408,31 +423,37 @@ interface ParsedSticky {
   readonly color?: string;
   /** Attachment `(on <Host Name>)` — host name still undecoded, resolved by the caller. */
   readonly host?: string;
+  /** A `(size …)` suffix appeared — only notes support it, the caller reports a diagnostic. */
+  readonly sizeSuffix?: boolean;
 }
 
 /**
  * Parses `<name> [x, y] [(color …)] [(on …)]`. The suffixes are looked up ONLY AFTER the
  * coordinates — parentheses inside the name stay untouched. `(on …)` is extracted first
- * (its host name runs to the final `)` and may itself contain a `(color …)`). Coordinates
- * are optional and default to `[0, 0]`; a malformed tuple (bracket present but unreadable)
- * is rejected so the caller can report a diagnostic instead of swallowing it into the name.
+ * (its host name runs to the final `)` and may itself contain a `(color …)` or `(size …)`).
+ * Coordinates are optional and default to `[0, 0]`; a malformed tuple (bracket present but
+ * unreadable) is rejected so the caller can report a diagnostic instead of swallowing it
+ * into the name.
  */
 function parseSticky(after: string): ParsedSticky | null {
   const split = splitAtCoords(after);
   if (split) {
     if (!split.name) return null;
     const on = parseOn(split.suffix);
-    const col = parseColor(on.rest);
+    const sz = parseSize(on.rest);
+    const col = parseColor(sz.rest);
     return compact({
       name: decodeName(split.name),
       coords: { x: split.coords.a, y: split.coords.b },
       color: col.color ?? undefined,
       host: on.host,
+      sizeSuffix: sz.size || sz.invalid ? true : undefined,
     }) as ParsedSticky;
   }
   if (after.includes('[')) return null;
   const on = parseOn(after);
-  const col = parseColor(on.rest);
+  const sz = parseSize(on.rest);
+  const col = parseColor(sz.rest);
   const name = col.rest.trim();
   if (!name) return null;
   return compact({
@@ -440,5 +461,6 @@ function parseSticky(after: string): ParsedSticky | null {
     coords: { x: 0, y: 0 },
     color: col.color ?? undefined,
     host: on.host,
+    sizeSuffix: sz.size || sz.invalid ? true : undefined,
   }) as ParsedSticky;
 }

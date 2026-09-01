@@ -15,7 +15,7 @@ import {
   type StickyKind,
 } from '../model/di-types.js';
 import type { RootBusinessObject } from '../io/types.js';
-import { STICKY_STYLES, noteMetrics } from '../draw/styles.js';
+import { STICKY_STYLES, isManualNoteBox, noteMetrics } from '../draw/styles.js';
 import UpdatePropertiesHandler from './cmd/UpdatePropertiesHandler.js';
 
 const UPDATE_PROPERTIES = 'element.updateProperties';
@@ -43,8 +43,13 @@ export default class EventStormingModeling {
   }
 
   updateLabel(element: EventStormingShape, label: string): void {
-    // Notes: resize the box (and thus the move/click hitbox) to the new text, keeping the center.
-    if (element.eventStormingType === 'note') {
+    // AUTO-sized notes: resize the box (and thus the move/click hitbox) to the new text, keeping
+    // the center. A MANUAL box (differs from the text metrics) was the user's choice — keep it,
+    // the text reflows/clips inside.
+    if (
+      element.eventStormingType === 'note' &&
+      !isManualNoteBox(element.eventStormingLabel, element)
+    ) {
       const { width, height } = noteMetrics(label);
       const cx = element.x + element.width / 2;
       const cy = element.y + element.height / 2;

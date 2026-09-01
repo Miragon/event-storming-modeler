@@ -35,6 +35,7 @@ export {
 export { eventStormingAppendModule, EventStormingAppendBehavior } from './append/index.js';
 export { eventStormingAttachModule, EventStormingAttachBehavior } from './attach/index.js';
 export { eventStormingColorPickerModule, EventStormingColorPicker } from './color-picker/index.js';
+export { eventStormingResizeModule, EventStormingResizeBehavior } from './resize/index.js';
 
 export {
   isEventStormingShape,

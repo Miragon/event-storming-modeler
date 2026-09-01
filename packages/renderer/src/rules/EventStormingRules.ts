@@ -3,9 +3,11 @@ import type EventBus from 'diagram-js/lib/core/EventBus';
 import {
   isAttachableSticky,
   isHostSticky,
+  isNote,
   isSticky,
   type EventStormingShape,
 } from '../model/di-types.js';
+import { NOTE_MIN_RESIZE } from '../draw/styles.js';
 
 /**
  * Is there already an arrow from `source` to `target` in this SAME direction? Arrows are
@@ -66,8 +68,20 @@ export default class EventStormingRules extends RuleProvider {
     this.addRule('shape.create', () => true);
     // Group create (paste preview): diagram-js Create checks this rule for element arrays.
     this.addRule('elements.create', () => true);
-    // Nothing is resizable: stickies have fixed per-kind sizes, notes auto-size to their text,
-    // drawings are reshaped via their vertex handles.
-    this.addRule('shape.resize', () => false);
+    // Only notes are freely resizable: stickies have fixed per-kind sizes, drawings are
+    // reshaped via their vertex handles. During a drag diagram-js re-checks with `newBounds`
+    // (already clamped to the resize.start `minDimensions`) — the explicit minimum here also
+    // keeps programmatic resizes from producing sub-minimum boxes.
+    this.addRule(
+      'shape.resize',
+      (context: { shape?: unknown; newBounds?: { width: number; height: number } }) => {
+        if (!isNote(context.shape)) return false;
+        const { newBounds } = context;
+        if (!newBounds) return true;
+        return (
+          newBounds.width >= NOTE_MIN_RESIZE.width && newBounds.height >= NOTE_MIN_RESIZE.height
+        );
+      },
+    );
   }
 }

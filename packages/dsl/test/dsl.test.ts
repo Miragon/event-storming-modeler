@@ -663,6 +663,124 @@ hotspot Double payment? [640, 280] (on Order Placed)`;
   });
 });
 
+describe('note size (project extension: `(size …)`)', () => {
+  it('parses `(size WxH)` combined with a color and round-trips to a fixed point', () => {
+    const src = 'title T\nnote Kickoff [80, 80] (color #15803d) (size 240x160)';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    const note = board.elements.find((e) => e.elementType === 'note');
+    expect(note).toMatchObject({
+      label: 'Kickoff',
+      color: '#15803d',
+      size: { width: 240, height: 160 },
+    });
+    const once = serializeDSL(board);
+    expect(once).toContain('note Kickoff [80, 80] (color #15803d) (size 240x160)');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('accepts whitespace around the `x` and canonicalizes suffix order (size last)', () => {
+    const src = 'title T\nnote Kickoff [80, 80] (size 240 x 160) (color #15803d)';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    const once = serializeDSL(board);
+    expect(once).toContain('note Kickoff [80, 80] (color #15803d) (size 240x160)');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('keeps `(size 1x1)` inside the note text (size is only read after the coordinates)', () => {
+    const src =
+      'title T\nnote use (size 1x1) sparingly [80, 80]\nnote use (size 1x1) sparingly [80, 200] (size 240x160)';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    const notes = board.elements.filter((e) => e.elementType === 'note');
+    expect(notes[0]).toMatchObject({ label: 'use (size 1x1) sparingly' });
+    expect(notes[0]).not.toHaveProperty('size');
+    expect(notes[1]).toMatchObject({
+      label: 'use (size 1x1) sparingly',
+      size: { width: 240, height: 160 },
+    });
+    const once = serializeDSL(board);
+    expect(once).toContain('note use (size 1x1) sparingly [80, 80]');
+    expect(once).toContain('note use (size 1x1) sparingly [80, 200] (size 240x160)');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('malformed size: line-numbered diagnostic, suffix ignored, note still created', () => {
+    const { board, diagnostics } = parseDSLWithDiagnostics(
+      'title T\nnote Kickoff [80, 80] (size 240)',
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.line).toBe(2);
+    expect(diagnostics[0]!.message).toContain('(size 240)');
+    expect(diagnostics[0]!.text).toContain('note Kickoff');
+    const note = board.elements.find((e) => e.elementType === 'note');
+    expect(note).toMatchObject({ label: 'Kickoff', position: { x: 80, y: 80 } });
+    expect(note).not.toHaveProperty('size');
+    const once = serializeDSL(board);
+    expect(once).toContain('note Kickoff [80, 80]');
+    expect(once).not.toContain('(size');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('a non-positive size is malformed (zero width)', () => {
+    const { board, diagnostics } = parseDSLWithDiagnostics('title T\nnote K [80, 80] (size 0x100)');
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.message).toContain('positive');
+    expect(board.elements.find((e) => e.elementType === 'note')).not.toHaveProperty('size');
+  });
+
+  it('emits `(size …)` only for notes carrying a size (auto notes stay untouched)', () => {
+    const board = parseDSL('title T\nnote Manual [80, 80] (size 240x160)\nnote Plain [500, 500]');
+    const out = serializeDSL(board);
+    expect(out).toContain('note Manual [80, 80] (size 240x160)');
+    expect(out).toContain('note Plain [500, 500]\n');
+    expect(out.match(/\(size /g)).toHaveLength(1);
+    expect(serializeDSL(parseDSL(out))).toBe(out);
+  });
+
+  it('`(size …)` on a sticky line yields a diagnostic and is ignored', () => {
+    const { board, diagnostics } = parseDSLWithDiagnostics('title T\nevent A [0, 0] (size 100x50)');
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.line).toBe(2);
+    expect(diagnostics[0]!.message).toContain('only notes support');
+    expect(board.elements[0]).toMatchObject({ elementType: 'event', label: 'A' });
+    const once = serializeDSL(board);
+    expect(once).toContain('event A [0, 0]');
+    expect(once).not.toContain('(size');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('`(size …)` on a drawing yields a diagnostic and is ignored', () => {
+    const { board, diagnostics } = parseDSLWithDiagnostics(
+      'title T\nline [[100, 100], [200, 150]] (dashed) (size 10x10)',
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.message).toContain('only notes support');
+    expect(board.elements.find((e) => e.elementType === 'drawing')).toBeDefined();
+    const once = serializeDSL(board);
+    expect(once).toContain('line [[100, 100], [200, 150]] (dashed)');
+    expect(once).not.toContain('(size');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('does not steal a `(size …)` inside a sticky name or a host name', () => {
+    const src =
+      'title T\nevent Pay (size 1x1) now [620, 300]\nhotspot H [640, 280] (size 2x2) (on Pay (size 1x1) now)';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    // Exactly ONE finding: the size suffix on the hotspot — the names stay untouched.
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.message).toContain('only notes support');
+    expect(board.elements.find((e) => e.elementType === 'event')?.label).toBe('Pay (size 1x1) now');
+    expect(board.elements.find((e) => e.elementType === 'hotspot')).toMatchObject({
+      attachedTo: 'event_pay_size_1x1_now',
+    });
+    const once = serializeDSL(board);
+    expect(once).toContain('hotspot H [640, 280] (on Pay (size 1x1) now)');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+});
+
 describe('serializeDSL – huge coordinates', () => {
   it('serializes magnitudes >= 1e21 without exponent notation', () => {
     const board = parseDSL('title T\nevent A [800, 300]\ncommand B [500, 600]\nA -> B');

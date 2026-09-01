@@ -10,6 +10,7 @@ import {
   exportDSL,
   exportSvg,
   renameShape,
+  resizeShapeBy,
   selectShape,
   settleForSnapshot,
   startNewBoard,
@@ -221,6 +222,43 @@ test.describe('webapp modelling interactions', () => {
     await expect.poll(async () => (await exportBoard(page)).elements.length).toBe(2);
     const labels = (await exportBoard(page)).elements.map((element) => element.label).sort();
     expect(labels).toEqual(['Domain Event', 'Domain Event 2']);
+  });
+
+  test('resizes a note by hand and the manual box survives a round-trip and a relabel', async ({
+    page,
+  }) => {
+    const id = await createStickyAt(page, 'note', 0.35, 0.4);
+    await renameShape(page, id, 'Kickoff questions');
+    const noteOf = async () =>
+      (await exportBoard(page)).elements.find((element) => element.elementType === 'note')!;
+
+    // Auto-sized (box == text metrics): no size in the export, no suffix in the DSL.
+    expect((await noteOf()).size).toBeUndefined();
+    expect(await exportDSL(page)).not.toContain('(size ');
+
+    // Fresh board -> zoom 1, so the hit box measures the model box in page px.
+    const boxBefore = await elementGfx(page, id).locator('.djs-hit').boundingBox();
+    await resizeShapeBy(page, id, { x: 80, y: 60 });
+
+    const resized = (await noteOf()).size;
+    expect(resized).toBeDefined();
+    expect(resized!.width).toBeGreaterThan(boxBefore!.width + 40);
+    expect(resized!.height).toBeGreaterThan(boxBefore!.height + 30);
+
+    // Export -> re-import: the manual box is preserved by the DSL (3-decimal rounding).
+    const dsl = await exportDSL(page);
+    expect(dsl).toContain('(size ');
+    await page.evaluate((text) => window.__eventStormingViewer.importDSL(text), dsl);
+    const reimported = await noteOf();
+    expect(reimported.size?.width).toBeCloseTo(resized!.width, 2);
+    expect(reimported.size?.height).toBeCloseTo(resized!.height, 2);
+
+    // Relabel: a MANUAL box is the user's choice — it must not snap back to the text metrics.
+    await renameShape(page, reimported.id, 'Kickoff questions and open risks');
+    const relabelled = await noteOf();
+    expect(relabelled.label).toBe('Kickoff questions and open risks');
+    expect(relabelled.size?.width).toBeCloseTo(resized!.width, 2);
+    expect(relabelled.size?.height).toBeCloseTo(resized!.height, 2);
   });
 
   test('pins an actor onto a command, moves it with the host and detaches on empty canvas', async ({

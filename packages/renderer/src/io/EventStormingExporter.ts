@@ -14,6 +14,7 @@ import {
   isEventStormingShape,
   type EventStormingShape,
 } from '../model/di-types.js';
+import { isManualNoteBox } from '../draw/styles.js';
 import { ROOT_ID, type RootBusinessObject } from './types.js';
 
 /**
@@ -81,12 +82,19 @@ export default class EventStormingExporter {
         ...(el.color ? { color: el.color } : {}),
       };
     }
+    // Auto-vs-manual: `size` is emitted ONLY when the note box differs from its text metrics —
+    // auto-sized notes stay absent-size, keeping existing boards byte-identical on round-trip.
+    const manualSize =
+      el.eventStormingType === 'note' && isManualNoteBox(el.eventStormingLabel, el)
+        ? { width: el.width, height: el.height }
+        : undefined;
     return {
       id: el.id,
       elementType: el.eventStormingType,
       label: el.eventStormingLabel,
       position: { x: el.x + el.width / 2, y: el.y + el.height / 2 },
       ...(el.color ? { color: el.color } : {}),
+      ...(manualSize ? { size: manualSize } : {}),
       // Pinning lives in the diagram-js host/attachers refs — only actor/hotspot ever carry a
       // host (attach rule), matching the schema's attachedTo placement.
       ...(el.host ? { attachedTo: el.host.id } : {}),

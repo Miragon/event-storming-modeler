@@ -90,9 +90,15 @@ export interface HotspotElement extends BoardElementBase {
   readonly attachedTo?: string;
 }
 
-/** Free-text note; auto-sizes to its text. */
+/** Free-text note; auto-sizes to its text unless a manual `size` is set. */
 export interface NoteElement extends BoardElementBase {
   readonly elementType: 'note';
+  /**
+   * Manual size in board pixels (the user resized the note by hand). Absent = auto-size
+   * from the text — that decision lives in the renderer, the model only carries the
+   * override. DSL: the `(size <w>x<h>)` suffix.
+   */
+  readonly size?: { readonly width: number; readonly height: number };
 }
 
 export type DrawingStrokeStyle = 'solid' | 'dashed' | 'dotted';
