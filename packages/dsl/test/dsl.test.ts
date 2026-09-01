@@ -6,25 +6,26 @@ const ORDER_CHECKOUT = `title Order Checkout
 
 actor Customer [80, 300]
 command Place Order [240, 300]
-aggregate Order [420, 290]
+aggregate Order [420, 290] (id agg_order)
 event Order Placed [620, 300]
 policy When order placed, ship it [800, 300]
-command Ship Order [980, 420]
-event Order Shipped [1160, 420]
+command Ship Order [980, 300]
+aggregate Order [1160, 290] (id agg_order_2)
+event Order Shipped [1340, 300]
 readmodel Order Status [620, 120]
 external Payment Provider [420, 520]
 hotspot Double payment on retry? [620, 520]
 note Big-picture session: checkout flow [80, 80]
 
 Customer -> Place Order
-Place Order -> Order
+Place Order -> #agg_order
 Place Order -> Payment Provider
-Order -> Order Placed
+#agg_order -> Order Placed
 Order Placed -> Order Status
 Order Placed -> When order placed, ship it
 When order placed, ship it -> Ship Order
-Ship Order -> Order
-Order -> Order Shipped`;
+Ship Order -> #agg_order_2
+#agg_order_2 -> Order Shipped`;
 
 const ALL_KINDS = `title Every Kind
 event Order Placed [620, 300]
@@ -444,14 +445,14 @@ describe('serializeDSL round-trip', () => {
     expect(twice).toBe(once);
   });
 
-  it('the canonical Order Checkout example survives with 11 elements and 9 arrows', () => {
+  it('the canonical Order Checkout example survives with 12 elements and 9 arrows', () => {
     const board = parseDSL(ORDER_CHECKOUT);
-    expect(board.elements).toHaveLength(11);
+    expect(board.elements).toHaveLength(12);
     expect(board.edges).toHaveLength(9);
     // Fixed point after ONE canonicalization: parse -> serialize -> parse.
     const once = serializeDSL(board);
     const reparsed = parseDSL(once);
-    expect(reparsed.elements).toHaveLength(11);
+    expect(reparsed.elements).toHaveLength(12);
     expect(reparsed.edges).toHaveLength(9);
     expect(reparsed.elements.map((e) => e.label)).toEqual(board.elements.map((e) => e.label));
     expect(serializeDSL(reparsed)).toBe(once);
