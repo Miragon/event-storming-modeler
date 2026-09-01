@@ -21,9 +21,9 @@ import type EventStormingElementFactory from '../model/EventStormingElementFacto
 import type EventStormingColorPicker from '../color-picker/EventStormingColorPicker.js';
 import { POPUP_PROVIDER_ID } from '../popup/index.js';
 import { STICKY_STYLES } from '../draw/styles.js';
+import { PALETTE_ICONS } from '../draw/palette-icons.js';
 import {
   iconMarkup,
-  ICON_ADD,
   ICON_ARROW_FORWARD,
   ICON_AUTORENEW,
   ICON_DELETE,
@@ -33,21 +33,11 @@ import {
 } from '../draw/icons.js';
 
 /**
- * Which sticky kind "append" creates next — the Event Storming grammar read left to right:
- * an actor issues a command, a command hits an aggregate, an aggregate emits an event, an event
- * triggers a policy, a policy issues the next command. Read models and external systems feed
- * back into the flow; a hotspot marks a problem around an event.
+ * The append choices offered on every sticky — the three kinds that carry the Event Storming
+ * flow (a command hits an aggregate, an aggregate emits an event, an event triggers the next
+ * command). Everything else comes from the palette.
  */
-const APPEND_SUGGESTION: Record<StickyKind, StickyKind> = {
-  actor: 'command',
-  command: 'aggregate',
-  aggregate: 'event',
-  event: 'policy',
-  policy: 'command',
-  readmodel: 'command',
-  external: 'event',
-  hotspot: 'event',
-};
+const APPEND_KINDS = ['event', 'command', 'aggregate'] as const satisfies readonly StickyKind[];
 
 /**
  * ContextPad entry as HTML with a Material icon. `draggable=true` is mandatory for entries with a
@@ -55,6 +45,11 @@ const APPEND_SUGGESTION: Record<StickyKind, StickyKind> = {
  */
 function cpHtml(icon: string, title: string, draggable = false): string {
   return `<div class="entry event-storming-cp-entry"${draggable ? ' draggable="true"' : ''} title="${title}">${iconMarkup(icon)}</div>`;
+}
+
+/** Append entry showing the target kind as its palette square (WYSIWYG choice). */
+function cpAppendHtml(kind: StickyKind, title: string): string {
+  return `<div class="entry event-storming-cp-entry event-storming-cp-append" draggable="true" title="${title}">${PALETTE_ICONS[kind]}</div>`;
 }
 
 /** Context actions per element. */
@@ -110,22 +105,24 @@ export default class EventStormingContextPadProvider implements ContextPadProvid
     const kind = shape.eventStormingType;
 
     if (isStickyKind(kind)) {
-      // Append: drags out the grammar-suggested next sticky and creates the arrow automatically
-      // (diagram-js Create with `source` -> modeling.appendShape).
-      const nextKind = APPEND_SUGGESTION[kind];
-      const nextLabel = STICKY_STYLES[nextKind].label;
-      const startAppend = (event: Event) => {
-        const next = this.factory.createNew(nextKind, nextLabel);
-        this.create.start(event as MouseEvent, next as unknown as Element, {
-          source: shape as unknown as Element,
-        });
-      };
-      entries['append'] = {
-        group: 'edit',
-        title: `Append ${nextLabel} (auto-connect)`,
-        html: cpHtml(ICON_ADD, `Append ${nextLabel}`, true),
-        action: { click: startAppend, dragstart: startAppend },
-      };
+      // Append: drags out a new sticky of the chosen kind and creates the arrow automatically
+      // (diagram-js Create with `source` -> modeling.appendShape). One entry per flow kind, shown
+      // as the same colored square the palette uses, so the choice is visible at a glance.
+      for (const nextKind of APPEND_KINDS) {
+        const nextLabel = STICKY_STYLES[nextKind].label;
+        const startAppend = (event: Event) => {
+          const next = this.factory.createNew(nextKind, nextLabel);
+          this.create.start(event as MouseEvent, next as unknown as Element, {
+            source: shape as unknown as Element,
+          });
+        };
+        entries[`append-${nextKind}`] = {
+          group: 'append',
+          title: `Append ${nextLabel} (auto-connect)`,
+          html: cpAppendHtml(nextKind, `Append ${nextLabel}`),
+          action: { click: startAppend, dragstart: startAppend },
+        };
+      }
 
       const startConnect = (event: Event) => {
         this.connect.start(event as MouseEvent, shape as unknown as Element);

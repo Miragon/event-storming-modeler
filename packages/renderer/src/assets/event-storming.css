@@ -186,6 +186,12 @@
   color: var(--event-storming-ink);
 }
 
+/* Typed append entries: the palette square scaled to leave breathing room in the pad. */
+.event-storming-container .event-storming-cp-append svg {
+  width: 20px;
+  height: 20px;
+}
+
 .event-storming-container .djs-context-pad .entry {
   border-radius: var(--event-storming-radius-sm);
   box-shadow:
