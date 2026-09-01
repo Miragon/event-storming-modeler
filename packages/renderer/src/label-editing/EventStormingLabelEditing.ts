@@ -7,7 +7,6 @@ import {
   type EventStormingShape,
 } from '../model/di-types.js';
 import type EventStormingModeling from '../modeling/EventStormingModeling.js';
-import type EventStormingElementFactory from '../model/EventStormingElementFactory.js';
 
 interface ActiveEdit {
   field: HTMLInputElement | HTMLTextAreaElement;
@@ -42,7 +41,7 @@ export function sanitizeLabel(raw: string): string {
  * click outside = save); connection labels use a single-line `<input>` (Enter = save).
  */
 export default class EventStormingLabelEditing {
-  static $inject = ['eventBus', 'canvas', 'eventStormingModeling', 'eventStormingElementFactory'];
+  static $inject = ['eventBus', 'canvas', 'eventStormingModeling'];
 
   private active: ActiveEdit | null = null;
 
@@ -50,7 +49,6 @@ export default class EventStormingLabelEditing {
     eventBus: EventBus,
     private readonly canvas: Canvas,
     private readonly modeling: EventStormingModeling,
-    private readonly factory: EventStormingElementFactory,
   ) {
     eventBus.on('element.dblclick', (event: { element?: unknown }) => {
       if (isEventStormingShape(event.element)) this.activate(event.element);
@@ -69,7 +67,6 @@ export default class EventStormingLabelEditing {
     const container = this.canvas.getContainer();
     const scale = this.canvas.zoom();
     const vb = this.canvas.viewbox();
-    const isNote = element.eventStormingType === 'note';
     // Overlay the editor centered ON the sticky (the text lives inside it — WYSIWYG); this also
     // keeps the field visible for stickies at the viewport edge.
     const left = (element.x + element.width / 2 - vb.x) * scale;
@@ -106,11 +103,9 @@ export default class EventStormingLabelEditing {
       const changed = value && value !== element.eventStormingLabel;
       cleanup();
       if (!changed) return;
-      // Enforce uniqueness only for linkable stickies (duplicate names would collapse stickies
-      // on the DSL round-trip -> arrows disappear). Notes are never edge endpoints and may
-      // therefore repeat (e.g. several "Risk" hints).
-      const finalLabel = isNote ? value : this.factory.uniqueLabel(value, element.id);
-      this.modeling.updateLabel(element, finalLabel);
+      // Renaming to an EXISTING label is allowed — duplicate labels are legal, the DSL
+      // disambiguates via `(id …)` suffixes and `#id` references.
+      this.modeling.updateLabel(element, value);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {

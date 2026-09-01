@@ -5,48 +5,76 @@ import EventStormingElementFactory from '../src/model/EventStormingElementFactor
 import { STICKY_STYLES, noteMetrics } from '../src/draw/styles.js';
 
 /** Factory with mocked ElementFactory/Registry (createShape returns the attributes). */
-function factory(existingLabels: string[]): EventStormingElementFactory {
+function factory(existing: Array<{ id?: string; eventStormingLabel?: string }>) {
   const elementFactory = {
     createShape: (attrs: Record<string, unknown>) => attrs,
     createConnection: (attrs: Record<string, unknown>) => attrs,
   } as unknown as ElementFactory;
   const registry = {
-    getAll: () => existingLabels.map((eventStormingLabel) => ({ eventStormingLabel })),
+    getAll: () => existing,
+    get: (id: string) => existing.find((el) => el.id === id),
   } as unknown as ElementRegistry;
   return new EventStormingElementFactory(elementFactory, registry);
 }
 
-describe('EventStormingElementFactory.createNew: unique labels', () => {
-  // Regression: duplicate labels cause ID collisions on the DSL round-trip and lose arrows.
+function labels(existingLabels: string[]): Array<{ eventStormingLabel: string }> {
+  return existingLabels.map((eventStormingLabel) => ({ eventStormingLabel }));
+}
+
+describe('EventStormingElementFactory.createNew: numbered default labels (UX)', () => {
+  // Duplicate labels are legal (the DSL disambiguates via ids) — the numbering only keeps
+  // consecutive palette creates tellable apart ("Domain Event 2" instead of identical defaults).
   it('assigns the base label when free', () => {
     expect(factory([]).createNew('event', 'Domain Event').eventStormingLabel).toBe('Domain Event');
   });
 
   it('appends a counter when the label is taken', () => {
-    expect(factory(['Domain Event']).createNew('event', 'Domain Event').eventStormingLabel).toBe(
-      'Domain Event 2',
-    );
     expect(
-      factory(['Domain Event', 'Domain Event 2']).createNew('event', 'Domain Event')
+      factory(labels(['Domain Event'])).createNew('event', 'Domain Event').eventStormingLabel,
+    ).toBe('Domain Event 2');
+    expect(
+      factory(labels(['Domain Event', 'Domain Event 2'])).createNew('event', 'Domain Event')
         .eventStormingLabel,
     ).toBe('Domain Event 3');
   });
 
   it('applies to other kinds as well (e.g. note)', () => {
-    expect(factory(['Note']).createNew('note', 'Note').eventStormingLabel).toBe('Note 2');
+    expect(factory(labels(['Note'])).createNew('note', 'Note').eventStormingLabel).toBe('Note 2');
+  });
+});
+
+describe('EventStormingElementFactory: DSL-style ids for interactive creates', () => {
+  // Ids surface in the `.storm` text once labels are duplicated (`(id …)` / `#id`) — they must
+  // read like the DSL allocator's, not like diagram-js `shape_N`.
+  it('assigns `<kind-prefix>_<n>` per kind on createNew', () => {
+    expect(factory([]).createNew('event', 'Domain Event').id).toBe('event_1');
+    expect(factory([]).createNew('command', 'Command').id).toBe('cmd_1');
+    expect(factory([]).createNew('actor', 'Actor').id).toBe('actor_1');
+    expect(factory([]).createNew('aggregate', 'Aggregate').id).toBe('agg_1');
+    expect(factory([]).createNew('policy', 'Policy').id).toBe('policy_1');
+    expect(factory([]).createNew('readmodel', 'Read Model').id).toBe('read_1');
+    expect(factory([]).createNew('external', 'External System').id).toBe('ext_1');
+    expect(factory([]).createNew('hotspot', 'Hotspot').id).toBe('hot_1');
+    expect(factory([]).createNew('note', 'Note').id).toBe('note_1');
   });
 
-  it('uniqueLabel excludes the element being renamed itself (rename to its own name)', () => {
-    const f = factory([]);
-    const registry = {
-      getAll: () => [
-        { id: 'event_order_placed', eventStormingLabel: 'Order Placed' },
-        { id: 'cmd_place_order', eventStormingLabel: 'Place Order' },
-      ],
-    };
-    Object.assign(f, { elementRegistry: registry });
-    expect(f.uniqueLabel('Order Placed', 'event_order_placed')).toBe('Order Placed');
-    expect(f.uniqueLabel('Place Order', 'event_order_placed')).toBe('Place Order 2');
+  it('skips ids already present in the registry', () => {
+    const f = factory([{ id: 'agg_1' }, { id: 'agg_2' }]);
+    expect(f.createNew('aggregate', 'Aggregate').id).toBe('agg_3');
+  });
+
+  it('allocateId honors batch-reserved ids (multi-shape paste before placement)', () => {
+    const f = factory([{ id: 'event_1' }]);
+    expect(f.allocateId('event', new Set(['event_2', 'event_3']))).toBe('event_4');
+  });
+
+  it('assigns a draw_ id to tool-drawn drawings, keeps explicit ids on import', () => {
+    const pts = [
+      { x: 10, y: 10 },
+      { x: 50, y: 40 },
+    ];
+    expect(factory([]).drawingFromCanvasPoints(pts).id).toBe('draw_1');
+    expect(factory([]).drawingFromCanvasPoints(pts, { id: 'draw_sketch' }).id).toBe('draw_sketch');
   });
 });
 

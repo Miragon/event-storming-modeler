@@ -35,7 +35,7 @@ reported as a diagnostic.
 ```
 <kind> <Name> [x, y]
 <kind> <Name> [x, y] (color #rrggbb)
-<kind> <Name> [x, y] (color #rrggbb) (on <Host Name>)
+<kind> <Name> [x, y] (color #rrggbb) (id <id>) (on <Host Name>)
 note <Text> [x, y] (color #rrggbb) (size <w>x<h>)
 ```
 
@@ -46,6 +46,11 @@ note <Text> [x, y] (color #rrggbb) (size <w>x<h>)
 - `[x, y]` — **pixel** coordinates of the sticky's **center**, `x` first. Optional (defaults to
   `[0, 0]`). Any finite number is allowed, including negatives; values are rounded to 3 decimals.
 - `(color #hex)` — optional per-sticky color override.
+- `(id <id>)` — the sticky's internal id (letters, digits, `_`, `-`); sticky kinds only, notes
+  and drawings are never referenced. The serializer writes it only when the name alone would be
+  ambiguous (two or more stickies share the label) or the label starts with `#`; an explicit
+  but unneeded id is accepted and dropped again on the next serialize. A malformed or duplicate
+  id is reported as a diagnostic and the element gets a freshly allocated id.
 - `(on <Host Name>)` — `actor`/`hotspot` only: pins the sticky onto the named host sticky
   (`event`, `command`, `aggregate`, `policy`, `readmodel` or `external`); it then moves together
   with the host while keeping its own absolute coordinates. Always the **last** suffix — the host
@@ -74,7 +79,7 @@ Stroke styles: `solid` (default), `dashed`, `dotted`; `closed` closes the polyli
 
 ## Edge statements (arrows)
 
-Edges reference stickies **by name** and never carry coordinates:
+Edges reference stickies **by name** (or by `#id`) and never carry coordinates:
 
 ```
 Customer -> Place Order
@@ -83,8 +88,21 @@ Order Placed -> When order placed, ship it; async
 
 - `A -> B` draws an arrow from sticky `A` to sticky `B`.
 - An optional label follows after `;`.
-- Because edges are name-referenced, the serializer keeps labels unique (collisions get a suffix:
-  `Name 2`) and replaces `->` inside labels with `→`.
+- A `#`-prefixed token always reads as an **id reference** — never a label lookup. It works for
+  every sticky's internal id, also ones declared without an `(id …)` suffix; an unresolved id
+  is reported as a diagnostic and the line kept losslessly. `(on …)` hosts accept `#id` too.
+- Duplicate labels are legal: the serializer references an ambiguous target by `#id` (its
+  declaration carries the matching `(id …)` suffix) and replaces `->` inside labels with `→`.
+
+```
+aggregate Order [420, 290] (id agg_order)
+aggregate Order [1160, 290] (id agg_order_2)
+
+Place Order -> #agg_order
+#agg_order -> Order Placed
+Ship Order -> #agg_order_2
+#agg_order_2 -> Order Shipped
+```
 
 ## Round-trip guarantee
 

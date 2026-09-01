@@ -210,7 +210,7 @@ test.describe('webapp modelling interactions', () => {
     await expect(palette.locator('[data-action="create.command"]')).toBeVisible();
   });
 
-  test('copies and pastes a sticky (labels stay unique)', async ({ page }) => {
+  test('copies and pastes a sticky (the clone keeps the label)', async ({ page }) => {
     const id = await createStickyAt(page, 'event', 0.4, 0.5);
     await selectShape(page, id);
 
@@ -220,8 +220,39 @@ test.describe('webapp modelling interactions', () => {
     await dropAt(page, 0.65, 0.6);
 
     await expect.poll(async () => (await exportBoard(page)).elements.length).toBe(2);
-    const labels = (await exportBoard(page)).elements.map((element) => element.label).sort();
-    expect(labels).toEqual(['Domain Event', 'Domain Event 2']);
+    // Duplicate labels are allowed: the clone keeps the source label under a fresh id.
+    const elements = (await exportBoard(page)).elements;
+    expect(elements.map((element) => element.label)).toEqual(['Domain Event', 'Domain Event']);
+    const clone = elements.find((element) => element.id !== id)!;
+    expect(clone.id).not.toBe(id);
+    await expect(elementGfx(page, id)).toBeVisible();
+    await expect(elementGfx(page, clone.id)).toBeVisible();
+  });
+
+  test('duplicate labels survive a DSL round-trip via internal ids', async ({ page }) => {
+    const orderA = await createStickyAt(page, 'aggregate', 0.35, 0.3);
+    const orderB = await createStickyAt(page, 'aggregate', 0.7, 0.3);
+    const command = await createStickyAt(page, 'command', 0.35, 0.65);
+
+    // Renaming onto an existing label is allowed — the same aggregate may appear twice.
+    await renameShape(page, orderA, 'Order');
+    await renameShape(page, orderB, 'Order');
+    await connectShapes(page, command, orderA);
+    expect((await exportBoard(page)).edges).toHaveLength(1);
+
+    // Ambiguous labels surface the internal ids: `(id …)` suffixes and a `#id` arrow reference.
+    const dsl = await exportDSL(page);
+    expect(dsl).toContain('(id ');
+    expect(dsl).toContain('-> #');
+
+    // Export -> re-import: both "Order" stickies keep their ids, and the arrow still points at
+    // the SAME sticky — the id reference disambiguates where the label cannot.
+    await page.evaluate((text) => window.__eventStormingViewer.importDSL(text), dsl);
+    const board = await exportBoard(page);
+    const orders = board.elements.filter((element) => element.label === 'Order');
+    expect(orders.map((element) => element.id).sort()).toEqual([orderA, orderB].sort());
+    expect(board.edges).toHaveLength(1);
+    expect(board.edges[0]!.to).toBe(orderA);
   });
 
   test('resizes a note by hand and the manual box survives a round-trip and a relabel', async ({

@@ -107,6 +107,21 @@ Notes auto-size to their text; a hand-resized note records its box with the trai
 note Kickoff agenda [80, 80] (size 240x160)
 ```
 
+Two stickies may carry the same label (e.g. the same aggregate appearing twice on the
+timeline). An ambiguous name is disambiguated with the sticky's internal id: an `(id …)`
+suffix on the declaration and `#id` in references (arrow endpoints and `(on …)` hosts) —
+unambiguous boards keep referencing purely by name, without any ids in the text:
+
+```
+aggregate Order [420, 290] (id agg_order)
+aggregate Order [1160, 290] (id agg_order_2)
+
+Place Order -> #agg_order
+#agg_order -> Order Placed
+Ship Order -> #agg_order_2
+#agg_order_2 -> Order Shipped
+```
+
 The full example board
 ([`example/order-checkout.storm`](example/order-checkout.storm)):
 

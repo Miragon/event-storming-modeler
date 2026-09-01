@@ -1,5 +1,4 @@
 import type ElementFactory from 'diagram-js/lib/core/ElementFactory';
-import type ElementRegistry from 'diagram-js/lib/core/ElementRegistry';
 import type Canvas from 'diagram-js/lib/core/Canvas';
 import type Create from 'diagram-js/lib/features/create/Create';
 import type Modeling from 'diagram-js/lib/features/modeling/Modeling';
@@ -11,8 +10,9 @@ import {
   isEventStormingShape,
   type EventStormingConnection,
   type EventStormingShape,
+  type EventStormingShapeType,
 } from '../model/di-types.js';
-import { isManualNoteBox, noteMetrics } from '../draw/styles.js';
+import type EventStormingElementFactory from '../model/EventStormingElementFactory.js';
 
 /** Offset (px) accumulated per paste operation. */
 const PASTE_OFFSET = 24;
@@ -57,7 +57,8 @@ function snapshotProps(
 
 /**
  * Custom copy/paste for Event Storming elements: copies the selection including the connections
- * BETWEEN selected shapes and assigns unique labels (the DSL references by name!).
+ * BETWEEN selected shapes. Clones keep their labels verbatim — duplicate labels are legal, the
+ * DSL disambiguates via `(id …)`/`#id` — and get fresh DSL-style ids.
  * Paste attaches the clones to the cursor like palette create (live preview, click places,
  * Escape cancels); duplicate inserts immediately with an offset. Either way the insert is ONE
  * undoable `elements.create` command.
@@ -67,7 +68,7 @@ export default class EventStormingCopyPaste {
     'selection',
     'modeling',
     'elementFactory',
-    'elementRegistry',
+    'eventStormingElementFactory',
     'canvas',
     'create',
     'mouse',
@@ -80,7 +81,7 @@ export default class EventStormingCopyPaste {
     private readonly selection: Selection,
     private readonly modeling: Modeling,
     private readonly elementFactory: ElementFactory,
-    private readonly elementRegistry: ElementRegistry,
+    private readonly esFactory: EventStormingElementFactory,
     private readonly canvas: Canvas,
     private readonly create: Create,
     private readonly mouse: Mouse,
@@ -153,29 +154,28 @@ export default class EventStormingCopyPaste {
     return this.insertWithOffset(this.buildClones());
   }
 
-  /** Builds fresh clone elements (unique labels, internal connections rewired). */
+  /** Builds fresh clone elements (fresh ids, labels kept, internal connections rewired). */
   private buildClones(): { shapes: Shape[]; connections: Element[] } {
     const clipboard = this.clipboard!;
-    const labels = this.uniqueLabels(clipboard.shapes.map((s) => s.label));
-    const shapes = clipboard.shapes.map((snap, i) => {
-      const label = labels[i]!;
-      let { x, y, width, height } = snap;
-      // AUTO note boxes are text-derived everywhere else (factory, updateLabel) — the
-      // unique-suffixed label needs a recomputed box (recentered), or the suffix is clipped
-      // invisible on canvas. A MANUAL box was the user's choice and survives the clone as-is.
-      if (snap.props['eventStormingType'] === 'note' && !isManualNoteBox(snap.label, snap)) {
-        const metrics = noteMetrics(label);
-        x = snap.x + snap.width / 2 - metrics.width / 2;
-        y = snap.y + snap.height / 2 - metrics.height / 2;
-        ({ width, height } = metrics);
-      }
+    // Labels are kept verbatim, so the snapshot geometry stays correct for every note (an AUTO
+    // box IS the label's text metrics, a MANUAL box was the user's choice). The fresh ids may
+    // surface in the DSL as `(id …)` — allocate them DSL-style, reserving within the batch
+    // (the clones only enter the registry once placed).
+    const reserved = new Set<string>();
+    const shapes = clipboard.shapes.map((snap) => {
+      const id = this.esFactory.allocateId(
+        snap.props['eventStormingType'] as EventStormingShapeType,
+        reserved,
+      );
+      reserved.add(id);
       return this.elementFactory.createShape({
         ...structuredClone(snap.props),
-        x,
-        y,
-        width,
-        height,
-        eventStormingLabel: label,
+        id,
+        x: snap.x,
+        y: snap.y,
+        width: snap.width,
+        height: snap.height,
+        eventStormingLabel: snap.label,
       });
     });
     // Re-pin clones onto their clone hosts — the diagram-js bi-directional refs keep
@@ -206,22 +206,6 @@ export default class EventStormingCopyPaste {
     );
     this.selection.select(created as Element[]);
     return true;
-  }
-
-  /** Labels unique against the registry AND within the paste batch. */
-  private uniqueLabels(bases: string[]): string[] {
-    const taken = new Set<string>();
-    for (const el of this.elementRegistry.getAll()) {
-      const lbl = (el as { eventStormingLabel?: unknown }).eventStormingLabel;
-      if (typeof lbl === 'string') taken.add(lbl);
-    }
-    return bases.map((base) => {
-      let label = base;
-      let i = 2;
-      while (taken.has(label)) label = `${base} ${i++}`;
-      taken.add(label);
-      return label;
-    });
   }
 }
 

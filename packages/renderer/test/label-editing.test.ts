@@ -8,7 +8,6 @@ import EventStormingLabelEditing, {
   sanitizeLabel,
 } from '../src/label-editing/EventStormingLabelEditing.js';
 import type EventStormingModeling from '../src/modeling/EventStormingModeling.js';
-import type EventStormingElementFactory from '../src/model/EventStormingElementFactory.js';
 import type { EventStormingConnection, EventStormingShape } from '../src/model/di-types.js';
 
 describe('sanitizeLabel: DSL metacharacter defusing', () => {
@@ -32,7 +31,7 @@ describe('sanitizeLabel: DSL metacharacter defusing', () => {
   });
 });
 
-/** Minimal DI mocks — the editor only touches canvas geometry, modeling and uniqueLabel. */
+/** Minimal DI mocks — the editor only touches canvas geometry and modeling. */
 function editingHarness() {
   const container = document.createElement('div');
   document.body.appendChild(container);
@@ -50,10 +49,7 @@ function editingHarness() {
     updateLabel: (...args: unknown[]) => calls.updateLabel.push(args),
     updateProperties: (...args: unknown[]) => calls.updateProperties.push(args),
   } as unknown as EventStormingModeling;
-  const factory = {
-    uniqueLabel: (base: string) => base,
-  } as unknown as EventStormingElementFactory;
-  const editing = new EventStormingLabelEditing(eventBus, canvas, modeling, factory);
+  const editing = new EventStormingLabelEditing(eventBus, canvas, modeling);
   return { container, editing, calls };
 }
 
@@ -154,6 +150,27 @@ describe('EventStormingLabelEditing', () => {
     expect(reparsed.elements.map((el) => el.label)).toEqual([label, 'Ship it']);
     expect(reparsed.edges).toHaveLength(1);
     expect(serializeDSL(reparsed)).toBe(out);
+  });
+
+  it('renaming a sticky to an EXISTING label commits it verbatim (duplicates are legal)', () => {
+    // Duplicate labels are legal — the DSL disambiguates via `(id …)`/`#id` — so the editor
+    // commits the typed value as-is: no uniqueness lookup, no silent "Order 2" suffixing.
+    const element = {
+      id: 'agg_2',
+      eventStormingType: 'aggregate',
+      eventStormingLabel: 'Shipment',
+      x: 100,
+      y: 100,
+      width: 130,
+      height: 90,
+    } as unknown as EventStormingShape;
+    harness.editing.activate(element);
+
+    const field = harness.container.querySelector('textarea')!;
+    field.value = 'Order';
+    field.dispatchEvent(new Event('blur'));
+
+    expect(harness.calls.updateLabel).toEqual([[element, 'Order']]);
   });
 
   it('opens the sticky editor centered OVER the sticky, sized to its footprint', () => {

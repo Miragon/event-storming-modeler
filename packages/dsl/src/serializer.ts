@@ -1,4 +1,5 @@
 import type { BoardElement, EventStormingBoard } from '@miragon/event-storming-schema-model';
+import { ID_CHARSET_RE, slug } from './lexer.js';
 
 /**
  * Coordinate formatter: 3-decimal rounding, NEVER exponent notation — `String(1e21)` yields
@@ -58,23 +59,16 @@ function defaultName(type: string): string {
 }
 
 /**
- * Returns a name per element ID that is UNIQUE within the DSL for the referenceable types
- * (the sticky kinds). Because arrows are serialized by name (`A -> B`), duplicate or empty
- * labels would collapse onto the same node on re-import and make arrows disappear. So on
- * collision a suffix (`Name 2`) is assigned and on an empty label a default — consistently for
- * BOTH sides (sticky line AND arrow reference). Unique names stay unchanged.
+ * Returns the DSL name per element ID for the referenceable types (the sticky kinds): the
+ * escaped label, or the per-kind default for an empty one. Duplicate labels are legal — an
+ * ambiguous name is disambiguated via an `(id …)` suffix plus `#id` references instead of
+ * being silently renamed.
  */
-function uniqueNames(board: EventStormingBoard): Map<string, string> {
-  const used = new Set<string>();
+function serializedNames(board: EventStormingBoard): Map<string, string> {
   const byId = new Map<string, string>();
   for (const el of board.elements) {
     if (!NAMED_TYPES.has(el.elementType)) continue;
-    const base = escapeName(el.label) || defaultName(el.elementType);
-    let name = base;
-    let i = 2;
-    while (used.has(name)) name = `${base} ${i++}`;
-    used.add(name);
-    byId.set(el.id, name);
+    byId.set(el.id, escapeName(el.label) || defaultName(el.elementType));
   }
   return byId;
 }
@@ -91,8 +85,34 @@ function colorSuffix(el: { color?: string }): string {
  */
 export function serializeDSL(board: EventStormingBoard): string {
   const lines: string[] = [];
-  const names = uniqueNames(board);
+  const names = serializedNames(board);
   const nameOf = (el: BoardElement): string => names.get(el.id) ?? el.label;
+
+  // A `#…` token in a reference position always reads as an id — so a sticky whose serialized
+  // name is AMBIGUOUS (shared by >= 2 stickies) or literally starts with `#` is declared with
+  // an `(id …)` suffix and referenced as `#id`. Everything else stays purely name-based, so
+  // unambiguous boards serialize without any ids, byte-identical to before.
+  const nameCount = new Map<string, number>();
+  for (const name of names.values()) nameCount.set(name, (nameCount.get(name) ?? 0) + 1);
+  const needsId = (id: string): boolean => {
+    const name = names.get(id);
+    return name !== undefined && (nameCount.get(name)! > 1 || name.startsWith('#'));
+  };
+
+  // Ids surface in the text only via needsId. An id outside the DSL id charset (possible in
+  // JSON-authored boards) would emit unparsable syntax and lose the arrows on re-import — a
+  // slug-based, collision-checked stand-in is substituted for the suffix AND every reference.
+  const emitIds = new Map<string, string>();
+  const taken = new Set(board.elements.map((e) => e.id));
+  for (const el of board.elements) {
+    if (!needsId(el.id) || ID_CHARSET_RE.test(el.id)) continue;
+    let candidate = slug(el.id);
+    for (let i = 2; taken.has(candidate); i++) candidate = `${slug(el.id)}_${i}`;
+    taken.add(candidate);
+    emitIds.set(el.id, candidate);
+  }
+  const idOf = (id: string): string => emitIds.get(id) ?? id;
+  const ref = (id: string): string => (needsId(id) ? `#${idOf(id)}` : (names.get(id) ?? id));
 
   lines.push(`title ${board.config.title}`);
   if (board.config.style) lines.push(`style ${board.config.style}`);
@@ -100,24 +120,23 @@ export function serializeDSL(board: EventStormingBoard): string {
 
   // Pinning `(on …)` is ALWAYS the last suffix — the parser reads the host name up to the
   // line's final `)`, so host names containing parentheses survive. validateBoard guarantees
-  // the host is a named sticky kind; the `?? attachedTo` fallback is purely defensive.
+  // the host is a named sticky kind; `ref` falls back to the raw id purely defensively.
   const onSuffix = (el: BoardElement): string => {
     const hostId =
       el.elementType === 'actor' || el.elementType === 'hotspot' ? el.attachedTo : undefined;
-    return hostId ? ` (on ${names.get(hostId) ?? hostId})` : '';
+    return hostId ? ` (on ${ref(hostId)})` : '';
   };
 
   for (const el of board.elements) {
-    lines.push(elementLine(el, nameOf(el), onSuffix(el)));
+    const idSuffix = needsId(el.id) ? ` (id ${idOf(el.id)})` : '';
+    lines.push(elementLine(el, nameOf(el), idSuffix, onSuffix(el)));
   }
 
-  // validateBoard guarantees arrow endpoints are sticky kinds, so the unique-name pass always
-  // covers them — the `?? edge.from` is purely defensive for unvalidated input.
+  // validateBoard guarantees arrow endpoints are sticky kinds, so the name map always covers
+  // them — `ref`'s raw-id fallback is purely defensive for unvalidated input.
   for (const edge of board.edges) {
-    const from = names.get(edge.from) ?? edge.from;
-    const to = names.get(edge.to) ?? edge.to;
     const annotation = edge.label ? `; ${edge.label}` : '';
-    lines.push(`${from} -> ${to}${annotation}`);
+    lines.push(`${ref(edge.from)} -> ${ref(edge.to)}${annotation}`);
   }
 
   // Config keywords were already emitted from the board above. A rawPassthrough entry with the
@@ -136,7 +155,7 @@ export function serializeDSL(board: EventStormingBoard): string {
   return lines.join('\n') + '\n';
 }
 
-function elementLine(el: BoardElement, name: string, attach: string): string {
+function elementLine(el: BoardElement, name: string, idSuffix: string, attach: string): string {
   const p = el.position;
   switch (el.elementType) {
     case 'event':
@@ -147,7 +166,8 @@ function elementLine(el: BoardElement, name: string, attach: string): string {
     case 'readmodel':
     case 'external':
     case 'hotspot':
-      return `${el.elementType} ${name} [${r(p.x)}, ${r(p.y)}]${colorSuffix(el)}${attach}`;
+      // Canonical suffix order: `(color …) (id …) (on …)` — `(on …)` stays last (see above).
+      return `${el.elementType} ${name} [${r(p.x)}, ${r(p.y)}]${colorSuffix(el)}${idSuffix}${attach}`;
     case 'note': {
       // Escape line breaks/comment starters -> the line-based DSL stays single-line. `->` is
       // fine in note text (notes are never arrow endpoints), so no `→` replacement here.

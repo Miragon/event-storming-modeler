@@ -134,17 +134,18 @@ describe('parseDSL – arrows', () => {
     expect(serializeDSL(parseDSL(out))).toBe(out);
   });
 
-  it('duplicate sticky labels do not lose an arrow (the serializer disambiguates names)', () => {
+  it('duplicate sticky labels do not lose an arrow (the serializer switches to ids)', () => {
     const board = parseDSL(base + 'A -> B');
-    // Set both stickies to the same name (as after a colliding rename).
+    // Set both stickies to the same name (as after a colliding rename) — labels stay verbatim,
+    // the ambiguity is carried by `(id …)` suffixes and `#id` references instead of renaming.
     const dup = { ...board, elements: board.elements.map((e) => ({ ...e, label: 'X' })) };
     const out = serializeDSL(dup);
-    // Names were disambiguated (X / X 2).
-    expect(out).toContain('event X [800, 300]');
-    expect(out).toContain('command X 2 [500, 600]');
-    // Re-import: the arrow connects TWO DIFFERENT stickies (no self-reference -> arrow stays).
+    expect(out).toContain('event X [800, 300] (id event_a)');
+    expect(out).toContain('command X [500, 600] (id cmd_b)');
+    expect(out).toContain('#event_a -> #cmd_b');
+    // Re-import: BOTH stickies keep the label and the arrow connects two different stickies.
     const round = parseDSL(out);
-    expect(round.elements).toHaveLength(2);
+    expect(round.elements.map((e) => e.label)).toEqual(['X', 'X']);
     expect(round.edges).toHaveLength(1);
     expect(round.edges[0]!.from).not.toBe(round.edges[0]!.to);
     expect(serializeDSL(round)).toBe(out);
@@ -659,6 +660,320 @@ hotspot Double payment? [640, 280] (on Order Placed)`;
     const once = serializeDSL(board);
     expect(once).toContain('event B [10, 10]');
     expect(once).not.toContain('(on');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+});
+
+describe('duplicate labels (project extension: `(id …)` + `#id` references)', () => {
+  it('parses and round-trips the spec example (two aggregates named "Order")', () => {
+    const src = `title T
+command Place Order [240, 300]
+command Ship Order [980, 420]
+aggregate Order [420, 290] (id agg_order)
+aggregate Order [1160, 290] (id agg_order_2)
+event Order Placed [620, 300]
+event Order Shipped [1160, 420]
+
+Place Order -> #agg_order
+#agg_order -> Order Placed
+Ship Order -> #agg_order_2
+#agg_order_2 -> Order Shipped`;
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    const aggs = board.elements.filter((e) => e.elementType === 'aggregate');
+    expect(aggs.map((a) => a.label)).toEqual(['Order', 'Order']);
+    expect(aggs.map((a) => a.id)).toEqual(['agg_order', 'agg_order_2']);
+    expect(board.edges.map((e) => `${e.from}>${e.to}`)).toEqual([
+      'cmd_place_order>agg_order',
+      'agg_order>event_order_placed',
+      'cmd_ship_order>agg_order_2',
+      'agg_order_2>event_order_shipped',
+    ]);
+    const once = serializeDSL(board);
+    expect(once).toContain('aggregate Order [420, 290] (id agg_order)');
+    expect(once).toContain('aggregate Order [1160, 290] (id agg_order_2)');
+    expect(once).toContain('Place Order -> #agg_order');
+    expect(once).toContain('#agg_order_2 -> Order Shipped');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('hand-written duplicates WITHOUT explicit ids get distinct auto ids and serialize with them', () => {
+    const src = 'title T\naggregate Order [420, 290]\naggregate Order [1160, 290]';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    expect(board.elements.map((e) => e.id)).toEqual(['agg_order', 'agg_order_2']);
+    const once = serializeDSL(board);
+    expect(once).toContain('aggregate Order [420, 290] (id agg_order)');
+    expect(once).toContain('aggregate Order [1160, 290] (id agg_order_2)');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('resolves `#id` for an element that did not need an `(id …)` suffix', () => {
+    const src =
+      'title T\nevent Order Placed [620, 300]\ncommand X [0, 0]\nX -> #event_order_placed';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    expect(board.edges[0]).toMatchObject({ from: 'cmd_x', to: 'event_order_placed' });
+    // Unambiguous labels reference by NAME again — the id reference is normalized away.
+    const once = serializeDSL(board);
+    expect(once).toContain('X -> Order Placed');
+    expect(once).not.toContain('(id');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('mixes label and id references on one board to a round-trip fixed point', () => {
+    const src = `title T
+aggregate Order [420, 290] (id agg_order)
+aggregate Order [1160, 290] (id agg_order_2)
+command Place Order [240, 300]
+Place Order -> #agg_order
+#agg_order_2 -> Place Order`;
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    expect(board.edges).toHaveLength(2);
+    const once = serializeDSL(board);
+    expect(once).toContain('Place Order -> #agg_order');
+    expect(once).toContain('#agg_order_2 -> Place Order');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('a label literally starting with `#` is declared with an id and referenced as `#id`', () => {
+    const src = 'title T\nevent #123 escalated [620, 300]\ncommand B [0, 0]';
+    const board = parseDSL(src);
+    const withArrow = {
+      ...board,
+      edges: [
+        { id: 'arrow_1', edgeType: 'arrow' as const, from: 'cmd_b', to: 'event_123_escalated' },
+      ],
+    };
+    const out = serializeDSL(withArrow);
+    // A `#…` arrow token always reads as an id — so the name is never used as a reference.
+    expect(out).toContain('event #123 escalated [620, 300] (id event_123_escalated)');
+    expect(out).toContain('B -> #event_123_escalated');
+    const round = parseDSL(out);
+    expect(round.elements.find((e) => e.elementType === 'event')?.label).toBe('#123 escalated');
+    expect(round.edges[0]).toMatchObject({ from: 'cmd_b', to: 'event_123_escalated' });
+    expect(serializeDSL(round)).toBe(out);
+  });
+
+  it('accepts an explicit-but-unneeded `(id …)` and drops it again on serialize (normalization)', () => {
+    const { board, diagnostics } = parseDSLWithDiagnostics(
+      'title T\nevent Foo [0, 0] (id my_custom_id)',
+    );
+    expect(diagnostics).toHaveLength(0);
+    expect(board.elements[0]!.id).toBe('my_custom_id');
+    const once = serializeDSL(board);
+    expect(once).toContain('event Foo [0, 0]\n');
+    expect(once).not.toContain('(id');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('ambiguity is decided AFTER trim — labels differing only in whitespace share the name', () => {
+    const board = parseDSL('title T\nevent A [800, 300]\ncommand B [500, 600]\nA -> B');
+    const dup = {
+      ...board,
+      elements: board.elements.map((e) => ({ ...e, label: e.label === 'A' ? 'X' : ' X ' })),
+    };
+    const out = serializeDSL(dup);
+    expect(out).toContain('event X [800, 300] (id event_a)');
+    expect(out).toContain('command X [500, 600] (id cmd_b)');
+    expect(out).toContain('#event_a -> #cmd_b');
+    expect(serializeDSL(parseDSL(out))).toBe(out);
+  });
+
+  it('two empty labels of one kind fall back to the SAME default name and get ids', () => {
+    const board = parseDSL('title T\nevent A [800, 300]\nevent B [500, 600]');
+    const blank = { ...board, elements: board.elements.map((e) => ({ ...e, label: '' })) };
+    const out = serializeDSL(blank);
+    expect(out).toContain('event Domain Event [800, 300] (id event_a)');
+    expect(out).toContain('event Domain Event [500, 600] (id event_b)');
+    expect(serializeDSL(parseDSL(out))).toBe(out);
+  });
+
+  it('canonicalizes the sticky suffix order to `(color …) (id …) (on …)`', () => {
+    const src = `title T
+command Place Order [240, 300]
+actor Customer [250, 280] (id actor_customer) (color #6d28d9) (on Place Order)
+actor Customer [80, 300]`;
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    const once = serializeDSL(board);
+    expect(once).toContain(
+      'actor Customer [250, 280] (color #6d28d9) (id actor_customer) (on Place Order)',
+    );
+    expect(once).toContain('actor Customer [80, 300] (id actor_customer_2)');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('`(on #id)` pins onto an ambiguous host and round-trips as an id reference', () => {
+    const src = `title T
+command Approve [240, 300]
+command Approve [980, 420]
+actor Manager [250, 280] (on #cmd_approve_2)`;
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    expect(board.elements.find((e) => e.elementType === 'actor')).toMatchObject({
+      attachedTo: 'cmd_approve_2',
+    });
+    const once = serializeDSL(board);
+    expect(once).toContain('actor Manager [250, 280] (on #cmd_approve_2)');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('malformed id: line-numbered diagnostic, suffix ignored, element gets an allocated id', () => {
+    const { board, diagnostics } = parseDSLWithDiagnostics(
+      'title T\nevent A [0, 0] (id has space!)',
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.line).toBe(2);
+    expect(diagnostics[0]!.message).toContain('(id has space!)');
+    expect(diagnostics[0]!.text).toContain('event A');
+    expect(board.elements[0]!.id).toBe('event_a');
+    const once = serializeDSL(board);
+    expect(once).toContain('event A [0, 0]');
+    expect(once).not.toContain('(id');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('duplicate explicit id: diagnostic, the LATER element gets a fresh id (never throws)', () => {
+    const { board, diagnostics } = parseDSLWithDiagnostics(
+      'title T\naggregate Order [0, 0] (id agg_order)\naggregate Order [10, 10] (id agg_order)',
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.line).toBe(3);
+    expect(diagnostics[0]!.message).toContain('agg_order');
+    expect(board.elements.map((e) => e.id)).toEqual(['agg_order', 'agg_order_2']);
+    const once = serializeDSL(board);
+    expect(once).toContain('aggregate Order [0, 0] (id agg_order)');
+    expect(once).toContain('aggregate Order [10, 10] (id agg_order_2)');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('an explicit id colliding with an earlier auto id yields a diagnostic and a fresh id', () => {
+    const { board, diagnostics } = parseDSLWithDiagnostics(
+      'title T\nevent A [0, 0]\ncommand B [10, 10] (id event_a)',
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.line).toBe(3);
+    expect(board.elements.map((e) => e.id)).toEqual(['event_a', 'cmd_b']);
+  });
+
+  it('an explicit `(id arrow_1)` never collides with generated arrow ids', () => {
+    const { board, diagnostics } = parseDSLWithDiagnostics(
+      'title T\nevent A [0, 0] (id arrow_1)\ncommand B [10, 10]\nA -> B',
+    );
+    expect(diagnostics).toHaveLength(0);
+    expect(board.elements[0]!.id).toBe('arrow_1');
+    expect(board.edges[0]!.id).toBe('arrow_2');
+    const once = serializeDSL(board);
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('unresolved `#id` arrow endpoint: NO label fallback, established diagnostic, lossless', () => {
+    // An element LABELED "#ghost" exists — but `#` always means id, so the token stays
+    // unresolved (its id is event_ghost, not ghost).
+    const { board, diagnostics } = parseDSLWithDiagnostics(
+      'title T\nevent A [0, 0]\nevent #ghost [10, 10]\nA -> #ghost',
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.line).toBe(4);
+    expect(diagnostics[0]!.message).toContain('"#ghost" not found');
+    expect(board.edges).toHaveLength(0);
+    expect(board.rawPassthrough).toContain('A -> #ghost');
+    const once = serializeDSL(board);
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('unresolved `(on #id)` host: NO label fallback, diagnostic, sticky stays unpinned', () => {
+    const { board, diagnostics } = parseDSLWithDiagnostics(
+      'title T\ncommand #ghost [0, 0]\nactor Customer [250, 280] (on #ghost)',
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.line).toBe(3);
+    expect(diagnostics[0]!.message).toContain('"#ghost" not found');
+    expect(board.elements.find((e) => e.elementType === 'actor')).not.toHaveProperty('attachedTo');
+  });
+
+  it('a `#id` arrow endpoint hitting a note is dropped with a diagnostic (never throws)', () => {
+    const { board, diagnostics } = parseDSLWithDiagnostics(
+      'title T\nevent A [0, 0]\nnote N [80, 80]\nA -> #note_n',
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.message).toContain('arrows may only connect stickies');
+    expect(board.edges).toHaveLength(0);
+    expect(board.rawPassthrough).toContain('A -> #note_n');
+    const once = serializeDSL(board);
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('a `(on #id)` host hitting a note yields the host-kind diagnostic', () => {
+    const { board, diagnostics } = parseDSLWithDiagnostics(
+      'title T\nnote N [80, 80]\nactor A [10, 10] (on #note_n)',
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.message).toContain('may only attach to host stickies');
+    expect(board.elements.find((e) => e.elementType === 'actor')).not.toHaveProperty('attachedTo');
+  });
+
+  it('`(id …)` on a note line yields a diagnostic; `(id …)` inside note text stays', () => {
+    const src = 'title T\nnote use (id x) sparingly [80, 80]\nnote Kickoff [80, 200] (id note_1)';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.line).toBe(3);
+    expect(diagnostics[0]!.message).toContain('only sticky kinds support');
+    const notes = board.elements.filter((e) => e.elementType === 'note');
+    expect(notes[0]!.label).toBe('use (id x) sparingly');
+    expect(notes[1]!.id).toBe('note_kickoff');
+    const once = serializeDSL(board);
+    expect(once).toContain('note use (id x) sparingly [80, 80]');
+    expect(once).toContain('note Kickoff [80, 200]');
+    expect(once).not.toContain('(id note_1)');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('`(id …)` on a drawing yields a diagnostic and is ignored', () => {
+    const { board, diagnostics } = parseDSLWithDiagnostics(
+      'title T\nline [[100, 100], [200, 150]] (dashed) (id d1)',
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.message).toContain('only sticky kinds support');
+    expect(board.elements[0]!.id).toBe('draw_line');
+    const once = serializeDSL(board);
+    expect(once).toContain('line [[100, 100], [200, 150]] (dashed)');
+    expect(once).not.toContain('(id');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('substitutes ids outside the DSL charset on emit (JSON-authored boards stay parseable)', () => {
+    const board = parseDSL('title T\nevent A [800, 300]\ncommand B [500, 600]\nA -> B');
+    const map: Record<string, string> = { event_a: 'weird id!', cmd_b: 'weird id!2' };
+    const unsafe = {
+      ...board,
+      elements: board.elements.map((e) => ({ ...e, id: map[e.id]!, label: 'X' })),
+      edges: board.edges.map((e) => ({ ...e, from: map[e.from]!, to: map[e.to]! })),
+    };
+    const out = serializeDSL(unsafe);
+    expect(out).toContain('event X [800, 300] (id weird_id)');
+    expect(out).toContain('command X [500, 600] (id weird_id_2)');
+    expect(out).toContain('#weird_id -> #weird_id_2');
+    const round = parseDSL(out);
+    expect(round.edges[0]).toMatchObject({ from: 'weird_id', to: 'weird_id_2' });
+    expect(serializeDSL(round)).toBe(out);
+  });
+
+  it('does not steal an `(id …)` inside a sticky name or a host name', () => {
+    const src =
+      'title T\nevent Pay (id 1) now [620, 300]\nhotspot H [640, 280] (id hot_h) (on Pay (id 1) now)';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    expect(board.elements.find((e) => e.elementType === 'event')?.label).toBe('Pay (id 1) now');
+    expect(board.elements.find((e) => e.elementType === 'hotspot')).toMatchObject({
+      id: 'hot_h',
+      attachedTo: 'event_pay_id_1_now',
+    });
+    const once = serializeDSL(board);
+    // The explicit id is unneeded (unique label) and dropped; the host name stays verbatim.
+    expect(once).toContain('hotspot H [640, 280] (on Pay (id 1) now)');
     expect(serializeDSL(parseDSL(once))).toBe(once);
   });
 });

@@ -116,6 +116,29 @@ export function parseOn(line: string): { host?: string; rest: string } {
   return { host, rest: `${line.slice(0, m.index)} ${line.slice(close + 1)}` };
 }
 
+// Internal-id extension: `(id <id>)` — emitted on sticky lines only when the name alone would
+// be ambiguous. The charset is deliberately tight (letters/digits/underscore/hyphen) so an id
+// can never collide with the line grammar (`)`/whitespace/`#` are all illegal).
+export const ID_CHARSET_RE = /^[A-Za-z0-9_-]+$/;
+
+const ID_RE = /\(\s*id\s+([A-Za-z0-9_-]+)\s*\)/i;
+
+// Any `(id …)` group — catches malformed variants so the caller can report a diagnostic.
+const ID_PRESENT_RE = /\(\s*id\b[^)]*\)/i;
+
+export function parseId(line: string): {
+  id?: string;
+  /** The matched `(id …)` text when present but unreadable (illegal charset). */
+  invalid?: string;
+  rest: string;
+} {
+  const m = ID_RE.exec(line);
+  if (m?.[1]) return { id: m[1], rest: line.replace(ID_RE, ' ') };
+  const p = ID_PRESENT_RE.exec(line);
+  if (!p) return { rest: line };
+  return { invalid: p[0], rest: line.replace(ID_PRESENT_RE, ' ') };
+}
+
 // Resize extension: `(size <w>x<h>)` — canonically the LAST suffix on note lines. The
 // serializer emits no spaces around the `x`; the parser tolerates optional whitespace.
 // Deliberately looked up only after the coordinates so `(size 1x1)` inside note text survives.

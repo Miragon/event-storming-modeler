@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type Canvas from 'diagram-js/lib/core/Canvas';
 import type ElementRegistry from 'diagram-js/lib/core/ElementRegistry';
 import type CommandStack from 'diagram-js/lib/command/CommandStack';
 import type Modeling from 'diagram-js/lib/features/modeling/Modeling';
+import type { Shape } from 'diagram-js/lib/model/Types';
 import { Modeler } from '../../src/index.js';
 import type EventStormingModeling from '../../src/modeling/EventStormingModeling.js';
+import type EventStormingElementFactory from '../../src/model/EventStormingElementFactory.js';
 import { isEventStormingShape, type EventStormingShape } from '../../src/model/di-types.js';
 // Pull the real stylesheet in so layout (getBBox) matches production. src/index.ts also imports it.
 import '../../src/assets/event-storming.css';
@@ -23,6 +26,20 @@ actor Customer [430, 300] (on Place Order)`;
 const RESIZED_DSL = `title Resize Fixture
 note Kickoff agenda [300, 200] (size 240x160)
 note Hint [500, 200]`;
+
+// Duplicate labels: the aggregate "Order" appears twice; `(id …)` suffixes plus `#id` references
+// keep the arrows unambiguous (the spec's canonical design-level example).
+const DUPLICATE_DSL = `title Duplicate Fixture
+command Place Order [200, 290]
+aggregate Order [420, 290] (id agg_order)
+event Order Placed [640, 290]
+command Ship Order [900, 290]
+aggregate Order [1160, 290] (id agg_order_2)
+event Order Shipped [1400, 290]
+Place Order -> #agg_order
+#agg_order -> Order Placed
+Ship Order -> #agg_order_2
+#agg_order_2 -> Order Shipped`;
 
 function findByLabel(registry: ElementRegistry, label: string): EventStormingShape {
   const shape = registry.find(
@@ -209,6 +226,66 @@ describe('Modeler integration (real browser DOM)', () => {
 
     selection.select(findByLabel(registry, 'Place Order'));
     expect(container.querySelectorAll('.djs-resizer').length).toBe(0);
+  });
+
+  it('round-trips duplicate labels via (id …) suffixes and #id arrow references', async () => {
+    const { warnings } = await modeler.importDSL(DUPLICATE_DSL);
+    expect(warnings).toEqual([]);
+
+    // Both "Order" stickies exist as SEPARATE elements under their explicit ids.
+    const registry = modeler.get<ElementRegistry>('elementRegistry');
+    const orders = registry.filter(
+      (el) => isEventStormingShape(el) && (el as EventStormingShape).eventStormingLabel === 'Order',
+    );
+    expect(orders.map((el) => el.id).sort()).toEqual(['agg_order', 'agg_order_2']);
+
+    // The ambiguous name serializes with `(id …)` and is referenced as `#id` in the arrows.
+    const out = modeler.exportDSL();
+    expect(out).toContain('aggregate Order [420, 290] (id agg_order)');
+    expect(out).toContain('aggregate Order [1160, 290] (id agg_order_2)');
+    expect(out).toContain('Place Order -> #agg_order');
+    expect(out).toContain('#agg_order -> Order Placed');
+    expect(out).toContain('Ship Order -> #agg_order_2');
+    expect(out).toContain('#agg_order_2 -> Order Shipped');
+
+    // Re-import of the export keeps both stickies and the arrows on the SAME endpoints.
+    await modeler.importDSL(out);
+    const board = modeler.exportMap();
+    const orderIds = board.elements
+      .filter((e) => e.label === 'Order')
+      .map((e) => e.id)
+      .sort();
+    expect(orderIds).toEqual(['agg_order', 'agg_order_2']);
+    const placed = board.elements.find((e) => e.label === 'Order Placed')!;
+    const shipped = board.elements.find((e) => e.label === 'Order Shipped')!;
+    expect(board.edges).toContainEqual(
+      expect.objectContaining({ from: 'agg_order', to: placed.id }),
+    );
+    expect(board.edges).toContainEqual(
+      expect.objectContaining({ from: 'agg_order_2', to: shipped.id }),
+    );
+    // Fixed point: the second export is byte-identical.
+    expect(modeler.exportDSL()).toBe(out);
+  });
+
+  it('palette create gets a DSL-style id and a rename may duplicate an existing label', async () => {
+    await modeler.importDSL(DUPLICATE_DSL);
+    const modeling = modeler.get<Modeling>('modeling');
+    const factory = modeler.get<EventStormingElementFactory>('eventStormingElementFactory');
+    const root = modeler.get<Canvas>('canvas').getRootElement() as Shape;
+
+    // Interactive create: numbered default label (pure UX) + a DSL-style id — NOT `shape_N`,
+    // because the id surfaces in the `.storm` text once the label is duplicated.
+    const created = factory.createNew('aggregate', 'Order');
+    expect(created.eventStormingLabel).toBe('Order 2');
+    expect(created.id).toBe('agg_1');
+    modeling.createShape(created as unknown as Shape, { x: 1600, y: 290 }, root);
+
+    // Renaming to an EXISTING label is allowed; the export disambiguates via `(id …)`.
+    modeler.get<EventStormingModeling>('eventStormingModeling').updateLabel(created, 'Order');
+    const board = modeler.exportMap();
+    expect(board.elements.filter((e) => e.label === 'Order')).toHaveLength(3);
+    expect(modeler.exportDSL()).toContain('aggregate Order [1600, 290] (id agg_1)');
   });
 
   it('deletes attachers with their host in ONE undoable step and restores the pinning on undo', async () => {

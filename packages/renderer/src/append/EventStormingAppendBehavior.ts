@@ -36,7 +36,7 @@ const AFTER_CREATE = 500;
  *  1. LIVE arrow preview from the source to the cursor (analogous to diagram-js ConnectPreview,
  *     but in the create flow) — requires the `connectionPreview` service (ConnectionPreviewModule).
  *  2. After creation, automatically opens the new sticky's label editor so it can be named
- *     (uniquely) right away — the core flow: sticky -> arrow -> next sticky -> type.
+ *     right away — the core flow: sticky -> arrow -> next sticky -> type.
  * Both only when `context.source` is set; ordinary palette-create stays untouched.
  */
 export default class EventStormingAppendBehavior {

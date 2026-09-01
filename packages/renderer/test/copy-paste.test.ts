@@ -7,9 +7,11 @@ import type Modeling from 'diagram-js/lib/features/modeling/Modeling';
 import type Mouse from 'diagram-js/lib/features/mouse/Mouse';
 import type Selection from 'diagram-js/lib/features/selection/Selection';
 import EventStormingCopyPaste from '../src/modeling/EventStormingCopyPaste.js';
+import EventStormingElementFactory from '../src/model/EventStormingElementFactory.js';
 import { STICKY_STYLES, noteMetrics } from '../src/draw/styles.js';
 
 interface CreatedShape {
+  id: string;
   eventStormingType: string;
   eventStormingLabel: string;
   x: number;
@@ -21,6 +23,14 @@ interface CreatedShape {
 
 function harness(selected: Array<Record<string, unknown>>) {
   const created: CreatedShape[][] = [];
+  const elementFactory = {
+    createShape: (attrs: Record<string, unknown>) => attrs,
+    createConnection: (attrs: Record<string, unknown>) => attrs,
+  } as unknown as ElementFactory;
+  const registry = {
+    getAll: () => selected,
+    get: (id: string) => selected.find((el) => el['id'] === id),
+  } as unknown as ElementRegistry;
   const copyPaste = new EventStormingCopyPaste(
     { get: () => selected, select: () => {} } as unknown as Selection,
     {
@@ -29,11 +39,8 @@ function harness(selected: Array<Record<string, unknown>>) {
         return elements;
       },
     } as unknown as Modeling,
-    {
-      createShape: (attrs: Record<string, unknown>) => attrs,
-      createConnection: (attrs: Record<string, unknown>) => attrs,
-    } as unknown as ElementFactory,
-    { getAll: () => selected } as unknown as ElementRegistry,
+    elementFactory,
+    new EventStormingElementFactory(elementFactory, registry),
     { getRootElement: () => ({ id: 'event-storming-root' }) } as unknown as Canvas,
     {} as unknown as Create,
     { getLastMoveEvent: () => null } as unknown as Mouse,
@@ -41,55 +48,12 @@ function harness(selected: Array<Record<string, unknown>>) {
   return { copyPaste, created };
 }
 
-describe('EventStormingCopyPaste: pasted note auto-size', () => {
-  // Regression: a pasted note kept the snapshot box sized for the OLD label, so the unique
-  // " 2" suffix was clipped invisible on canvas and the geometry changed on reload.
-  it('recomputes the note box from the suffixed label, keeping the center', () => {
-    const base = noteMetrics('Risk');
-    const note = {
-      eventStormingType: 'note',
-      eventStormingLabel: 'Risk',
-      x: 100,
-      y: 100,
-      width: base.width,
-      height: base.height,
-    };
-    const { copyPaste, created } = harness([note]);
-
-    expect(copyPaste.duplicate()).toBe(true);
-
-    const clone = created[0]![0]!;
-    const expected = noteMetrics('Risk 2');
-    expect(clone.eventStormingLabel).toBe('Risk 2');
-    expect(clone.width).toBe(expected.width);
-    expect(clone.height).toBe(expected.height);
-    expect(clone.x + clone.width / 2).toBe(note.x + note.width / 2);
-    expect(clone.y + clone.height / 2).toBe(note.y + note.height / 2);
-  });
-
-  it('keeps a MANUALLY sized box on the clone (only auto boxes track the suffixed label)', () => {
-    const note = {
-      eventStormingType: 'note',
-      eventStormingLabel: 'Risk',
-      x: 100,
-      y: 100,
-      width: 240,
-      height: 160,
-    };
-    const { copyPaste, created } = harness([note]);
-
-    expect(copyPaste.duplicate()).toBe(true);
-
-    const clone = created[0]![0]!;
-    expect(clone.eventStormingLabel).toBe('Risk 2');
-    expect(clone.width).toBe(240);
-    expect(clone.height).toBe(160);
-    expect(clone.x).toBe(note.x);
-    expect(clone.y).toBe(note.y);
-  });
-
-  it('keeps the snapshot size for fixed-size stickies', () => {
+describe('EventStormingCopyPaste: clones keep the label, get fresh DSL-style ids', () => {
+  // Duplicate labels are legal — the DSL disambiguates via `(id …)`/`#id`, so a paste keeps the
+  // source label verbatim and only the (possibly DSL-visible) id is fresh.
+  it('keeps the sticky label verbatim and allocates a `<kind-prefix>_<n>` id', () => {
     const sticky = {
+      id: 'event_order_placed',
       eventStormingType: 'event',
       eventStormingLabel: 'Order Placed',
       x: 200,
@@ -102,17 +66,91 @@ describe('EventStormingCopyPaste: pasted note auto-size', () => {
     expect(copyPaste.duplicate()).toBe(true);
 
     const clone = created[0]![0]!;
-    expect(clone.eventStormingLabel).toBe('Order Placed 2');
+    expect(clone.eventStormingLabel).toBe('Order Placed');
+    expect(clone.id).toBe('event_1');
     expect(clone.width).toBe(STICKY_STYLES.event.width);
     expect(clone.height).toBe(STICKY_STYLES.event.height);
     expect(clone.x).toBe(sticky.x);
     expect(clone.y).toBe(sticky.y);
+  });
+
+  it('allocates distinct ids within one paste batch (clones are not in the registry yet)', () => {
+    const sticky = (id: string, label: string, x: number) => ({
+      id,
+      eventStormingType: 'event',
+      eventStormingLabel: label,
+      x,
+      y: 300,
+      width: STICKY_STYLES.event.width,
+      height: STICKY_STYLES.event.height,
+    });
+    const { copyPaste, created } = harness([
+      sticky('event_1', 'Order Placed', 200),
+      sticky('event_b', 'Order Shipped', 400),
+    ]);
+
+    expect(copyPaste.duplicate()).toBe(true);
+
+    const [first, second] = created[0]! as [CreatedShape, CreatedShape];
+    expect(first.id).toBe('event_2');
+    expect(second.id).toBe('event_3');
+    expect(first.eventStormingLabel).toBe('Order Placed');
+    expect(second.eventStormingLabel).toBe('Order Shipped');
+  });
+});
+
+describe('EventStormingCopyPaste: pasted note box', () => {
+  it('keeps an AUTO-sized box as-is (same label => same text metrics)', () => {
+    const base = noteMetrics('Risk');
+    const note = {
+      id: 'note_risk',
+      eventStormingType: 'note',
+      eventStormingLabel: 'Risk',
+      x: 100,
+      y: 100,
+      width: base.width,
+      height: base.height,
+    };
+    const { copyPaste, created } = harness([note]);
+
+    expect(copyPaste.duplicate()).toBe(true);
+
+    const clone = created[0]![0]!;
+    expect(clone.eventStormingLabel).toBe('Risk');
+    expect(clone.id).toBe('note_1');
+    expect(clone.width).toBe(base.width);
+    expect(clone.height).toBe(base.height);
+    expect(clone.x).toBe(note.x);
+    expect(clone.y).toBe(note.y);
+  });
+
+  it('keeps a MANUALLY sized box on the clone (resize feature behavior)', () => {
+    const note = {
+      id: 'note_risk',
+      eventStormingType: 'note',
+      eventStormingLabel: 'Risk',
+      x: 100,
+      y: 100,
+      width: 240,
+      height: 160,
+    };
+    const { copyPaste, created } = harness([note]);
+
+    expect(copyPaste.duplicate()).toBe(true);
+
+    const clone = created[0]![0]!;
+    expect(clone.eventStormingLabel).toBe('Risk');
+    expect(clone.width).toBe(240);
+    expect(clone.height).toBe(160);
+    expect(clone.x).toBe(note.x);
+    expect(clone.y).toBe(note.y);
   });
 });
 
 describe('EventStormingCopyPaste: attachments (pinning)', () => {
   function pinnedSelection() {
     const host = {
+      id: 'cmd_place_order',
       eventStormingType: 'command',
       eventStormingLabel: 'Place Order',
       x: 200,
@@ -121,6 +159,7 @@ describe('EventStormingCopyPaste: attachments (pinning)', () => {
       height: STICKY_STYLES.command.height,
     };
     const attacher = {
+      id: 'actor_customer',
       eventStormingType: 'actor',
       eventStormingLabel: 'Customer',
       x: 210,

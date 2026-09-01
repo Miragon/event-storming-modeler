@@ -15,6 +15,24 @@ import {
 } from './di-types.js';
 
 /**
+ * Id prefixes matching the DSL parser's allocator (event_/cmd_/…) plus note/drawing — ids can
+ * surface in the `.storm` text (`(id …)` suffix, `#id` references) once labels are duplicated,
+ * so interactively created elements must not carry diagram-js `shape_N` ids.
+ */
+const ID_PREFIXES: Readonly<Record<EventStormingShapeType, string>> = {
+  event: 'event',
+  command: 'cmd',
+  actor: 'actor',
+  aggregate: 'agg',
+  policy: 'policy',
+  readmodel: 'read',
+  external: 'ext',
+  hotspot: 'hot',
+  note: 'note',
+  drawing: 'draw',
+};
+
+/**
  * Creates diagram-js runtime elements with Event Storming markers. Schema positions are element
  * CENTERS in board pixels — converted to diagram-js top-left via the per-kind width/height.
  */
@@ -27,17 +45,13 @@ export default class EventStormingElementFactory {
   ) {}
 
   /**
-   * Returns a unique label: `base`, otherwise `base 2`, `base 3`, … Unique labels are mandatory
-   * because the `.storm` DSL references elements BY THEIR NAME — duplicate names would cause ID
-   * collisions on serialize/re-import and lose arrows.
-   *
-   * @param excludeId optional ID of the element currently being renamed (does NOT count its own
-   *        current name as a collision — otherwise every rename would add a suffix).
+   * Returns a unique label: `base`, otherwise `base 2`, `base 3`, … Duplicate labels are legal
+   * (the DSL disambiguates via ids) — the numbering is pure UX so consecutive palette creates
+   * read "Domain Event 2" instead of piling up identical defaults.
    */
-  uniqueLabel(base: string, excludeId?: string): string {
+  uniqueLabel(base: string): string {
     const taken = new Set<string>();
     for (const el of this.elementRegistry.getAll()) {
-      if (excludeId && el.id === excludeId) continue;
       const lbl = (el as { eventStormingLabel?: unknown }).eventStormingLabel;
       if (typeof lbl === 'string') taken.add(lbl);
     }
@@ -45,6 +59,19 @@ export default class EventStormingElementFactory {
     let i = 2;
     while (taken.has(`${base} ${i}`)) i++;
     return `${base} ${i}`;
+  }
+
+  /**
+   * DSL-style id `<kind-prefix>_<n>` for interactively created elements, collision-checked
+   * against the elementRegistry. `reserved` covers ids handed out for the same batch before
+   * anything is placed (e.g. a multi-shape paste — the clones are not in the registry yet).
+   */
+  allocateId(type: EventStormingShapeType, reserved?: ReadonlySet<string>): string {
+    const prefix = ID_PREFIXES[type];
+    for (let i = 1; ; i++) {
+      const id = `${prefix}_${i}`;
+      if (!this.elementRegistry.get(id) && !reserved?.has(id)) return id;
+    }
   }
 
   /** Builds a fixed-size sticky from a schema element (position = center). */
@@ -114,7 +141,7 @@ export default class EventStormingElementFactory {
     const width = Math.max(Math.max(...xs) - x, 4);
     const height = Math.max(Math.max(...ys) - y, 4);
     const shape = this.elementFactory.createShape({
-      ...(extra.id ? { id: extra.id } : {}),
+      id: extra.id ?? this.allocateId('drawing'),
       x,
       y,
       width,
@@ -132,10 +159,11 @@ export default class EventStormingElementFactory {
 
   /** Palette/keyboard create: sized per kind, position comes from the drop point. */
   createNew(type: EventStormingShapeType, rawLabel: string): EventStormingShape {
-    // Enforce a unique label -> lossless DSL round-trip (see uniqueLabel).
+    // Numbered default labels ("Domain Event 2") are pure UX — see uniqueLabel.
     const label = this.uniqueLabel(rawLabel);
     const { width, height } = isStickyKind(type) ? STICKY_STYLES[type] : noteMetrics(label);
     const shape = this.elementFactory.createShape({
+      id: this.allocateId(type),
       width,
       height,
       eventStormingType: type,

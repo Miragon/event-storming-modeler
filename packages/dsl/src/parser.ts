@@ -19,6 +19,7 @@ import {
   keywordOf,
   parseColor,
   parseCoords,
+  parseId,
   parseMultiCoords,
   parseOn,
   parseSize,
@@ -61,6 +62,9 @@ const STICKY_ID_PREFIXES: Readonly<Partial<Record<ElementType, string>>> = {
   hotspot: 'hot',
 };
 
+// The 8 sticky kinds — the only legal arrow endpoints (mirrors validateBoard's contract).
+const STICKY_KINDS: ReadonlySet<string> = new Set(Object.keys(STICKY_ID_PREFIXES));
+
 interface PendingArrow {
   readonly left: string;
   readonly right: string;
@@ -99,6 +103,12 @@ export interface ParseResult {
 
 class IdAllocator {
   private readonly used = new Set<string>();
+  /** Explicit `(id …)` — false when the id is already taken (caller reports + allocates). */
+  claim(id: string): boolean {
+    if (this.used.has(id)) return false;
+    this.used.add(id);
+    return true;
+  }
   alloc(prefix: string, label: string): string {
     const base = `${prefix}_${slug(label)}`;
     let id = base;
@@ -260,7 +270,16 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
           failed(line);
           break;
         }
-        const id = ids.alloc(STICKY_ID_PREFIXES[kw as ElementType]!, node.name);
+        if (node.idInvalid) {
+          diag(
+            `Id: could not read "${node.idInvalid.trim()}" — expected (id <id>) with letters, digits, '_' or '-'`,
+          );
+        }
+        const explicit = node.id !== undefined && ids.claim(node.id) ? node.id : undefined;
+        if (node.id !== undefined && explicit === undefined) {
+          diag(`Id: "${node.id}" is already taken — the element got a fresh id`);
+        }
+        const id = explicit ?? ids.alloc(STICKY_ID_PREFIXES[kw as ElementType]!, node.name);
         elements.push(
           compact({
             id,
@@ -298,11 +317,15 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
         // Color/size ONLY from the suffix after the coordinates (mirrors parseSticky) — notes
         // are free text, so `(color …)` or `(size 1x1)` may legitimately appear inside it.
         const sz = parseSize(split ? split.suffix : after);
-        const col = parseColor(sz.rest);
+        const idp = parseId(sz.rest);
+        const col = parseColor(idp.rest);
         if (sz.invalid) {
           diag(
             `Size: could not read "${sz.invalid.trim()}" — expected (size <w>x<h>) with positive numbers`,
           );
+        }
+        if (idp.id !== undefined || idp.invalid) {
+          diag('Id: a note cannot be referenced — only sticky kinds support (id …)');
         }
         // Literal `\n` back into real line breaks (multi-line notes).
         const textPart = decodeName((split ? split.name : col.rest).trim());
@@ -330,6 +353,10 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
         const szDrawing = parseSize(multi.rest);
         if (szDrawing.size || szDrawing.invalid) {
           diag('Size: a drawing cannot be resized — only notes support (size …)');
+        }
+        const idDrawing = parseId(multi.rest);
+        if (idDrawing.id !== undefined || idDrawing.invalid) {
+          diag('Id: a drawing cannot be referenced — only sticky kinds support (id …)');
         }
         const flags = multi.rest.toLowerCase();
         const strokeStyle: DrawingStrokeStyle | undefined = flags.includes('(dashed)')
@@ -359,12 +386,23 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
     }
   }
 
+  // Reference resolution for arrow endpoints and `(on …)` hosts: a `#`-prefixed token is an id
+  // reference (ids exist for EVERY element, not only those declared with `(id …)`); anything
+  // else stays a label lookup. No fallback across the two — `#` always means id.
+  const resolve = (token: string): BoardElement | undefined => {
+    if (token.startsWith('#')) {
+      const id = token.slice(1);
+      return elements.find((e) => e.id === id);
+    }
+    const id = nameToId.get(decodeName(token));
+    return id !== undefined ? elements.find((e) => e.id === id) : undefined;
+  };
+
   // Deferred like arrows so a host may be declared after its attacher. On failure the sticky
   // stays WITHOUT attachedTo (it was already created above) — no rawPassthrough, the line is
   // otherwise fully represented.
   for (const att of pendingAttachments) {
-    const hostId = nameToId.get(decodeName(att.host));
-    const host = hostId ? elements.find((e) => e.id === hostId) : undefined;
+    const host = resolve(att.host);
     if (!host) {
       diag(`Attachment: "${att.host}" not found`, att.lineNo, att.raw);
       continue;
@@ -381,14 +419,38 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
   }
 
   let arrowN = 0;
+  // An explicit `(id arrow_N)` on a sticky may occupy an arrow-id slot — skip it (diagram-js
+  // has ONE id namespace for shapes and connections; validateBoard rejects the collision).
+  const elementIds = new Set(elements.map((e) => e.id));
+  const nextArrowId = (): string => {
+    let id = `arrow_${++arrowN}`;
+    while (elementIds.has(id)) id = `arrow_${++arrowN}`;
+    return id;
+  };
   const edges: BoardEdge[] = [];
   for (const arrow of pendingArrows) {
-    const fromId = nameToId.get(decodeName(arrow.left));
-    const toId = nameToId.get(decodeName(arrow.right));
-    if (!fromId || !toId) {
+    const from = resolve(arrow.left);
+    const to = resolve(arrow.right);
+    if (!from || !to) {
       rawPassthrough.push(arrow.raw);
       diag(
-        `Arrow: ${!fromId ? `"${arrow.left}"` : `"${arrow.right}"`} not found`,
+        `Arrow: ${!from ? `"${arrow.left}"` : `"${arrow.right}"`} not found`,
+        arrow.lineNo,
+        arrow.raw,
+      );
+      continue;
+    }
+    // Only reachable via `#id` refs (labels are registered for sticky kinds only) — an edge to
+    // a note/drawing would make validateBoard throw, so it is dropped losslessly instead.
+    const nonSticky = !STICKY_KINDS.has(from.elementType)
+      ? ([arrow.left, from] as const)
+      : !STICKY_KINDS.has(to.elementType)
+        ? ([arrow.right, to] as const)
+        : undefined;
+    if (nonSticky) {
+      rawPassthrough.push(arrow.raw);
+      diag(
+        `Arrow: "${nonSticky[0]}" is a ${nonSticky[1].elementType} — arrows may only connect stickies`,
         arrow.lineNo,
         arrow.raw,
       );
@@ -396,10 +458,10 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
     }
     edges.push(
       compact({
-        id: `arrow_${++arrowN}`,
+        id: nextArrowId(),
         edgeType: 'arrow',
-        from: fromId,
-        to: toId,
+        from: from.id,
+        to: to.id,
         label: arrow.label,
       }) as BoardEdge,
     );
@@ -423,36 +485,44 @@ interface ParsedSticky {
   readonly color?: string;
   /** Attachment `(on <Host Name>)` — host name still undecoded, resolved by the caller. */
   readonly host?: string;
+  /** Explicit `(id …)` — the caller claims it (duplicate ⇒ diagnostic + fresh id). */
+  readonly id?: string;
+  /** The matched `(id …)` text when present but unreadable (illegal charset). */
+  readonly idInvalid?: string;
   /** A `(size …)` suffix appeared — only notes support it, the caller reports a diagnostic. */
   readonly sizeSuffix?: boolean;
 }
 
 /**
- * Parses `<name> [x, y] [(color …)] [(on …)]`. The suffixes are looked up ONLY AFTER the
- * coordinates — parentheses inside the name stay untouched. `(on …)` is extracted first
- * (its host name runs to the final `)` and may itself contain a `(color …)` or `(size …)`).
- * Coordinates are optional and default to `[0, 0]`; a malformed tuple (bracket present but
- * unreadable) is rejected so the caller can report a diagnostic instead of swallowing it
- * into the name.
+ * Parses `<name> [x, y] [(color …)] [(id …)] [(on …)]`. The suffixes are looked up ONLY AFTER
+ * the coordinates — parentheses inside the name stay untouched. `(on …)` is extracted first
+ * (its host name runs to the final `)` and may itself contain a `(color …)`, `(id …)` or
+ * `(size …)`). Coordinates are optional and default to `[0, 0]`; a malformed tuple (bracket
+ * present but unreadable) is rejected so the caller can report a diagnostic instead of
+ * swallowing it into the name.
  */
 function parseSticky(after: string): ParsedSticky | null {
   const split = splitAtCoords(after);
   if (split) {
     if (!split.name) return null;
     const on = parseOn(split.suffix);
-    const sz = parseSize(on.rest);
+    const idp = parseId(on.rest);
+    const sz = parseSize(idp.rest);
     const col = parseColor(sz.rest);
     return compact({
       name: decodeName(split.name),
       coords: { x: split.coords.a, y: split.coords.b },
       color: col.color ?? undefined,
       host: on.host,
+      id: idp.id,
+      idInvalid: idp.invalid,
       sizeSuffix: sz.size || sz.invalid ? true : undefined,
     }) as ParsedSticky;
   }
   if (after.includes('[')) return null;
   const on = parseOn(after);
-  const sz = parseSize(on.rest);
+  const idp = parseId(on.rest);
+  const sz = parseSize(idp.rest);
   const col = parseColor(sz.rest);
   const name = col.rest.trim();
   if (!name) return null;
@@ -461,6 +531,8 @@ function parseSticky(after: string): ParsedSticky | null {
     coords: { x: 0, y: 0 },
     color: col.color ?? undefined,
     host: on.host,
+    id: idp.id,
+    idInvalid: idp.invalid,
     sizeSuffix: sz.size || sz.invalid ? true : undefined,
   }) as ParsedSticky;
 }
