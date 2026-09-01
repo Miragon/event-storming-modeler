@@ -119,7 +119,11 @@
     color 150ms ease;
 }
 .djs-palette .entry:hover {
-  background: var(--event-storming-accent-soft);
+  /* Accent tint LAYERED over the solid surface — a bare alpha background would let the canvas
+     shine through and make the hovered entry look transparent. */
+  background:
+    linear-gradient(var(--event-storming-accent-soft), var(--event-storming-accent-soft)),
+    var(--event-storming-surface);
   color: var(--event-storming-accent);
 }
 /* Draw mode: crosshair over the whole canvas. */
@@ -204,7 +208,10 @@
     color 150ms ease;
 }
 .event-storming-container .djs-context-pad .entry:hover {
-  background: var(--event-storming-accent-soft);
+  /* Same layering as the palette hover: solid surface below the accent tint, never see-through. */
+  background:
+    linear-gradient(var(--event-storming-accent-soft), var(--event-storming-accent-soft)),
+    var(--event-storming-surface);
   color: var(--event-storming-accent);
 }
 
