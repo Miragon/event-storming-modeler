@@ -92,3 +92,49 @@ describe('EventStormingRenderer: drawing ink', () => {
     expect(stroke).toBe('rgb(0, 230, 118)');
   });
 });
+
+describe('EventStormingRenderer: sticky shadow', () => {
+  function drawAttached(shape: Record<string, unknown>, svg?: SVGSVGElement) {
+    const root = svg ?? document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const visuals = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    root.appendChild(visuals);
+    renderer().drawShape(visuals, shape as unknown as ShapeLike);
+    return { root, visuals };
+  }
+  const sticky = (label = 'A') => ({
+    eventStormingType: 'event',
+    eventStormingLabel: label,
+    x: 0,
+    y: 0,
+    width: 130,
+    height: 90,
+  });
+
+  it('gives stickies a drop-shadow filter and installs the defs once per SVG', () => {
+    const { root, visuals } = drawAttached(sticky());
+    expect(visuals.querySelector('rect')!.getAttribute('filter')).toBe(
+      'url(#event-storming-sticky-shadow)',
+    );
+    drawAttached(sticky('B'), root);
+    expect(root.querySelectorAll('#event-storming-sticky-shadow')).toHaveLength(1);
+    expect(root.querySelector('defs filter feDropShadow')).not.toBeNull();
+  });
+
+  it('leaves drawings without a shadow and skips the filter on detached groups', () => {
+    const { visuals } = drawAttached({
+      eventStormingType: 'drawing',
+      x: 0,
+      y: 0,
+      width: 50,
+      height: 50,
+      drawingPoints: [
+        { x: 0, y: 0 },
+        { x: 50, y: 50 },
+      ],
+    });
+    expect(visuals.querySelector('polyline')!.getAttribute('filter')).toBeNull();
+    // Detached visuals (no owning SVG): referencing a missing def would hide the element.
+    const detached = draw(sticky());
+    expect(detached.querySelector('rect')!.getAttribute('filter')).toBeNull();
+  });
+});

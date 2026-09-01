@@ -28,6 +28,34 @@ const RENDER_PRIORITY = 1500;
 /** Hotspots stand out with a slight tilt (rotated around the sticky center). */
 const HOTSPOT_ROTATION_DEG = -3;
 
+/** Soft drop shadow that makes stickies read as paper on the board (defs id, per canvas SVG). */
+export const STICKY_SHADOW_FILTER_ID = 'event-storming-sticky-shadow';
+
+/**
+ * Installs the shadow filter into the owning SVG's defs (once per SVG — the export clones the
+ * whole SVG, so the defs travel into saved files). Returns false while the visual group is not
+ * attached yet: a `filter="url(#…)"` pointing at a missing def would make the element invisible,
+ * so callers must only reference the filter when this succeeded.
+ */
+function ensureStickyShadowFilter(visuals: SVGElement): boolean {
+  const svg = visuals.closest('svg');
+  if (!svg) return false;
+  if (svg.querySelector(`#${STICKY_SHADOW_FILTER_ID}`)) return true;
+  const drop = svgAttr(svgCreate('feDropShadow'), {
+    dx: 1,
+    dy: 2,
+    stdDeviation: 2,
+    'flood-color': '#000000',
+    'flood-opacity': 0.2,
+  });
+  const filter = svgAttr(svgCreate('filter'), { id: STICKY_SHADOW_FILTER_ID });
+  svgAppend(filter, drop);
+  const defs = svgCreate('defs');
+  svgAppend(defs, filter);
+  svg.insertBefore(defs, svg.firstChild);
+  return true;
+}
+
 type Attrs = Record<string, string | number>;
 
 export default class EventStormingRenderer extends BaseRenderer {
@@ -95,6 +123,10 @@ export default class EventStormingRenderer extends BaseRenderer {
       stroke: style.stroke,
       'stroke-width': 1.5,
     });
+    // Attribute (not tiny-svg attr, which routes `filter` into inline style) so exports carry it.
+    if (ensureStickyShadowFilter(visuals)) {
+      rect.setAttribute('filter', `url(#${STICKY_SHADOW_FILTER_ID})`);
+    }
     svgAppend(parent, rect);
 
     drawStickyText(parent, shape, kind === 'note');
