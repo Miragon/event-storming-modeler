@@ -6,6 +6,7 @@ import type Modeling from 'diagram-js/lib/features/modeling/Modeling';
 import type { Shape } from 'diagram-js/lib/model/Types';
 import { Modeler } from '../../src/index.js';
 import type EventStormingModeling from '../../src/modeling/EventStormingModeling.js';
+import type EventStormingViewOptions from '../../src/view-options/EventStormingViewOptions.js';
 import type EventStormingElementFactory from '../../src/model/EventStormingElementFactory.js';
 import { isEventStormingShape, type EventStormingShape } from '../../src/model/di-types.js';
 // Pull the real stylesheet in so layout (getBBox) matches production. src/index.ts also imports it.
@@ -286,6 +287,36 @@ describe('Modeler integration (real browser DOM)', () => {
     const board = modeler.exportMap();
     expect(board.elements.filter((e) => e.label === 'Order')).toHaveLength(3);
     expect(modeler.exportDSL()).toContain('aggregate Order [1600, 290] (id agg_1)');
+  });
+
+  it('shows kind captions on stickies (live DOM + SVG export) and hides them on toggle', async () => {
+    await modeler.importDSL(DSL);
+    const captionTexts = () =>
+      [...container.querySelectorAll('text.event-storming-kind-caption')]
+        .map((t) => t.textContent)
+        .sort();
+
+    // Default ON: the actor and the command each carry their kind caption.
+    expect(captionTexts()).toEqual(['Actor', 'Command']);
+
+    // saveSVG clones the live canvas — visible captions travel into the export.
+    const { svg } = await modeler.saveSVG();
+    expect(svg).toContain('event-storming-kind-caption');
+    expect(svg).toContain('Command');
+
+    // Toggling off via the DI service fires the pinned event and re-renders caption-free.
+    const viewOptions = modeler.get<EventStormingViewOptions>('eventStormingViewOptions');
+    let changed = 0;
+    modeler.on('eventStorming.viewOptions.changed', () => changed++);
+    viewOptions.setTypeCaptionsVisible(false);
+    expect(changed).toBe(1);
+    expect(captionTexts()).toEqual([]);
+    const { svg: hidden } = await modeler.saveSVG();
+    expect(hidden).not.toContain('event-storming-kind-caption');
+
+    // Back on: captions re-appear without a re-import.
+    viewOptions.setTypeCaptionsVisible(true);
+    expect(captionTexts()).toEqual(['Actor', 'Command']);
   });
 
   it('deletes attachers with their host in ONE undoable step and restores the pinning on undo', async () => {

@@ -9,6 +9,11 @@ export type { EventStormingViewerOptions, EventCallback } from './EventStormingB
 export { eventStormingModelModule, EventStormingElementFactory } from './model/index.js';
 export { boardBoundsModule, BoardBounds } from './board-bounds/index.js';
 export { eventStormingDrawModule, EventStormingRenderer } from './draw/index.js';
+export {
+  eventStormingViewOptionsModule,
+  EventStormingViewOptions,
+  VIEW_OPTIONS_CHANGED_EVENT,
+} from './view-options/index.js';
 export { COLORS, STICKY_STYLES, NOTE_STYLE } from './draw/styles.js';
 
 /* Miragon brand tokens (single source of truth for colour) — for consumers theming their own chrome. */

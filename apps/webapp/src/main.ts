@@ -290,6 +290,31 @@ for (const { id, level } of LEVELS) onMenu(id, () => levelModeling.setLevel(leve
 viewer.on('commandStack.changed', updateLevelMenu);
 viewer.on('import.done', updateLevelMenu);
 
+// --- Type captions (menu checkbox; a VIEW preference, persisted per browser) ---
+const TYPE_CAPTIONS_KEY = 'event-storming.typeCaptions';
+const viewOptions = viewer.get('eventStormingViewOptions') as {
+  typeCaptionsVisible(): boolean;
+  setTypeCaptionsVisible(visible: boolean): void;
+};
+function updateTypeCaptionsMenu(): void {
+  const el = document.getElementById('m-type-captions');
+  if (!el) return;
+  const visible = viewOptions.typeCaptionsVisible();
+  el.setAttribute('aria-checked', String(visible));
+  // Same checkmark affordance as the level items: icon slot marks "on", spacer keeps alignment.
+  if (visible) setLabel('m-type-captions', ICON_CHECK, 'Type captions');
+  else el.innerHTML = `<span class="menu-icon-spacer"></span><span>Type captions</span>`;
+}
+onMenu('m-type-captions', () => {
+  const visible = !viewOptions.typeCaptionsVisible();
+  viewOptions.setTypeCaptionsVisible(visible);
+  localStorage.setItem(TYPE_CAPTIONS_KEY, visible ? '1' : '0');
+  updateTypeCaptionsMenu();
+});
+// Not board content -> not in the URL hash; re-apply the stored choice before the first import.
+if (localStorage.getItem(TYPE_CAPTIONS_KEY) === '0') viewOptions.setTypeCaptionsVisible(false);
+updateTypeCaptionsMenu();
+
 // --- Landing (start-screen) buttons ---
 document.getElementById('btn-new')?.addEventListener('click', () => {
   /* Canvas is already empty here — just leave the landing and reveal the working chrome. */

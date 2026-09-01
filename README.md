@@ -83,6 +83,7 @@ accepts an optional `(color #hex)` override.
 | Zoom                       | `Ctrl/Cmd` + `+` / `-` / `0` (fit), controls bottom-right                                                                                                                                        |
 | Edit label                 | Double-click a sticky (`Cmd/Ctrl+Enter` saves)                                                                                                                                                   |
 | Change sticky type         | Context pad → change-type popup                                                                                                                                                                  |
+| Type captions on/off       | Menu → "Type captions" (small kind caption at the bottom of every sticky; per-client view preference)                                                                                            |
 | Recolor                    | Context pad → color picker                                                                                                                                                                       |
 
 ## The `.storm` DSL

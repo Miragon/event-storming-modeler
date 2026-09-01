@@ -214,7 +214,7 @@ function levelModeling(): { setLevel(level: BoardLevel): void; getLevel(): Board
   return modeler.get('eventStormingModeling');
 }
 
-/** Checkmark in the icon slot marks the active level; a spacer keeps the labels aligned. */
+/** Checkmark in the icon slot marks a checked item; a spacer keeps the labels aligned. */
 function levelMarkup(label: string, active: boolean): string {
   return active
     ? `${iconMarkup(ICON_CHECK, 16)}<span>${label}</span>`
@@ -242,6 +242,34 @@ function updateLevelMenu(): void {
 modeler.on('commandStack.changed', updateLevelMenu);
 modeler.on('import.done', updateLevelMenu);
 
+// --- Type captions (menu checkbox; a VIEW preference, persisted in the webview state) ---
+
+const viewOptions = modeler.get<{
+  typeCaptionsVisible(): boolean;
+  setTypeCaptionsVisible(visible: boolean): void;
+}>('eventStormingViewOptions');
+
+const typeCaptionsItem = menuItem(ICON_CHECK, 'Type captions', () => {
+  const visible = !viewOptions.typeCaptionsVisible();
+  viewOptions.setTypeCaptionsVisible(visible);
+  // Merge into the webview state — never clobber keys other consumers may have stored.
+  const state = (vscode.getState() ?? {}) as Record<string, unknown>;
+  vscode.setState({ ...state, typeCaptionsVisible: visible });
+  updateTypeCaptionsItem();
+});
+typeCaptionsItem.setAttribute('role', 'menuitemcheckbox');
+
+function updateTypeCaptionsItem(): void {
+  const visible = viewOptions.typeCaptionsVisible();
+  typeCaptionsItem.setAttribute('aria-checked', String(visible));
+  typeCaptionsItem.innerHTML = levelMarkup('Type captions', visible);
+}
+
+// Webview state survives tab switches/reloads — re-apply the stored choice before the first paint.
+const storedState = (vscode.getState() ?? {}) as Record<string, unknown>;
+if (storedState.typeCaptionsVisible === false) viewOptions.setTypeCaptionsVisible(false);
+updateTypeCaptionsItem();
+
 const menuBtn = document.createElement('button');
 menuBtn.type = 'button';
 menuBtn.className = 'menu-btn';
@@ -264,6 +292,8 @@ dropdown.append(
   menuSep(),
   menuLabel('Level'),
   ...levelItems.map(({ item }) => item),
+  menuSep(),
+  typeCaptionsItem,
 );
 
 toolbar.append(menuBtn, dropdown);

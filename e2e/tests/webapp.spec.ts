@@ -92,6 +92,31 @@ test.describe('webapp export round-trip', () => {
     expect(result.first).toContain('title Round Trip');
   });
 
+  test('toggles the type captions on the stickies via the menu', async ({ page }) => {
+    await page.locator('#btn-example').click();
+    await expect(page.locator('#canvas .djs-element').first()).toBeVisible();
+
+    // View preference, ON by default: every sticky carries its kind as a small caption.
+    const captions = page.locator('#canvas .event-storming-kind-caption');
+    await expect(captions.first()).toBeVisible();
+    expect(await captions.count()).toBeGreaterThan(0);
+    await expect(captions.filter({ hasText: 'Domain Event' }).first()).toBeVisible();
+    await expect(page.locator('#m-type-captions')).toHaveAttribute('aria-checked', 'true');
+
+    // Toggle off: the captions leave the live DOM immediately (forced re-render).
+    await page.locator('#btn-menu').click();
+    await page.locator('#m-type-captions').click();
+    await expect(captions).toHaveCount(0);
+    await expect(page.locator('#m-type-captions')).toHaveAttribute('aria-checked', 'false');
+
+    // Toggle back on: the captions return.
+    await page.locator('#btn-menu').click();
+    await page.locator('#m-type-captions').click();
+    await expect(captions.first()).toBeVisible();
+    expect(await captions.count()).toBeGreaterThan(0);
+    await expect(page.locator('#m-type-captions')).toHaveAttribute('aria-checked', 'true');
+  });
+
   test('exports the example board as an SVG matching the snapshot', async ({ page }) => {
     await page.locator('#btn-example').click();
     await expect(page.locator('#canvas .djs-element').first()).toBeVisible();

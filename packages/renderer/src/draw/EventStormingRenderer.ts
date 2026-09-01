@@ -21,12 +21,23 @@ import {
   type EventStormingConnection,
   type EventStormingShape,
 } from '../model/di-types.js';
+import type EventStormingViewOptions from '../view-options/EventStormingViewOptions.js';
 
 /** BaseRenderer default is 1000; 1500 wins the render.shape/render.connection event. */
 const RENDER_PRIORITY = 1500;
 
 /** Hotspots stand out with a slight tilt (rotated around the sticky center). */
 const HOTSPOT_ROTATION_DEG = -3;
+
+/** Class of the small kind caption at a sticky's bottom (selector contract for tests/e2e). */
+export const KIND_CAPTION_CLASS = 'event-storming-kind-caption';
+
+/** Caption typography: small and light so it never competes with the user's label. */
+const CAPTION_FONT_SIZE = 9;
+const CAPTION_FONT_WEIGHT = 300;
+const CAPTION_FILL = '#606060';
+/** Caption baseline sits this many px above the sticky's bottom edge. */
+const CAPTION_BOTTOM_OFFSET = 7;
 
 /** Soft drop shadow that makes stickies read as paper on the board (defs id, per canvas SVG). */
 export const STICKY_SHADOW_FILTER_ID = 'event-storming-sticky-shadow';
@@ -59,9 +70,12 @@ function ensureStickyShadowFilter(visuals: SVGElement): boolean {
 type Attrs = Record<string, string | number>;
 
 export default class EventStormingRenderer extends BaseRenderer {
-  static $inject = ['eventBus'];
+  static $inject = ['eventBus', 'eventStormingViewOptions'];
 
-  constructor(eventBus: EventBus) {
+  constructor(
+    eventBus: EventBus,
+    private readonly viewOptions: EventStormingViewOptions,
+  ) {
     super(eventBus, RENDER_PRIORITY);
   }
 
@@ -130,6 +144,26 @@ export default class EventStormingRenderer extends BaseRenderer {
     svgAppend(parent, rect);
 
     drawStickyText(parent, shape, kind === 'note');
+
+    // Small kind caption at the bottom — the 8 sticky kinds only (a note explains itself,
+    // drawings never reach this method). Appended to `parent` so it tilts with a hotspot.
+    if (isStickyKind(kind) && this.viewOptions.typeCaptionsVisible()) {
+      const caption = label(
+        STICKY_STYLES[kind].label,
+        shape.width / 2,
+        shape.height - CAPTION_BOTTOM_OFFSET,
+        {
+          'text-anchor': 'middle',
+          'font-size': CAPTION_FONT_SIZE,
+          fill: CAPTION_FILL,
+        },
+      );
+      // Plain attributes (tiny-svg attr routes `font-weight` into inline style): the class is
+      // the test/e2e selector contract, and exports must carry both as-is.
+      caption.setAttribute('class', KIND_CAPTION_CLASS);
+      caption.setAttribute('font-weight', String(CAPTION_FONT_WEIGHT));
+      svgAppend(parent, caption);
+    }
     return rect;
   }
 
