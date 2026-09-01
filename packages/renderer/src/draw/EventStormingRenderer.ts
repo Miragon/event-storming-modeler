@@ -53,13 +53,20 @@ function ensureStickyShadowFilter(visuals: SVGElement): boolean {
   if (!svg) return false;
   if (svg.querySelector(`#${STICKY_SHADOW_FILTER_ID}`)) return true;
   const drop = svgAttr(svgCreate('feDropShadow'), {
-    dx: 1,
-    dy: 2,
-    stdDeviation: 2,
+    dx: 0,
+    dy: 5,
+    stdDeviation: 5,
     'flood-color': '#000000',
     'flood-opacity': 0.2,
   });
-  const filter = svgAttr(svgCreate('filter'), { id: STICKY_SHADOW_FILTER_ID });
+  // Widened filter region: the default -10%/120% box would clip the soft blur below the sticky.
+  const filter = svgAttr(svgCreate('filter'), {
+    id: STICKY_SHADOW_FILTER_ID,
+    x: '-40%',
+    y: '-40%',
+    width: '180%',
+    height: '180%',
+  });
   svgAppend(filter, drop);
   const defs = svgCreate('defs');
   svgAppend(defs, filter);
