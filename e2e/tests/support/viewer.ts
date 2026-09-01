@@ -12,7 +12,7 @@ export interface EventStormingBoardElement {
   readonly position: { readonly x: number; readonly y: number };
   /** Manual note box: present only when a note's size differs from its text-derived metrics. */
   readonly size?: { readonly width: number; readonly height: number };
-  /** Pinning: id of the host sticky an actor/hotspot is attached to (absent when detached). */
+  /** Pinning: id of the host sticky an actor/hotspot/note is attached to (absent when detached). */
   readonly attachedTo?: string;
 }
 
@@ -195,7 +195,7 @@ export async function dragShape(
 /**
  * Drag a shape onto another shape: grab it at its hit-box center and drop it at the target's
  * center plus an optional pixel offset (e.g. to leave the host's center grabbable under an
- * attached sticky). Dropping an actor/hotspot over a host-kind sticky attaches (pins) it.
+ * attached sticky). Dropping an actor/hotspot/note over a host-kind sticky attaches (pins) it.
  */
 export async function dragShapeTo(
   page: Page,

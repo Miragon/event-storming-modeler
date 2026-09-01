@@ -347,7 +347,7 @@ describe('Note size (manual resize)', () => {
 
 describe('Attachments (pinning)', () => {
   it('pins the exact attachable and host kind sets', () => {
-    expect(ATTACHABLE_STICKY_KINDS).toEqual(['actor', 'hotspot']);
+    expect(ATTACHABLE_STICKY_KINDS).toEqual(['actor', 'hotspot', 'note']);
     expect(HOST_STICKY_KINDS).toEqual([
       'event',
       'command',
@@ -384,6 +384,27 @@ describe('Attachments (pinning)', () => {
     const hotspot = loaded.elements.find((el) => el.id === 'hot_retry');
     expect(actor).toMatchObject({ attachedTo: 'cmd_place_order', position: { x: 250, y: 280 } });
     expect(hotspot).toMatchObject({ attachedTo: 'event_order_placed' });
+  });
+
+  it('accepts a note attached to a host sticky (position stays absolute)', () => {
+    const board = {
+      ...sample,
+      elements: [
+        ...sample.elements,
+        {
+          id: 'note_check',
+          elementType: 'note',
+          label: 'Check with legal',
+          position: { x: 640, y: 260 },
+          attachedTo: 'event_order_placed',
+        },
+      ],
+    };
+    const note = loadBoard(board).elements.find((el) => el.id === 'note_check');
+    expect(note).toMatchObject({
+      attachedTo: 'event_order_placed',
+      position: { x: 640, y: 260 },
+    });
   });
 
   it('rejects attachedTo referencing a missing element', () => {
@@ -437,6 +458,62 @@ describe('Attachments (pinning)', () => {
       ],
     };
     expect(() => loadBoard(bad)).toThrow(/may only attach to host stickies/);
+  });
+
+  it('rejects a note attachedTo referencing a missing element', () => {
+    const bad = {
+      ...sample,
+      elements: [
+        ...sample.elements,
+        {
+          id: 'note_ghosted',
+          elementType: 'note',
+          label: 'Ghosted',
+          position: { x: 0, y: 0 },
+          attachedTo: 'ghost',
+        },
+      ],
+    };
+    expect(() => loadBoard(bad)).toThrow(/attachedTo "ghost" references no element/);
+  });
+
+  it('rejects a note attached to another note (notes are never hosts)', () => {
+    const bad = {
+      ...sample,
+      elements: [
+        ...sample.elements,
+        { id: 'note_host', elementType: 'note', label: 'Host?', position: { x: 0, y: 0 } },
+        {
+          id: 'note_chained',
+          elementType: 'note',
+          label: 'Chained',
+          position: { x: 10, y: 10 },
+          attachedTo: 'note_host',
+        },
+      ],
+    };
+    expect(() => loadBoard(bad)).toThrow(/may only attach to host stickies/);
+  });
+
+  it('round-trips a manually sized attached note through the JSON serialization', () => {
+    const board = loadBoard({
+      ...sample,
+      elements: [
+        ...sample.elements,
+        {
+          id: 'note_check',
+          elementType: 'note',
+          label: 'Check with legal',
+          position: { x: 640, y: 260 },
+          size: { width: 240, height: 160 },
+          attachedTo: 'event_order_placed',
+        },
+      ],
+    });
+    const out = serializeBoard(board);
+    expect(out).toContain('"attachedTo": "event_order_placed"');
+    expect(out).toContain('"width": 240');
+    expect(serializeBoard(parseBoardJSON(out))).toBe(out);
   });
 
   it('round-trips attachedTo through the deterministic JSON serialization', () => {

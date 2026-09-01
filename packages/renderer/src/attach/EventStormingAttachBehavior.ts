@@ -6,10 +6,12 @@ import { isAttachableKind, isHostKind } from '../model/di-types.js';
 import type { UpdatePropertiesContext } from '../modeling/cmd/UpdatePropertiesHandler.js';
 
 /**
- * Keeps pinning consistent under RETYPE (`setStickyKind` via the popup): only actor/hotspot may
- * carry a `host` and only host kinds may carry attachers — a stale link would make the exporter's
- * `validateBoard` throw. Drag/drop, host-delete and move-together are covered by the stock
- * diagram-js AttachSupport; retype mutates in place (no `shape.replace`), so it needs this hook.
+ * Keeps pinning consistent under RETYPE (`setStickyKind` via the popup): only attachable kinds
+ * (actor/hotspot/note) may carry a `host` and only host kinds may carry attachers — a stale link
+ * would make the exporter's `validateBoard` throw. Drag/drop, host-delete and move-together are
+ * covered by the stock diagram-js AttachSupport; retype mutates in place (no `shape.replace`),
+ * so it needs this hook. Notes themselves cannot be retyped (`setStickyKind` rejects them), but
+ * a HOST retyped to a non-host kind sheds its note attachers like any other attacher here.
  * Runs in `preExecute` of the SAME command -> detach joins the retype as one undo step.
  */
 export default class EventStormingAttachBehavior extends CommandInterceptor {

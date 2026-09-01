@@ -358,4 +358,46 @@ test.describe('webapp modelling interactions', () => {
     expect(await exportDSL(page)).not.toContain('(on ');
     expect(await positionOf(command)).toEqual(commandAfter);
   });
+
+  test('pins a note onto a command, moves it with the host and detaches on empty canvas', async ({
+    page,
+  }) => {
+    const command = await createStickyAt(page, 'command', 0.4, 0.5);
+    const note = await createStickyAt(page, 'note', 0.15, 0.2);
+    const positionOf = async (id: string) =>
+      (await exportBoard(page)).elements.find((element) => element.id === id)!.position;
+
+    // Drop the note onto the command's lower-right quarter: still over the host (attach verdict),
+    // but the smaller auto-sized note leaves the command's center uncovered and grabbable.
+    await dragShapeTo(page, note, command, { x: 55, y: 35 });
+    await expect
+      .poll(
+        async () =>
+          (await exportBoard(page)).elements.find((element) => element.id === note)?.attachedTo,
+      )
+      .toBe(command);
+    expect(await exportDSL(page)).toContain('(on Command)');
+
+    // Moving the host carries the pinned note along by the exact same delta.
+    const commandBefore = await positionOf(command);
+    const noteBefore = await positionOf(note);
+    await dragShape(page, command, 0.7, 0.7);
+    const commandAfter = await positionOf(command);
+    const delta = { x: commandAfter.x - commandBefore.x, y: commandAfter.y - commandBefore.y };
+    expect(Math.abs(delta.x) + Math.abs(delta.y)).toBeGreaterThan(50);
+    const noteAfter = await positionOf(note);
+    expect(noteAfter.x - noteBefore.x).toBeCloseTo(delta.x, 1);
+    expect(noteAfter.y - noteBefore.y).toBeCloseTo(delta.y, 1);
+
+    // Dropping the pinned note on empty canvas detaches it (host stays where it is).
+    await dragShape(page, note, 0.15, 0.2);
+    await expect
+      .poll(
+        async () =>
+          (await exportBoard(page)).elements.find((element) => element.id === note)?.attachedTo,
+      )
+      .toBe(undefined);
+    expect(await exportDSL(page)).not.toContain('(on ');
+    expect(await positionOf(command)).toEqual(commandAfter);
+  });
 });

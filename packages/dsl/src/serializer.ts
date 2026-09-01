@@ -123,7 +123,9 @@ export function serializeDSL(board: EventStormingBoard): string {
   // the host is a named sticky kind; `ref` falls back to the raw id purely defensively.
   const onSuffix = (el: BoardElement): string => {
     const hostId =
-      el.elementType === 'actor' || el.elementType === 'hotspot' ? el.attachedTo : undefined;
+      el.elementType === 'actor' || el.elementType === 'hotspot' || el.elementType === 'note'
+        ? el.attachedTo
+        : undefined;
     return hostId ? ` (on ${ref(hostId)})` : '';
   };
 
@@ -171,10 +173,11 @@ function elementLine(el: BoardElement, name: string, idSuffix: string, attach: s
     case 'note': {
       // Escape line breaks/comment starters -> the line-based DSL stays single-line. `->` is
       // fine in note text (notes are never arrow endpoints), so no `→` replacement here.
-      // `(size WxH)` is ALWAYS the last suffix on note lines and only present for manually
-      // sized notes — auto-sized boards stay byte-identical.
+      // Canonical note suffix order: `(color …) (size WxH) (on …)` — `(on …)` stays last
+      // (final-paren rule, see above); size/attachment are only present when set, so plain
+      // boards stay byte-identical.
       const size = el.size ? ` (size ${r(el.size.width)}x${r(el.size.height)})` : '';
-      return `note ${escapeText(name)} [${r(p.x)}, ${r(p.y)}]${colorSuffix(el)}${size}`;
+      return `note ${escapeText(name)} [${r(p.x)}, ${r(p.y)}]${colorSuffix(el)}${size}${attach}`;
     }
     case 'drawing': {
       // Project extension (freeform drawing): tuple list + style flags.

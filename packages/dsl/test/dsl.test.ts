@@ -665,6 +665,163 @@ hotspot Double payment? [640, 280] (on Order Placed)`;
   });
 });
 
+describe('note attachments (project extension: `(on …)` on note lines)', () => {
+  it('parses and round-trips an attached note (position stays absolute)', () => {
+    const src =
+      'title T\nevent Order Placed [620, 300]\nnote Check with legal [640, 260] (on Order Placed)';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    const note = board.elements.find((e) => e.elementType === 'note');
+    expect(note).toMatchObject({
+      label: 'Check with legal',
+      attachedTo: 'event_order_placed',
+      position: { x: 640, y: 260 },
+    });
+    const once = serializeDSL(board);
+    expect(once).toContain('note Check with legal [640, 260] (on Order Placed)');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('resolves a host declared AFTER the note (deferred like arrow endpoints)', () => {
+    const src = 'title T\nnote Check [640, 260] (on Order Placed)\nevent Order Placed [620, 300]';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    expect(board.elements.find((e) => e.elementType === 'note')).toMatchObject({
+      attachedTo: 'event_order_placed',
+    });
+  });
+
+  it('combines color and attachment — canonical suffix order is `(color …) (on …)`', () => {
+    const src =
+      'title T\ncommand Place Order [240, 300]\nnote Watch this [250, 240] (color #b45309) (on Place Order)';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    expect(board.elements.find((e) => e.elementType === 'note')).toMatchObject({
+      color: '#b45309',
+      attachedTo: 'cmd_place_order',
+    });
+    const once = serializeDSL(board);
+    expect(once).toContain('note Watch this [250, 240] (color #b45309) (on Place Order)');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('combines size and attachment — canonical suffix order is `(size …) (on …)`', () => {
+    const src =
+      'title T\ncommand Place Order [240, 300]\nnote Agenda [250, 240] (size 240x160) (on Place Order)';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    expect(board.elements.find((e) => e.elementType === 'note')).toMatchObject({
+      size: { width: 240, height: 160 },
+      attachedTo: 'cmd_place_order',
+    });
+    const once = serializeDSL(board);
+    expect(once).toContain('note Agenda [250, 240] (size 240x160) (on Place Order)');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('canonicalizes all three suffixes to `(color …) (size …) (on …)` — on stays last', () => {
+    const src =
+      'title T\nevent Order Placed [620, 300]\nnote Kickoff [640, 260] (size 240x160) (color #15803d) (on Order Placed)';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    expect(board.elements.find((e) => e.elementType === 'note')).toMatchObject({
+      label: 'Kickoff',
+      color: '#15803d',
+      size: { width: 240, height: 160 },
+      attachedTo: 'event_order_placed',
+    });
+    const once = serializeDSL(board);
+    expect(once).toContain(
+      'note Kickoff [640, 260] (color #15803d) (size 240x160) (on Order Placed)',
+    );
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('`(on #id)` pins a note onto a duplicate-label host and round-trips as an id reference', () => {
+    const src = `title T
+command Approve [240, 300]
+command Approve [980, 420]
+note Needs sign-off [990, 360] (on #cmd_approve_2)`;
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    expect(board.elements.find((e) => e.elementType === 'note')).toMatchObject({
+      attachedTo: 'cmd_approve_2',
+    });
+    const once = serializeDSL(board);
+    expect(once).toContain('note Needs sign-off [990, 360] (on #cmd_approve_2)');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('unresolved host: line-numbered diagnostic, note stays unpinned, round-trip fixed point', () => {
+    const { board, diagnostics } = parseDSLWithDiagnostics(
+      'title T\nnote Orphan [80, 80] (on Ghost)',
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.line).toBe(2);
+    expect(diagnostics[0]!.message).toContain('Ghost');
+    expect(diagnostics[0]!.text).toContain('note Orphan');
+    const note = board.elements.find((e) => e.elementType === 'note');
+    expect(note?.label).toBe('Orphan');
+    expect(note).not.toHaveProperty('attachedTo');
+    const once = serializeDSL(board);
+    expect(once).toContain('note Orphan [80, 80]');
+    expect(once).not.toContain('(on');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('reads a host name containing parentheses up to the final `)` of the line', () => {
+    const src =
+      'title T\nevent Payment (retry) [620, 300]\nnote Why twice? [640, 260] (on Payment (retry))';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    expect(board.elements.find((e) => e.elementType === 'note')).toMatchObject({
+      attachedTo: 'event_payment_retry',
+    });
+    const once = serializeDSL(board);
+    expect(once).toContain('note Why twice? [640, 260] (on Payment (retry))');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('a note host of a non-host kind yields a diagnostic and no attachment (no chains)', () => {
+    const { board, diagnostics } = parseDSLWithDiagnostics(
+      'title T\nactor A [0, 0]\nnote N [10, 10] (on A)',
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.line).toBe(3);
+    expect(diagnostics[0]!.message).toContain('may only attach to host stickies');
+    expect(board.elements.find((e) => e.elementType === 'note')).not.toHaveProperty('attachedTo');
+  });
+
+  it('keeps `(on …)` inside the note text (attachment is only read after the coordinates)', () => {
+    const src =
+      'title T\nevent Order Placed [620, 300]\nnote drop it (on the host) later [80, 80]\nnote pinned [640, 260] (on Order Placed)';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    const notes = board.elements.filter((e) => e.elementType === 'note');
+    expect(notes[0]!.label).toBe('drop it (on the host) later');
+    expect(notes[0]).not.toHaveProperty('attachedTo');
+    expect(notes[1]).toMatchObject({ attachedTo: 'event_order_placed' });
+    const once = serializeDSL(board);
+    expect(once).toContain('note drop it (on the host) later [80, 80]');
+    expect(once).toContain('note pinned [640, 260] (on Order Placed)');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('`(on …)` on a drawing yields a diagnostic and is ignored', () => {
+    const { board, diagnostics } = parseDSLWithDiagnostics(
+      'title T\nline [[100, 100], [200, 150]] (dashed) (on X)',
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.line).toBe(2);
+    expect(diagnostics[0]!.message).toContain('only actor/hotspot/note');
+    expect(board.elements.find((e) => e.elementType === 'drawing')).toBeDefined();
+    const once = serializeDSL(board);
+    expect(once).toContain('line [[100, 100], [200, 150]] (dashed)');
+    expect(once).not.toContain('(on');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+});
+
 describe('duplicate labels (project extension: `(id …)` + `#id` references)', () => {
   it('parses and round-trips the spec example (two aggregates named "Order")', () => {
     const src = `title T

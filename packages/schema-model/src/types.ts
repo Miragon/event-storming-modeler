@@ -99,6 +99,8 @@ export interface NoteElement extends BoardElementBase {
    * override. DSL: the `(size <w>x<h>)` suffix.
    */
   readonly size?: { readonly width: number; readonly height: number };
+  /** Pinning: id of the host sticky this note is attached to (see ActorElement.attachedTo). */
+  readonly attachedTo?: string;
 }
 
 export type DrawingStrokeStyle = 'solid' | 'dashed' | 'dotted';

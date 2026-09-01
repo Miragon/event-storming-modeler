@@ -51,7 +51,7 @@ export function validateBoard(data: unknown): EventStormingBoard {
     }
     if (!HOST_TYPES.has(typeById.get(el.attachedTo)!)) {
       throw new Error(
-        `Element ${el.id}: attachedTo "${el.attachedTo}" is a ${typeById.get(el.attachedTo)} — actors/hotspots may only attach to host stickies.`,
+        `Element ${el.id}: attachedTo "${el.attachedTo}" is a ${typeById.get(el.attachedTo)} — actors/hotspots/notes may only attach to host stickies.`,
       );
     }
   }

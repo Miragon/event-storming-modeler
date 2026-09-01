@@ -22,7 +22,7 @@ const domainEventSchema = z.object({ ...baseFields, elementType: z.literal('even
 
 const commandSchema = z.object({ ...baseFields, elementType: z.literal('command') });
 
-// Pinning: only actor/hotspot may carry `attachedTo` (host existence/kind checked in validateBoard).
+// Pinning: only actor/hotspot/note may carry `attachedTo` (host existence/kind checked in validateBoard).
 const attachedTo = z.string().min(1).optional();
 
 const actorSchema = z.object({ ...baseFields, elementType: z.literal('actor'), attachedTo });
@@ -47,6 +47,7 @@ const noteSchema = z.object({
   ...baseFields,
   elementType: z.literal('note'),
   size: noteSizeSchema.optional(),
+  attachedTo,
 });
 
 const drawingSchema = z.object({

@@ -89,7 +89,7 @@ export function isSticky(el: unknown): el is EventStormingShape {
   return isEventStormingShape(el) && isStickyKind(el.eventStormingType);
 }
 
-/** Pinnable kinds (actor/hotspot): can be dropped onto a host sticky and then move with it. */
+/** Pinnable kinds (actor/hotspot/note): can be dropped onto a host sticky and then move with it. */
 export function isAttachableKind(type: string): boolean {
   return (ATTACHABLE_STICKY_KINDS as readonly string[]).includes(type);
 }

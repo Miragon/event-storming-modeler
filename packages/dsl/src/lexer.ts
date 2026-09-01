@@ -102,7 +102,8 @@ export function parseColor(line: string): { color?: string; rest: string } {
 
 // Attachment extension: `(on <Host Name>)` — canonically the LAST suffix. The host name runs
 // up to the line's FINAL ')', so names may themselves contain parentheses (`Payment (retry)`).
-// Extracted BEFORE the color so a `(color …)` inside a host name is never mistaken for one.
+// Extracted BEFORE the other suffixes so a `(color …)` or `(size …)` inside a host name is
+// never mistaken for one.
 const ON_RE = /\(\s*on\s+/i;
 
 export function parseOn(line: string): { host?: string; rest: string } {
@@ -139,8 +140,8 @@ export function parseId(line: string): {
   return { invalid: p[0], rest: line.replace(ID_PRESENT_RE, ' ') };
 }
 
-// Resize extension: `(size <w>x<h>)` — canonically the LAST suffix on note lines. The
-// serializer emits no spaces around the `x`; the parser tolerates optional whitespace.
+// Resize extension: `(size <w>x<h>)` — canonically the last suffix before `(on …)` on note
+// lines. The serializer emits no spaces around the `x`; the parser tolerates optional whitespace.
 // Deliberately looked up only after the coordinates so `(size 1x1)` inside note text survives.
 const SIZE_RE = /\(\s*size\s+([\d.]+)\s*x\s*([\d.]+)\s*\)/i;
 

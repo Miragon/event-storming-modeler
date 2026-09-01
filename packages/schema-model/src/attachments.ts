@@ -2,14 +2,15 @@
 
 import type { ElementType } from './types.js';
 
-/** Sticky kinds that can be pinned onto a host sticky and then move with it. */
+/** Element kinds that can be pinned onto a host sticky and then move with it. */
 export const ATTACHABLE_STICKY_KINDS = [
   'actor',
   'hotspot',
+  'note',
 ] as const satisfies readonly ElementType[];
 
 /**
- * Sticky kinds that can carry attachments. Attachable kinds, notes and drawings are never
+ * Sticky kinds that can carry attachments. Attachable kinds and drawings are never
  * hosts — so attach chains cannot exist.
  */
 export const HOST_STICKY_KINDS = [

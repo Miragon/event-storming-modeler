@@ -197,4 +197,55 @@ describe('EventStormingCopyPaste: attachments (pinning)', () => {
     expect(copyPaste.duplicate()).toBe(true);
     expect(created[0]![0]!.host).toBeUndefined();
   });
+
+  function pinnedNoteSelection() {
+    const host = {
+      id: 'cmd_place_order',
+      eventStormingType: 'command',
+      eventStormingLabel: 'Place Order',
+      x: 200,
+      y: 300,
+      width: STICKY_STYLES.command.width,
+      height: STICKY_STYLES.command.height,
+    };
+    const note = {
+      id: 'note_check',
+      eventStormingType: 'note',
+      eventStormingLabel: 'Check credit limit',
+      x: 210,
+      y: 240,
+      width: 240,
+      height: 160,
+      host,
+    };
+    return { host, note };
+  }
+
+  it('keeps a pinned note attached to the CLONE host when copied together, incl. its manual box', () => {
+    const { host, note } = pinnedNoteSelection();
+    const { copyPaste, created } = harness([host, note]);
+
+    expect(copyPaste.duplicate()).toBe(true);
+
+    const [hostClone, noteClone] = created[0]! as [CreatedShape, CreatedShape];
+    expect(noteClone.eventStormingType).toBe('note');
+    // Pinned to the CLONE host — not to the original.
+    expect(noteClone.host).toBe(hostClone);
+    expect(noteClone.host).not.toBe(host);
+    // The manually resized box (resize feature) travels with the clone.
+    expect(noteClone.width).toBe(240);
+    expect(noteClone.height).toBe(160);
+  });
+
+  it('pastes a lone attached note detached, keeping its manual box', () => {
+    const { note } = pinnedNoteSelection();
+    const { copyPaste, created } = harness([note]);
+
+    expect(copyPaste.duplicate()).toBe(true);
+
+    const clone = created[0]![0]!;
+    expect(clone.host).toBeUndefined();
+    expect(clone.width).toBe(240);
+    expect(clone.height).toBe(160);
+  });
 });

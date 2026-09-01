@@ -95,8 +95,8 @@ export default class EventStormingExporter {
       position: { x: el.x + el.width / 2, y: el.y + el.height / 2 },
       ...(el.color ? { color: el.color } : {}),
       ...(manualSize ? { size: manualSize } : {}),
-      // Pinning lives in the diagram-js host/attachers refs — only actor/hotspot ever carry a
-      // host (attach rule), matching the schema's attachedTo placement.
+      // Pinning lives in the diagram-js host/attachers refs — only actor/hotspot/note ever
+      // carry a host (attach rule), matching the schema's attachedTo placement.
       ...(el.host ? { attachedTo: el.host.id } : {}),
     };
   }

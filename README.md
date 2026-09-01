@@ -92,13 +92,14 @@ A line-based text format: `<kind> <Name> [x, y]` places a sticky (pixel coordina
 `A -> B` connects two stickies by name (optional label after `;`). Unknown lines survive
 round-trips untouched. An optional `level big-picture|process|design` statement records the
 workshop level and filters which sticky kinds the editor offers for creation (absent = `design`,
-everything available); existing elements of any kind stay valid on every level. An actor or
-hotspot can be pinned onto a host sticky with the trailing `(on <Host Name>)` suffix — it then
-moves together with its host:
+everything available); existing elements of any kind stay valid on every level. An actor,
+hotspot or note can be pinned onto a host sticky with the trailing `(on <Host Name>)` suffix —
+it then moves together with its host:
 
 ```
 command Approve Order [240, 300]
 actor Manager [250, 280] (on Approve Order)
+note Check with legal first [250, 340] (on Approve Order)
 ```
 
 Notes auto-size to their text; a hand-resized note records its box with the trailing

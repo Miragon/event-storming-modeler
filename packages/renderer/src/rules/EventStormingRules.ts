@@ -19,9 +19,11 @@ function alreadyConnected(source: EventStormingShape, target: EventStormingShape
 }
 
 /**
- * Pinning (bpmn-js boundary-event pattern): a SINGLE actor/hotspot dragged over a host-kind
+ * Pinning (bpmn-js boundary-event pattern): a SINGLE actor/hotspot/note dragged over a host-kind
  * sticky yields the diagram-js 'attach' verdict — the drop then sets `host` while the parent
- * stays the root. Host kinds exclude the attachable kinds, so attach chains cannot form.
+ * stays the root. Host kinds exclude the attachable kinds, so attach chains cannot form. Notes
+ * join via the shared attachable-kinds constant WITHOUT becoming connectable — the connection
+ * rules gate on the eight sticky kinds, which exclude notes.
  */
 function canAttach(shapes: readonly unknown[], target: unknown): 'attach' | false {
   if (shapes.length !== 1) return false;

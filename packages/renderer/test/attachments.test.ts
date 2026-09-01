@@ -91,6 +91,42 @@ describe('Attachments: import -> export round-trip', () => {
     expect('attachedTo' in command).toBe(false);
   });
 
+  it('round-trips an attached note incl. a manual (size …) box', () => {
+    const board = {
+      config: { title: 'Fixture' },
+      elements: [
+        {
+          id: 'note_check',
+          elementType: 'note',
+          label: 'Check credit limit',
+          position: { x: 320, y: 210 },
+          size: { width: 240, height: 160 },
+          attachedTo: 'command_place_order',
+        },
+        {
+          id: 'command_place_order',
+          elementType: 'command',
+          label: 'Place Order',
+          position: { x: 200, y: 200 },
+        },
+      ],
+      edges: [],
+    } as unknown as EventStormingBoard;
+
+    const { importer, exporter, byId } = ioHarness();
+    expect(importer.import(board)).toEqual([]);
+    expect(byId('note_check')!.host).toBe(byId('command_place_order'));
+
+    const exported = exporter.export();
+    const note = exported.elements.find((e) => e.id === 'note_check');
+    if (note?.elementType !== 'note') throw new Error('note missing');
+    expect(note.attachedTo).toBe('command_place_order');
+    // Both the manual box (resize feature) and the note's own absolute center survive the
+    // attachment round-trip untouched.
+    expect(note.size).toEqual({ width: 240, height: 160 });
+    expect(note.position).toEqual({ x: 320, y: 210 });
+  });
+
   it('warns (instead of crashing) on a missing or non-host attachedTo target', () => {
     const board = {
       config: { title: 'Fixture' },
@@ -207,5 +243,47 @@ describe('EventStormingAttachBehavior: retype keeps pinning consistent', () => {
     const { host, attacher } = pinnedPair();
     modeling.setStickyKind(attacher, 'hotspot');
     expect(attacher.host).toBe(host);
+  });
+
+  it('sheds a pinned NOTE when its host is retyped to a non-host kind — undo restores', () => {
+    const { commandStack, modeling } = retypeHarness();
+    const { host, attacher } = pinnedPair();
+    const note = {
+      id: 'note_check',
+      eventStormingType: 'note',
+      eventStormingLabel: 'Check credit limit',
+      x: 30,
+      y: 30,
+      width: 240,
+      height: 160,
+      host,
+    } as unknown as EventStormingShape;
+    host.attachers!.push(note);
+
+    modeling.setStickyKind(host, 'actor');
+    expect(note.host).toBeUndefined();
+    expect(attacher.host).toBeUndefined();
+    expect(host.attachers).toEqual([]);
+
+    commandStack.undo();
+    expect(note.host).toBe(host);
+    expect(host.attachers).toContain(note);
+  });
+
+  it('rejects retyping the note itself — notes never gain a retype path', () => {
+    const { modeling } = retypeHarness();
+    const { host } = pinnedPair();
+    const note = {
+      id: 'note_check',
+      eventStormingType: 'note',
+      eventStormingLabel: 'Check credit limit',
+      x: 30,
+      y: 30,
+      width: 240,
+      height: 160,
+      host,
+    } as unknown as EventStormingShape;
+    expect(() => modeling.setStickyKind(note, 'event')).toThrow(/sticky kinds/);
+    expect(note.host).toBe(host);
   });
 });

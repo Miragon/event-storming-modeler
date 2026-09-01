@@ -299,7 +299,7 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
               lineNo,
             });
           } else {
-            diag(`Attachment: a ${kw} cannot be pinned — only actor/hotspot support (on …)`);
+            diag(`Attachment: a ${kw} cannot be pinned — only actor/hotspot/note support (on …)`);
           }
         }
         if (node.sizeSuffix) {
@@ -314,9 +314,12 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
           failed(line);
           break;
         }
-        // Color/size ONLY from the suffix after the coordinates (mirrors parseSticky) — notes
-        // are free text, so `(color …)` or `(size 1x1)` may legitimately appear inside it.
-        const sz = parseSize(split ? split.suffix : after);
+        // Suffixes ONLY after the coordinates (mirrors parseSticky) — notes are free text, so
+        // `(on …)`, `(color …)` or `(size 1x1)` may legitimately appear inside it. `(on …)` is
+        // stripped FIRST: it is always the last suffix and its host name runs to the final `)`,
+        // so it may itself contain a `(color …)` or `(size …)`.
+        const on = parseOn(split ? split.suffix : after);
+        const sz = parseSize(on.rest);
         const idp = parseId(sz.rest);
         const col = parseColor(idp.rest);
         if (sz.invalid) {
@@ -339,6 +342,9 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
           size: sz.size,
         }) as NoteElement;
         elements.push(note);
+        if (on.host !== undefined) {
+          pendingAttachments.push({ index: elements.length - 1, host: on.host, raw: line, lineNo });
+        }
         break;
       }
 
@@ -350,15 +356,19 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
           failed(line);
           break;
         }
-        const szDrawing = parseSize(multi.rest);
+        const onDrawing = parseOn(multi.rest);
+        if (onDrawing.host !== undefined) {
+          diag('Attachment: a drawing cannot be pinned — only actor/hotspot/note support (on …)');
+        }
+        const szDrawing = parseSize(onDrawing.rest);
         if (szDrawing.size || szDrawing.invalid) {
           diag('Size: a drawing cannot be resized — only notes support (size …)');
         }
-        const idDrawing = parseId(multi.rest);
+        const idDrawing = parseId(onDrawing.rest);
         if (idDrawing.id !== undefined || idDrawing.invalid) {
           diag('Id: a drawing cannot be referenced — only sticky kinds support (id …)');
         }
-        const flags = multi.rest.toLowerCase();
+        const flags = onDrawing.rest.toLowerCase();
         const strokeStyle: DrawingStrokeStyle | undefined = flags.includes('(dashed)')
           ? 'dashed'
           : flags.includes('(dotted)')
@@ -409,7 +419,7 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
     }
     if (!HOST_KINDS.has(host.elementType)) {
       diag(
-        `Attachment: "${att.host}" is a ${host.elementType} — actors/hotspots may only attach to host stickies`,
+        `Attachment: "${att.host}" is a ${host.elementType} — actors/hotspots/notes may only attach to host stickies`,
         att.lineNo,
         att.raw,
       );

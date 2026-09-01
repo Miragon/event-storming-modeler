@@ -28,6 +28,11 @@ const RESIZED_DSL = `title Resize Fixture
 note Kickoff agenda [300, 200] (size 240x160)
 note Hint [500, 200]`;
 
+// Attachable notes: the note is pinned to the command via `(on …)`; its manual box travels along.
+const NOTE_PINNED_DSL = `title Note Attachment Fixture
+command Place Order [420, 320]
+note Check credit limit [430, 220] (size 240x160) (on Place Order)`;
+
 // Duplicate labels: the aggregate "Order" appears twice; `(id …)` suffixes plus `#id` references
 // keep the arrows unambiguous (the spec's canonical design-level example).
 const DUPLICATE_DSL = `title Duplicate Fixture
@@ -165,6 +170,66 @@ describe('Modeler integration (real browser DOM)', () => {
     const moved = modeler.exportMap().elements.find((e) => e.label === 'Customer');
     expect(moved?.position.x).toBeCloseTo(430 + 150, 2);
     expect(moved?.position.y).toBeCloseTo(300 + 40, 2);
+  });
+
+  it('round-trips a pinned note via (on …) and moves it together with its host', async () => {
+    const { warnings } = await modeler.importDSL(NOTE_PINNED_DSL);
+    expect(warnings).toEqual([]);
+
+    const registry = modeler.get<ElementRegistry>('elementRegistry');
+    const modeling = modeler.get<Modeling>('modeling');
+    const note = findByLabel(registry, 'Check credit limit');
+    const placeOrder = findByLabel(registry, 'Place Order');
+
+    // Notes pin exactly like actors/hotspots: host/attachers refs, the parent stays the root.
+    expect(note.host).toBe(placeOrder);
+    expect(placeOrder.attachers).toContain(note);
+    expect(note.parent?.id).toBe('event-storming-root');
+
+    const exported = modeler.exportMap().elements.find((e) => e.label === 'Check credit limit');
+    if (exported?.elementType !== 'note') throw new Error('note missing in export');
+    expect(exported.attachedTo).toBe(placeOrder.id);
+    expect(exported.size).toEqual({ width: 240, height: 160 });
+    // Canonical suffix order: `(size …)` before the final `(on …)`.
+    expect(modeler.exportDSL()).toContain('(size 240x160) (on Place Order)');
+
+    // Moving only the HOST drags the pinned note along by the exact same delta.
+    modeling.moveElements([placeOrder], { x: 150, y: 40 });
+    expect(note.x).toBeCloseTo(430 - note.width / 2 + 150, 1);
+    expect(note.y).toBeCloseTo(220 - note.height / 2 + 40, 1);
+    const moved = modeler.exportMap().elements.find((e) => e.label === 'Check credit limit');
+    expect(moved?.position.x).toBeCloseTo(430 + 150, 2);
+    expect(moved?.position.y).toBeCloseTo(220 + 40, 2);
+
+    // The full DSL round-trip keeps the pinning and the manual box.
+    await modeler.importDSL(modeler.exportDSL());
+    const reloadedRegistry = modeler.get<ElementRegistry>('elementRegistry');
+    const reloaded = findByLabel(reloadedRegistry, 'Check credit limit');
+    expect(reloaded.host?.id).toBe(findByLabel(reloadedRegistry, 'Place Order').id);
+    expect(reloaded.width).toBe(240);
+    expect(reloaded.height).toBe(160);
+  });
+
+  it('deletes a pinned note with its host and restores the note pinning on undo', async () => {
+    await modeler.importDSL(NOTE_PINNED_DSL);
+    const registry = modeler.get<ElementRegistry>('elementRegistry');
+    const modeling = modeler.get<Modeling>('modeling');
+    const noteId = findByLabel(registry, 'Check credit limit').id;
+    const placeOrderId = findByLabel(registry, 'Place Order').id;
+
+    modeling.removeElements([findByLabel(registry, 'Place Order')]);
+    expect(registry.get(placeOrderId)).toBeUndefined();
+    expect(registry.get(noteId)).toBeUndefined();
+
+    modeler.undo();
+    const note = registry.get(noteId) as EventStormingShape;
+    expect(note.host?.id).toBe(placeOrderId);
+    // The manual box (resize feature) survives the delete/undo cycle.
+    expect(note.width).toBe(240);
+    expect(note.height).toBe(160);
+    const exported = modeler.exportMap().elements.find((e) => e.id === noteId);
+    if (exported?.elementType !== 'note') throw new Error('note missing in export');
+    expect(exported.attachedTo).toBe(placeOrderId);
   });
 
   it('round-trips a manually resized note via (size …) and keeps the box on relabel', async () => {

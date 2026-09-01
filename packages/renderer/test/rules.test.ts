@@ -15,13 +15,15 @@ function ruleHarness() {
     },
   } as unknown as EventBus;
   new EventStormingRules(eventBus);
+  const canStartConnection = (source: unknown) =>
+    handlers.get('commandStack.connection.start.canExecute')!({ context: { source } });
   const canCreateConnection = (source: unknown, target: unknown) =>
     handlers.get('commandStack.connection.create.canExecute')!({ context: { source, target } });
   const canMoveElements = (shapes: unknown[], target?: unknown) =>
     handlers.get('commandStack.elements.move.canExecute')!({ context: { shapes, target } });
   const canResizeShape = (shape: unknown, newBounds?: { width: number; height: number }) =>
     handlers.get('commandStack.shape.resize.canExecute')!({ context: { shape, newBounds } });
-  return { canCreateConnection, canMoveElements, canResizeShape };
+  return { canStartConnection, canCreateConnection, canMoveElements, canResizeShape };
 }
 
 function sticky(id: string, eventStormingType = 'command') {
@@ -102,6 +104,38 @@ describe('EventStormingRules: attach (pinning)', () => {
     expect(canMoveElements([sticky('hot_a', 'hotspot')], host)).toBe('attach');
     expect(canMoveElements([sticky('evt_a', 'event')], host)).toBe(true);
     expect(canMoveElements([sticky('a', 'actor'), sticky('b', 'hotspot')], host)).toBe(true);
+  });
+});
+
+describe('EventStormingRules: note attach (pinning)', () => {
+  const note = (id: string) => ({ id, eventStormingType: 'note', eventStormingLabel: 'Hint' });
+
+  it('yields the attach verdict for a single note over every host kind', () => {
+    const { canMoveElements } = ruleHarness();
+    for (const host of HOST_STICKY_KINDS) {
+      expect(canMoveElements([note('note_a')], sticky('h', host)), `note over ${host}`).toBe(
+        'attach',
+      );
+    }
+  });
+
+  it('never attaches a note to note/actor/hotspot/drawing targets (no chains) — the move stays allowed', () => {
+    const { canMoveElements } = ruleHarness();
+    for (const target of [
+      note('note_t'),
+      sticky('actor_t', 'actor'),
+      sticky('hot_t', 'hotspot'),
+      { id: 'draw_t', eventStormingType: 'drawing' },
+    ]) {
+      expect(canMoveElements([note('note_a')], target), target.id).toBe(true);
+    }
+  });
+
+  it('keeps notes non-connectable although they are attachable', () => {
+    const { canStartConnection, canCreateConnection } = ruleHarness();
+    const source = { ...note('note_a'), incoming: [], outgoing: [] };
+    expect(canStartConnection(source)).toBe(false);
+    expect(canCreateConnection(source, sticky('cmd_t'))).toBe(false);
   });
 });
 
