@@ -98,8 +98,17 @@ export function serializeDSL(board: EventStormingBoard): string {
   if (board.config.style) lines.push(`style ${board.config.style}`);
   if (board.config.level) lines.push(`level ${board.config.level}`);
 
+  // Pinning `(on …)` is ALWAYS the last suffix — the parser reads the host name up to the
+  // line's final `)`, so host names containing parentheses survive. validateBoard guarantees
+  // the host is a named sticky kind; the `?? attachedTo` fallback is purely defensive.
+  const onSuffix = (el: BoardElement): string => {
+    const hostId =
+      el.elementType === 'actor' || el.elementType === 'hotspot' ? el.attachedTo : undefined;
+    return hostId ? ` (on ${names.get(hostId) ?? hostId})` : '';
+  };
+
   for (const el of board.elements) {
-    lines.push(elementLine(el, nameOf(el)));
+    lines.push(elementLine(el, nameOf(el), onSuffix(el)));
   }
 
   // validateBoard guarantees arrow endpoints are sticky kinds, so the unique-name pass always
@@ -127,7 +136,7 @@ export function serializeDSL(board: EventStormingBoard): string {
   return lines.join('\n') + '\n';
 }
 
-function elementLine(el: BoardElement, name: string): string {
+function elementLine(el: BoardElement, name: string, attach: string): string {
   const p = el.position;
   switch (el.elementType) {
     case 'event':
@@ -138,7 +147,7 @@ function elementLine(el: BoardElement, name: string): string {
     case 'readmodel':
     case 'external':
     case 'hotspot':
-      return `${el.elementType} ${name} [${r(p.x)}, ${r(p.y)}]${colorSuffix(el)}`;
+      return `${el.elementType} ${name} [${r(p.x)}, ${r(p.y)}]${colorSuffix(el)}${attach}`;
     case 'note':
       // Escape line breaks/comment starters -> the line-based DSL stays single-line. `->` is
       // fine in note text (notes are never arrow endpoints), so no `→` replacement here.

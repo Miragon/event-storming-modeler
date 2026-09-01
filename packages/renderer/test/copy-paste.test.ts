@@ -16,6 +16,7 @@ interface CreatedShape {
   y: number;
   width: number;
   height: number;
+  host?: CreatedShape;
 }
 
 function harness(selected: Array<Record<string, unknown>>) {
@@ -85,5 +86,55 @@ describe('EventStormingCopyPaste: pasted note auto-size', () => {
     expect(clone.height).toBe(STICKY_STYLES.event.height);
     expect(clone.x).toBe(sticky.x);
     expect(clone.y).toBe(sticky.y);
+  });
+});
+
+describe('EventStormingCopyPaste: attachments (pinning)', () => {
+  function pinnedSelection() {
+    const host = {
+      eventStormingType: 'command',
+      eventStormingLabel: 'Place Order',
+      x: 200,
+      y: 300,
+      width: STICKY_STYLES.command.width,
+      height: STICKY_STYLES.command.height,
+    };
+    const attacher = {
+      eventStormingType: 'actor',
+      eventStormingLabel: 'Customer',
+      x: 210,
+      y: 290,
+      width: STICKY_STYLES.actor.width,
+      height: STICKY_STYLES.actor.height,
+      host,
+    };
+    return { host, attacher };
+  }
+
+  it('keeps the attachment when host and attacher are copied together (one insert command)', () => {
+    const { host, attacher } = pinnedSelection();
+    const { copyPaste, created } = harness([host, attacher]);
+
+    expect(copyPaste.duplicate()).toBe(true);
+
+    expect(created).toHaveLength(1);
+    const [hostClone, attacherClone] = created[0]! as [CreatedShape, CreatedShape];
+    expect(attacherClone.eventStormingType).toBe('actor');
+    // Pinned to the CLONE host — not to the original.
+    expect(attacherClone.host).toBe(hostClone);
+    expect(attacherClone.host).not.toBe(host);
+  });
+
+  it('pastes a lone attacher detached (host not part of the copy)', () => {
+    const { host, attacher } = pinnedSelection();
+    // Sanity contrast: copied together the clone IS pinned…
+    const together = harness([host, attacher]);
+    together.copyPaste.duplicate();
+    expect(together.created[0]![1]!.host).toBeDefined();
+
+    // …copied alone it is not.
+    const { copyPaste, created } = harness([attacher]);
+    expect(copyPaste.duplicate()).toBe(true);
+    expect(created[0]![0]!.host).toBeUndefined();
   });
 });

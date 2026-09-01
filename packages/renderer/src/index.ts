@@ -33,6 +33,7 @@ export {
   POPUP_PROVIDER_ID,
 } from './popup/index.js';
 export { eventStormingAppendModule, EventStormingAppendBehavior } from './append/index.js';
+export { eventStormingAttachModule, EventStormingAttachBehavior } from './attach/index.js';
 export { eventStormingColorPickerModule, EventStormingColorPicker } from './color-picker/index.js';
 
 export {
@@ -40,6 +41,10 @@ export {
   isEventStormingConnection,
   isSticky,
   isStickyKind,
+  isAttachableKind,
+  isHostKind,
+  isAttachableSticky,
+  isHostSticky,
   STICKY_KINDS,
 } from './model/di-types.js';
 export type {

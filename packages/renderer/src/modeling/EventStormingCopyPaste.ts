@@ -24,6 +24,8 @@ interface ShapeSnapshot {
   readonly width: number;
   readonly height: number;
   readonly label: string;
+  /** Pinning: index of the copied HOST within the batch — absent if the host was not copied. */
+  readonly hostIdx?: number;
 }
 interface ConnectionSnapshot {
   readonly sourceIdx: number;
@@ -109,14 +111,20 @@ export default class EventStormingCopyPaste {
     }
 
     this.clipboard = {
-      shapes: shapes.map((s) => ({
-        props: snapshotProps(s as unknown as Record<string, unknown>, SHAPE_PROPS),
-        x: s.x,
-        y: s.y,
-        width: s.width,
-        height: s.height,
-        label: s.eventStormingLabel ?? '',
-      })),
+      shapes: shapes.map((s) => {
+        // Attachment survives the copy only when the HOST is copied along (like the internal
+        // connections); a lone attacher pastes detached.
+        const hostIdx = s.host ? indexOf.get(s.host as unknown as EventStormingShape) : undefined;
+        return {
+          props: snapshotProps(s as unknown as Record<string, unknown>, SHAPE_PROPS),
+          x: s.x,
+          y: s.y,
+          width: s.width,
+          height: s.height,
+          label: s.eventStormingLabel ?? '',
+          ...(hostIdx !== undefined ? { hostIdx } : {}),
+        };
+      }),
       connections,
     };
     this.pasteCount = 0;
@@ -168,6 +176,11 @@ export default class EventStormingCopyPaste {
         height,
         eventStormingLabel: label,
       });
+    });
+    // Re-pin clones onto their clone hosts — the diagram-js bi-directional refs keep
+    // `host.attachers` in sync, and AttachSupport moves/deletes them together after insert.
+    clipboard.shapes.forEach((snap, i) => {
+      if (snap.hostIdx !== undefined) shapes[i]!.host = shapes[snap.hostIdx]!;
     });
     const connections = clipboard.connections.map((c) =>
       this.elementFactory.createConnection({

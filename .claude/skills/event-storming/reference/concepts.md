@@ -40,6 +40,10 @@ external system ↔ events at the boundary
   automation and most modelling insight lives. A missing policy between an event and the command it
   obviously triggers is the classic gap to probe.
 - **Hotspots** go wherever people disagree or knowledge is missing.
+- In real workshops, actors and hotspots are often **pinned** directly onto the sticky they refer
+  to — an actor stuck on its command, a hotspot on the problematic event. The modeler supports
+  this: drop an actor/hotspot onto a host sticky to attach it; it then moves together with the
+  host (DSL: the `(on <Host Name>)` suffix).
 
 ## The three levels
 

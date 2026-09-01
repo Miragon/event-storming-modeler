@@ -1,5 +1,7 @@
 import {
+  ATTACHABLE_STICKY_KINDS,
   CURRENT_SCHEMA_VERSION,
+  HOST_STICKY_KINDS,
   validateBoard,
   type BoardConfig,
   type BoardEdge,
@@ -18,6 +20,7 @@ import {
   parseColor,
   parseCoords,
   parseMultiCoords,
+  parseOn,
   slug,
   splitAtCoords,
   splitLineComment,
@@ -33,6 +36,10 @@ function splitArrow(core: string): { left: string; right: string } | null {
 }
 
 const KNOWN_STYLES: ReadonlySet<string> = new Set(['classic', 'dark']);
+
+const ATTACHABLE_KINDS: ReadonlySet<string> = new Set(ATTACHABLE_STICKY_KINDS);
+
+const HOST_KINDS: ReadonlySet<string> = new Set(HOST_STICKY_KINDS);
 
 const KNOWN_LEVELS: ReadonlySet<string> = new Set(['big-picture', 'process', 'design']);
 
@@ -58,6 +65,15 @@ interface PendingArrow {
   readonly right: string;
   /** Annotation text after `;`. */
   readonly label?: string;
+  readonly raw: string;
+  readonly lineNo: number;
+}
+
+/** `(on …)` attachment — host referenced BY NAME, resolution deferred like arrow endpoints. */
+interface PendingAttachment {
+  /** Index into `elements` of the attachable sticky. */
+  readonly index: number;
+  readonly host: string;
   readonly raw: string;
   readonly lineNo: number;
 }
@@ -111,6 +127,7 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
   const elements: BoardElement[] = [];
   const rawPassthrough: string[] = [];
   const pendingArrows: PendingArrow[] = [];
+  const pendingAttachments: PendingAttachment[] = [];
 
   let config: BoardConfig = { title: 'Untitled Board' };
   let inBlockComment = false;
@@ -253,6 +270,18 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
           }) as BoardElement,
         );
         register(node.name, id);
+        if (node.host !== undefined) {
+          if (ATTACHABLE_KINDS.has(kw)) {
+            pendingAttachments.push({
+              index: elements.length - 1,
+              host: node.host,
+              raw: line,
+              lineNo,
+            });
+          } else {
+            diag(`Attachment: a ${kw} cannot be pinned — only actor/hotspot support (on …)`);
+          }
+        }
         break;
       }
 
@@ -315,6 +344,27 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
     }
   }
 
+  // Deferred like arrows so a host may be declared after its attacher. On failure the sticky
+  // stays WITHOUT attachedTo (it was already created above) — no rawPassthrough, the line is
+  // otherwise fully represented.
+  for (const att of pendingAttachments) {
+    const hostId = nameToId.get(decodeName(att.host));
+    const host = hostId ? elements.find((e) => e.id === hostId) : undefined;
+    if (!host) {
+      diag(`Attachment: "${att.host}" not found`, att.lineNo, att.raw);
+      continue;
+    }
+    if (!HOST_KINDS.has(host.elementType)) {
+      diag(
+        `Attachment: "${att.host}" is a ${host.elementType} — actors/hotspots may only attach to host stickies`,
+        att.lineNo,
+        att.raw,
+      );
+      continue;
+    }
+    elements[att.index] = { ...elements[att.index]!, attachedTo: host.id } as BoardElement;
+  }
+
   let arrowN = 0;
   const edges: BoardEdge[] = [];
   for (const arrow of pendingArrows) {
@@ -356,32 +406,39 @@ interface ParsedSticky {
   readonly coords: { x: number; y: number };
   /** Color override `(color …)` — supported on every element line. */
   readonly color?: string;
+  /** Attachment `(on <Host Name>)` — host name still undecoded, resolved by the caller. */
+  readonly host?: string;
 }
 
 /**
- * Parses `<name> [x, y] [(color …)]`. The color is looked up ONLY in the suffix AFTER the
- * coordinates — parentheses inside the name stay untouched. Coordinates are optional and
- * default to `[0, 0]`; a malformed tuple (bracket present but unreadable) is rejected so the
- * caller can report a diagnostic instead of swallowing it into the name.
+ * Parses `<name> [x, y] [(color …)] [(on …)]`. The suffixes are looked up ONLY AFTER the
+ * coordinates — parentheses inside the name stay untouched. `(on …)` is extracted first
+ * (its host name runs to the final `)` and may itself contain a `(color …)`). Coordinates
+ * are optional and default to `[0, 0]`; a malformed tuple (bracket present but unreadable)
+ * is rejected so the caller can report a diagnostic instead of swallowing it into the name.
  */
 function parseSticky(after: string): ParsedSticky | null {
   const split = splitAtCoords(after);
   if (split) {
     if (!split.name) return null;
-    const col = parseColor(split.suffix);
+    const on = parseOn(split.suffix);
+    const col = parseColor(on.rest);
     return compact({
       name: decodeName(split.name),
       coords: { x: split.coords.a, y: split.coords.b },
       color: col.color ?? undefined,
+      host: on.host,
     }) as ParsedSticky;
   }
   if (after.includes('[')) return null;
-  const col = parseColor(after);
+  const on = parseOn(after);
+  const col = parseColor(on.rest);
   const name = col.rest.trim();
   if (!name) return null;
   return compact({
     name: decodeName(name),
     coords: { x: 0, y: 0 },
     color: col.color ?? undefined,
+    host: on.host,
   }) as ParsedSticky;
 }

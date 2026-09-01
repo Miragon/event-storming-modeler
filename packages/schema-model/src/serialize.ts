@@ -1,5 +1,6 @@
 import { eventStormingBoardSchema } from './schema.js';
 import { migrate, CURRENT_SCHEMA_VERSION } from './migrations.js';
+import { HOST_STICKY_KINDS } from './attachments.js';
 import type { BoardConfig, EventStormingBoard } from './types.js';
 
 /** Number of decimal places for coordinates in serialization. */
@@ -19,6 +20,8 @@ const CONNECTABLE_TYPES: ReadonlySet<string> = new Set([
   'hotspot',
 ]);
 
+const HOST_TYPES: ReadonlySet<string> = new Set(HOST_STICKY_KINDS);
+
 function round(n: number, digits = COORD_PRECISION): number {
   const f = 10 ** digits;
   return Math.round(n * f) / f;
@@ -37,6 +40,20 @@ export function validateBoard(data: unknown): EventStormingBoard {
     if (ids.has(el.id)) throw new Error(`Duplicate element id: ${el.id}`);
     ids.add(el.id);
     typeById.set(el.id, el.elementType);
+  }
+
+  // Pinning: the host must exist and be of a host kind — actor/hotspot/note/drawing are never
+  // hosts (no attach chains), which also rules out self-attachment.
+  for (const el of parsed.elements) {
+    if (!('attachedTo' in el) || el.attachedTo === undefined) continue;
+    if (!ids.has(el.attachedTo)) {
+      throw new Error(`Element ${el.id}: attachedTo "${el.attachedTo}" references no element.`);
+    }
+    if (!HOST_TYPES.has(typeById.get(el.attachedTo)!)) {
+      throw new Error(
+        `Element ${el.id}: attachedTo "${el.attachedTo}" is a ${typeById.get(el.attachedTo)} — actors/hotspots may only attach to host stickies.`,
+      );
+    }
   }
 
   // Shared ID namespace: diagram-js' ElementRegistry has only ONE namespace for

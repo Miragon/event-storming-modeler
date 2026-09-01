@@ -6,7 +6,7 @@ import type { Root } from 'diagram-js/lib/model/Types';
 import type { BoardElement, EventStormingBoard } from '@miragon/event-storming-schema-model';
 import type BoardBounds from '../board-bounds/BoardBounds.js';
 import type EventStormingElementFactory from '../model/EventStormingElementFactory.js';
-import type { EventStormingShape } from '../model/di-types.js';
+import { isHostSticky, type EventStormingShape } from '../model/di-types.js';
 import { ROOT_ID, type ImportWarning, type RootBusinessObject } from './types.js';
 
 /**
@@ -90,6 +90,23 @@ export default class EventStormingImporter {
       const shape = this.createShape(el);
       this.canvas.addShape(shape, root);
       shapeById.set(el.id, shape);
+    }
+
+    // Pinning is wired only once ALL shapes exist — a host may appear later in document order
+    // than its attacher. The diagram-js bi-directional refs keep `host.attachers` in sync;
+    // positions stay the elements' own absolute centers (attachedTo adds behavior, not geometry).
+    for (const el of nodes) {
+      const attachedTo = 'attachedTo' in el ? el.attachedTo : undefined;
+      if (!attachedTo) continue;
+      const host = shapeById.get(attachedTo);
+      if (!host || !isHostSticky(host)) {
+        warnings.push({
+          message: `Element ${el.id}: attachedTo host "${attachedTo}" missing.`,
+          elementId: el.id,
+        });
+        continue;
+      }
+      shapeById.get(el.id)!.host = host;
     }
 
     for (const edge of board.edges) {

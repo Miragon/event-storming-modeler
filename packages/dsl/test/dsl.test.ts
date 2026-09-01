@@ -531,6 +531,138 @@ describe('note color (project extension: `(color …)`)', () => {
   });
 });
 
+describe('attachments (project extension: `(on …)`)', () => {
+  it('parses and round-trips an attached actor and hotspot', () => {
+    const src = `title T
+command Place Order [240, 300]
+event Order Placed [620, 300]
+actor Customer [250, 280] (on Place Order)
+hotspot Double payment? [640, 280] (on Order Placed)`;
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    const actor = board.elements.find((e) => e.elementType === 'actor');
+    const hotspot = board.elements.find((e) => e.elementType === 'hotspot');
+    // attachedTo adds behavior only — the position stays the sticky's own absolute center.
+    expect(actor).toMatchObject({ attachedTo: 'cmd_place_order', position: { x: 250, y: 280 } });
+    expect(hotspot).toMatchObject({ attachedTo: 'event_order_placed' });
+    const once = serializeDSL(board);
+    expect(once).toContain('actor Customer [250, 280] (on Place Order)');
+    expect(once).toContain('hotspot Double payment? [640, 280] (on Order Placed)');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('resolves a host declared AFTER the attacher (deferred like arrow endpoints)', () => {
+    const src =
+      'title T\nactor Customer [250, 280] (on Place Order)\ncommand Place Order [240, 300]';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    expect(board.elements.find((e) => e.elementType === 'actor')).toMatchObject({
+      attachedTo: 'cmd_place_order',
+    });
+  });
+
+  it('reads a host name containing parentheses up to the final `)` of the line', () => {
+    const src =
+      'title T\nevent Payment (retry) [620, 300]\nhotspot Why twice? [640, 280] (on Payment (retry))';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    expect(board.elements.find((e) => e.elementType === 'hotspot')).toMatchObject({
+      attachedTo: 'event_payment_retry',
+    });
+    const once = serializeDSL(board);
+    expect(once).toContain('hotspot Why twice? [640, 280] (on Payment (retry))');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('keeps `->` in host labels arrow-safe (`→` in name AND `(on …)` reference)', () => {
+    const board = parseDSL('title T\ncommand Ship [240, 300]\nactor Clerk [250, 280] (on Ship)');
+    const renamed = {
+      ...board,
+      elements: board.elements.map((e) =>
+        e.elementType === 'command' ? { ...e, label: 'go -> there' } : e,
+      ),
+    };
+    const out = serializeDSL(renamed);
+    expect(out).toContain('command go → there [240, 300]');
+    expect(out).toContain('actor Clerk [250, 280] (on go → there)');
+    const round = parseDSL(out);
+    const host = round.elements.find((e) => e.elementType === 'command');
+    expect(round.elements.find((e) => e.elementType === 'actor')).toMatchObject({
+      attachedTo: host!.id,
+    });
+    expect(serializeDSL(round)).toBe(out);
+  });
+
+  it('combines color and attachment — canonical suffix order is `(color …) (on …)`', () => {
+    const src =
+      'title T\ncommand Place Order [240, 300]\nactor Customer [250, 280] (color #6d28d9) (on Place Order)';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    expect(board.elements.find((e) => e.elementType === 'actor')).toMatchObject({
+      color: '#6d28d9',
+      attachedTo: 'cmd_place_order',
+    });
+    const once = serializeDSL(board);
+    expect(once).toContain('actor Customer [250, 280] (color #6d28d9) (on Place Order)');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('does not steal a `(color …)` inside the host name as a color override', () => {
+    const src =
+      'title T\nevent Pay (color red) now [620, 300]\nhotspot H [640, 280] (on Pay (color red) now)';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    const hotspot = board.elements.find((e) => e.elementType === 'hotspot');
+    expect(hotspot).toMatchObject({ attachedTo: 'event_pay_color_red_now' });
+    expect(hotspot?.color).toBeUndefined();
+    const once = serializeDSL(board);
+    expect(once).toContain('hotspot H [640, 280] (on Pay (color red) now)');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('unresolved host: line-numbered diagnostic, sticky stays unpinned, round-trip fixed point', () => {
+    const { board, diagnostics } = parseDSLWithDiagnostics(
+      'title T\nactor Customer [250, 280] (on Ghost)',
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.line).toBe(2);
+    expect(diagnostics[0]!.message).toContain('Ghost');
+    expect(diagnostics[0]!.text).toContain('actor Customer');
+    const actor = board.elements.find((e) => e.elementType === 'actor');
+    expect(actor?.label).toBe('Customer');
+    expect(actor).not.toHaveProperty('attachedTo');
+    const once = serializeDSL(board);
+    expect(once).toContain('actor Customer [250, 280]');
+    expect(once).not.toContain('(on');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('a host of a non-host kind yields a diagnostic and no attachment (no chains)', () => {
+    const { board, diagnostics } = parseDSLWithDiagnostics(
+      'title T\nactor A [0, 0]\nhotspot H [10, 10] (on A)',
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.line).toBe(3);
+    expect(diagnostics[0]!.message).toContain('may only attach to host stickies');
+    expect(board.elements.find((e) => e.elementType === 'hotspot')).not.toHaveProperty(
+      'attachedTo',
+    );
+  });
+
+  it('`(on …)` on a non-attachable kind yields a diagnostic and is ignored', () => {
+    const { board, diagnostics } = parseDSLWithDiagnostics(
+      'title T\nevent A [0, 0]\nevent B [10, 10] (on A)',
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.line).toBe(3);
+    expect(diagnostics[0]!.message).toContain('only actor/hotspot');
+    const once = serializeDSL(board);
+    expect(once).toContain('event B [10, 10]');
+    expect(once).not.toContain('(on');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+});
+
 describe('serializeDSL – huge coordinates', () => {
   it('serializes magnitudes >= 1e21 without exponent notation', () => {
     const board = parseDSL('title T\nevent A [800, 300]\ncommand B [500, 600]\nA -> B');

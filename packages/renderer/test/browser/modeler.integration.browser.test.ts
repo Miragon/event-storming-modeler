@@ -13,6 +13,11 @@ actor Customer [200, 300]
 command Place Order [420, 320]
 Customer -> Place Order`;
 
+// Pinning: the actor is attached to (moves with) the command via the `(on …)` suffix.
+const PINNED_DSL = `title Attachment Fixture
+command Place Order [420, 320]
+actor Customer [430, 300] (on Place Order)`;
+
 function findByLabel(registry: ElementRegistry, label: string): EventStormingShape {
   const shape = registry.find(
     (el) => isEventStormingShape(el) && el.eventStormingLabel === label,
@@ -108,5 +113,52 @@ describe('Modeler integration (real browser DOM)', () => {
     modeler.redo();
     expect(placeOrder.x).toBeCloseTo(movedX, 1);
     expect(modeler.canUndo()).toBe(true);
+  });
+
+  it('round-trips a pinned actor via (on …) and moves it together with its host', async () => {
+    const { warnings } = await modeler.importDSL(PINNED_DSL);
+    expect(warnings).toEqual([]);
+
+    const registry = modeler.get<ElementRegistry>('elementRegistry');
+    const modeling = modeler.get<Modeling>('modeling');
+    const customer = findByLabel(registry, 'Customer');
+    const placeOrder = findByLabel(registry, 'Place Order');
+
+    // Attachment lives in the diagram-js host/attachers refs; the parent stays the root.
+    expect(customer.host).toBe(placeOrder);
+    expect(placeOrder.attachers).toContain(customer);
+    expect(customer.parent?.id).toBe('event-storming-root');
+
+    const exported = modeler.exportMap().elements.find((e) => e.label === 'Customer');
+    if (exported?.elementType !== 'actor') throw new Error('actor missing in export');
+    expect(exported.attachedTo).toBe(placeOrder.id);
+    expect(modeler.exportDSL()).toContain('(on Place Order)');
+
+    // Moving only the HOST drags the pinned actor along by the exact same delta.
+    modeling.moveElements([placeOrder], { x: 150, y: 40 });
+    expect(customer.x).toBeCloseTo(430 - customer.width / 2 + 150, 1);
+    expect(customer.y).toBeCloseTo(300 - customer.height / 2 + 40, 1);
+    const moved = modeler.exportMap().elements.find((e) => e.label === 'Customer');
+    expect(moved?.position.x).toBeCloseTo(430 + 150, 2);
+    expect(moved?.position.y).toBeCloseTo(300 + 40, 2);
+  });
+
+  it('deletes attachers with their host in ONE undoable step and restores the pinning on undo', async () => {
+    await modeler.importDSL(PINNED_DSL);
+    const registry = modeler.get<ElementRegistry>('elementRegistry');
+    const modeling = modeler.get<Modeling>('modeling');
+    const customerId = findByLabel(registry, 'Customer').id;
+    const placeOrderId = findByLabel(registry, 'Place Order').id;
+
+    modeling.removeElements([findByLabel(registry, 'Place Order')]);
+    expect(registry.get(placeOrderId)).toBeUndefined();
+    expect(registry.get(customerId)).toBeUndefined();
+
+    modeler.undo();
+    const customer = registry.get(customerId) as EventStormingShape;
+    expect(customer.host?.id).toBe(placeOrderId);
+    const exported = modeler.exportMap().elements.find((e) => e.id === customerId);
+    if (exported?.elementType !== 'actor') throw new Error('actor missing in export');
+    expect(exported.attachedTo).toBe(placeOrderId);
   });
 });

@@ -10,6 +10,8 @@ export interface EventStormingBoardElement {
   readonly label: string;
   readonly elementType: string;
   readonly position: { readonly x: number; readonly y: number };
+  /** Pinning: id of the host sticky an actor/hotspot is attached to (absent when detached). */
+  readonly attachedTo?: string;
 }
 
 export interface EventStormingBoardEdge {
@@ -185,6 +187,25 @@ export async function dragShape(
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
   await page.mouse.move(to.x, to.y, { steps: 10 });
+  await page.mouse.up();
+}
+
+/**
+ * Drag a shape onto another shape: grab it at its hit-box center and drop it at the target's
+ * center plus an optional pixel offset (e.g. to leave the host's center grabbable under an
+ * attached sticky). Dropping an actor/hotspot over a host-kind sticky attaches (pins) it.
+ */
+export async function dragShapeTo(
+  page: Page,
+  id: string,
+  targetId: string,
+  offset: Point = { x: 0, y: 0 },
+): Promise<void> {
+  const from = await centerOf(shapeHit(page, id));
+  const target = await centerOf(shapeHit(page, targetId));
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move(target.x + offset.x, target.y + offset.y, { steps: 10 });
   await page.mouse.up();
 }
 

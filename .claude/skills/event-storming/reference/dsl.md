@@ -35,6 +35,7 @@ reported as a diagnostic.
 ```
 <kind> <Name> [x, y]
 <kind> <Name> [x, y] (color #rrggbb)
+<kind> <Name> [x, y] (color #rrggbb) (on <Host Name>)
 ```
 
 - `<kind>` is one of: `event`, `command`, `actor`, `aggregate`, `policy`, `readmodel`,
@@ -44,6 +45,16 @@ reported as a diagnostic.
 - `[x, y]` — **pixel** coordinates of the sticky's **center**, `x` first. Optional (defaults to
   `[0, 0]`). Any finite number is allowed, including negatives; values are rounded to 3 decimals.
 - `(color #hex)` — optional per-sticky color override.
+- `(on <Host Name>)` — `actor`/`hotspot` only: pins the sticky onto the named host sticky
+  (`event`, `command`, `aggregate`, `policy`, `readmodel` or `external`); it then moves together
+  with the host while keeping its own absolute coordinates. Always the **last** suffix — the host
+  name runs to the line's final `)`, so names containing parentheses work. An unresolved or
+  invalid host is reported as a diagnostic and the sticky stays unpinned.
+
+```
+command Approve Order [240, 300]
+actor Manager [250, 280] (on Approve Order)
+```
 
 Freeform drawings use `line` with a list of points and optional suffixes:
 

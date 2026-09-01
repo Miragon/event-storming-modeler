@@ -100,6 +100,22 @@ export function parseColor(line: string): { color?: string; rest: string } {
   return { color: m[1], rest: line.replace(COLOR_RE, ' ') };
 }
 
+// Attachment extension: `(on <Host Name>)` — canonically the LAST suffix. The host name runs
+// up to the line's FINAL ')', so names may themselves contain parentheses (`Payment (retry)`).
+// Extracted BEFORE the color so a `(color …)` inside a host name is never mistaken for one.
+const ON_RE = /\(\s*on\s+/i;
+
+export function parseOn(line: string): { host?: string; rest: string } {
+  const m = ON_RE.exec(line);
+  if (!m) return { rest: line };
+  const start = m.index + m[0].length;
+  const close = line.lastIndexOf(')');
+  if (close < start) return { rest: line };
+  const host = line.slice(start, close).trim();
+  if (!host) return { rest: line };
+  return { host, rest: `${line.slice(0, m.index)} ${line.slice(close + 1)}` };
+}
+
 /** First word (keyword) of a line, lowercased. */
 export function keywordOf(line: string): string {
   const m = /^\s*([A-Za-z][\w-]*)/.exec(line);

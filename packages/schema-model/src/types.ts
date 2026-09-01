@@ -55,6 +55,12 @@ export interface CommandElement extends BoardElementBase {
 /** Small yellow sticky: the person issuing commands. */
 export interface ActorElement extends BoardElementBase {
   readonly elementType: 'actor';
+  /**
+   * Pinning: id of the host sticky (a HOST_STICKY_KINDS element) this sticky is attached to
+   * and moves with. `position` stays this element's own absolute center — attachedTo adds
+   * behavior, it never changes how coordinates are stored. DSL: the `(on <Host Name>)` suffix.
+   */
+  readonly attachedTo?: string;
 }
 
 /** Large yellow sticky: the consistency boundary that handles commands and emits events. */
@@ -80,6 +86,8 @@ export interface ExternalSystemElement extends BoardElementBase {
 /** Red sticky: an open question, conflict or risk spotted during the workshop. */
 export interface HotspotElement extends BoardElementBase {
   readonly elementType: 'hotspot';
+  /** Pinning: id of the host sticky this sticky is attached to (see ActorElement.attachedTo). */
+  readonly attachedTo?: string;
 }
 
 /** Free-text note; auto-sizes to its text. */

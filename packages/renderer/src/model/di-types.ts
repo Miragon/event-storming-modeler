@@ -1,8 +1,10 @@
 import type { Shape, Connection } from 'diagram-js/lib/model/Types';
-import type {
-  BoardEdge,
-  BoardElement,
-  DrawingStrokeStyle,
+import {
+  ATTACHABLE_STICKY_KINDS,
+  HOST_STICKY_KINDS,
+  type BoardEdge,
+  type BoardElement,
+  type DrawingStrokeStyle,
 } from '@miragon/event-storming-schema-model';
 
 /**
@@ -85,6 +87,24 @@ export function isStickyKind(type: string): type is StickyKind {
 
 export function isSticky(el: unknown): el is EventStormingShape {
   return isEventStormingShape(el) && isStickyKind(el.eventStormingType);
+}
+
+/** Pinnable kinds (actor/hotspot): can be dropped onto a host sticky and then move with it. */
+export function isAttachableKind(type: string): boolean {
+  return (ATTACHABLE_STICKY_KINDS as readonly string[]).includes(type);
+}
+
+/** Host kinds: can carry pinned attachers. Disjoint from the attachable kinds — no chains. */
+export function isHostKind(type: string): boolean {
+  return (HOST_STICKY_KINDS as readonly string[]).includes(type);
+}
+
+export function isAttachableSticky(el: unknown): el is EventStormingShape {
+  return isEventStormingShape(el) && isAttachableKind(el.eventStormingType);
+}
+
+export function isHostSticky(el: unknown): el is EventStormingShape {
+  return isEventStormingShape(el) && isHostKind(el.eventStormingType);
 }
 
 export function isDrawing(el: unknown): el is EventStormingShape {

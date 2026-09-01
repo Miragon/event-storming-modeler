@@ -3,6 +3,7 @@ import {
   connectShapes,
   createStickyAt,
   dragShape,
+  dragShapeTo,
   dropAt,
   elementGfx,
   exportBoard,
@@ -220,5 +221,47 @@ test.describe('webapp modelling interactions', () => {
     await expect.poll(async () => (await exportBoard(page)).elements.length).toBe(2);
     const labels = (await exportBoard(page)).elements.map((element) => element.label).sort();
     expect(labels).toEqual(['Domain Event', 'Domain Event 2']);
+  });
+
+  test('pins an actor onto a command, moves it with the host and detaches on empty canvas', async ({
+    page,
+  }) => {
+    const command = await createStickyAt(page, 'command', 0.4, 0.5);
+    const actor = await createStickyAt(page, 'actor', 0.15, 0.2);
+    const positionOf = async (id: string) =>
+      (await exportBoard(page)).elements.find((element) => element.id === id)!.position;
+
+    // Drop the actor onto the command's lower-right quarter: still over the host (attach verdict),
+    // but the smaller actor sticky leaves the command's center uncovered and grabbable.
+    await dragShapeTo(page, actor, command, { x: 55, y: 35 });
+    await expect
+      .poll(
+        async () =>
+          (await exportBoard(page)).elements.find((element) => element.id === actor)?.attachedTo,
+      )
+      .toBe(command);
+    expect(await exportDSL(page)).toContain('(on Command)');
+
+    // Moving the host carries the pinned actor along by the exact same delta.
+    const commandBefore = await positionOf(command);
+    const actorBefore = await positionOf(actor);
+    await dragShape(page, command, 0.7, 0.7);
+    const commandAfter = await positionOf(command);
+    const delta = { x: commandAfter.x - commandBefore.x, y: commandAfter.y - commandBefore.y };
+    expect(Math.abs(delta.x) + Math.abs(delta.y)).toBeGreaterThan(50);
+    const actorAfter = await positionOf(actor);
+    expect(actorAfter.x - actorBefore.x).toBeCloseTo(delta.x, 1);
+    expect(actorAfter.y - actorBefore.y).toBeCloseTo(delta.y, 1);
+
+    // Dropping the pinned actor on empty canvas detaches it (host stays where it is).
+    await dragShape(page, actor, 0.15, 0.2);
+    await expect
+      .poll(
+        async () =>
+          (await exportBoard(page)).elements.find((element) => element.id === actor)?.attachedTo,
+      )
+      .toBe(undefined);
+    expect(await exportDSL(page)).not.toContain('(on ');
+    expect(await positionOf(command)).toEqual(commandAfter);
   });
 });

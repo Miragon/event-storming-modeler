@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
+  ATTACHABLE_STICKY_KINDS,
   CURRENT_SCHEMA_VERSION,
   DEFAULT_BOARD_LEVEL,
   DEFAULT_BOARD_SIZE,
+  HOST_STICKY_KINDS,
   LEVEL_STICKY_KINDS,
   sortByTimeline,
   loadBoard,
@@ -312,6 +314,120 @@ describe('Validation', () => {
       ],
     };
     expect(() => loadBoard(bad)).toThrow();
+  });
+});
+
+describe('Attachments (pinning)', () => {
+  it('pins the exact attachable and host kind sets', () => {
+    expect(ATTACHABLE_STICKY_KINDS).toEqual(['actor', 'hotspot']);
+    expect(HOST_STICKY_KINDS).toEqual([
+      'event',
+      'command',
+      'aggregate',
+      'policy',
+      'readmodel',
+      'external',
+    ]);
+  });
+
+  it('accepts an actor and a hotspot attached to host stickies (position stays absolute)', () => {
+    const board = {
+      ...sample,
+      elements: [
+        ...sample.elements,
+        {
+          id: 'actor_customer',
+          elementType: 'actor',
+          label: 'Customer',
+          position: { x: 250, y: 280 },
+          attachedTo: 'cmd_place_order',
+        },
+        {
+          id: 'hot_retry',
+          elementType: 'hotspot',
+          label: 'Retry?',
+          position: { x: 640, y: 280 },
+          attachedTo: 'event_order_placed',
+        },
+      ],
+    };
+    const loaded = loadBoard(board);
+    const actor = loaded.elements.find((el) => el.id === 'actor_customer');
+    const hotspot = loaded.elements.find((el) => el.id === 'hot_retry');
+    expect(actor).toMatchObject({ attachedTo: 'cmd_place_order', position: { x: 250, y: 280 } });
+    expect(hotspot).toMatchObject({ attachedTo: 'event_order_placed' });
+  });
+
+  it('rejects attachedTo referencing a missing element', () => {
+    const bad = {
+      ...sample,
+      elements: [
+        ...sample.elements,
+        {
+          id: 'actor_ghosted',
+          elementType: 'actor',
+          label: 'Ghosted',
+          position: { x: 0, y: 0 },
+          attachedTo: 'ghost',
+        },
+      ],
+    };
+    expect(() => loadBoard(bad)).toThrow(/attachedTo "ghost" references no element/);
+  });
+
+  it('rejects attaching to a non-host kind (no attach chains)', () => {
+    const bad = {
+      ...sample,
+      elements: [
+        ...sample.elements,
+        { id: 'actor_host', elementType: 'actor', label: 'Host?', position: { x: 0, y: 0 } },
+        {
+          id: 'hot_chained',
+          elementType: 'hotspot',
+          label: 'Chained',
+          position: { x: 10, y: 10 },
+          attachedTo: 'actor_host',
+        },
+      ],
+    };
+    expect(() => loadBoard(bad)).toThrow(/may only attach to host stickies/);
+  });
+
+  it('rejects attaching to a note (annotations are never hosts)', () => {
+    const bad = {
+      ...sample,
+      elements: [
+        ...sample.elements,
+        { id: 'note_1', elementType: 'note', label: 'A note', position: { x: 0, y: 0 } },
+        {
+          id: 'actor_on_note',
+          elementType: 'actor',
+          label: 'On note',
+          position: { x: 10, y: 10 },
+          attachedTo: 'note_1',
+        },
+      ],
+    };
+    expect(() => loadBoard(bad)).toThrow(/may only attach to host stickies/);
+  });
+
+  it('round-trips attachedTo through the deterministic JSON serialization', () => {
+    const board = loadBoard({
+      ...sample,
+      elements: [
+        ...sample.elements,
+        {
+          id: 'actor_customer',
+          elementType: 'actor',
+          label: 'Customer',
+          position: { x: 250, y: 280 },
+          attachedTo: 'cmd_place_order',
+        },
+      ],
+    });
+    const out = serializeBoard(board);
+    expect(out).toContain('"attachedTo": "cmd_place_order"');
+    expect(serializeBoard(parseBoardJSON(out))).toBe(out);
   });
 });
 

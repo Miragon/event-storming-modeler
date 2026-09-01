@@ -12,6 +12,7 @@ import OutlineModule from 'diagram-js/lib/features/outline';
 import PopupMenuModule from 'diagram-js/lib/features/popup-menu';
 
 import { NavigatedViewer } from './NavigatedViewer.js';
+import { eventStormingAttachModule } from './attach/index.js';
 import { eventStormingModelingModule } from './modeling/index.js';
 import { eventStormingLassoModule } from './lasso/index.js';
 import { eventStormingRulesModule } from './rules/index.js';
@@ -28,7 +29,7 @@ import { eventStormingDrawToolModule } from './draw-tool/index.js';
 
 /**
  * Full Event Storming editor: palette/create, free move with sticky-center snapping, connect
- * with rules, context pad, inline label editing, undo/redo.
+ * with rules, context pad, inline label editing, undo/redo, pinning of actor/hotspot stickies.
  */
 export class Modeler extends NavigatedViewer {
   protected override _getModules(): ModuleDeclaration[] {
@@ -44,6 +45,7 @@ export class Modeler extends NavigatedViewer {
       OutlineModule,
       PopupMenuModule,
       eventStormingModelingModule,
+      eventStormingAttachModule,
       eventStormingRulesModule,
       elementSnappingModule,
       eventStormingPaletteModule,
