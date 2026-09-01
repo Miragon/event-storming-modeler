@@ -4,6 +4,7 @@ import type {
   PopupMenuEntries,
   default as PopupMenuProvider,
 } from 'diagram-js/lib/features/popup-menu/PopupMenuProvider';
+import { LEVEL_STICKY_KINDS } from '@miragon/event-storming-schema-model';
 import {
   STICKY_KINDS,
   isSticky,
@@ -45,7 +46,11 @@ export default class EventStormingElementSettingsProvider implements PopupMenuPr
 
   private kindEntries(shape: EventStormingShape): PopupMenuEntries {
     const entries: PopupMenuEntries = {};
+    // The workshop level filters the offered kinds; the element's CURRENT kind always shows,
+    // so an out-of-level sticky (levels are not validation) still displays its type checked.
+    const allowed = LEVEL_STICKY_KINDS[this.modeling.getLevel()];
     for (const kind of STICKY_KINDS) {
+      if (!allowed.includes(kind) && kind !== shape.eventStormingType) continue;
       const style = STICKY_STYLES[kind];
       entries[`kind-${kind}`] = {
         label: mark(shape.eventStormingType === kind, style.label),

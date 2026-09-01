@@ -108,6 +108,26 @@ body {
   flex: none;
 }
 
+/* Active workshop level (menuitemradio): link accent, check via markup. */
+.menu-item[aria-checked='true'] {
+  color: var(--vscode-textLink-foreground, #2b50d4);
+  font-weight: 600;
+}
+/* Keeps unchecked labels aligned with the 16px icons of the other menu items. */
+.menu-item .menu-icon-spacer {
+  flex: none;
+  width: 16px;
+}
+
+.menu-label {
+  padding: 6px 10px 2px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--vscode-descriptionForeground, rgba(0, 0, 0, 0.55));
+}
+
 .menu-sep {
   height: 1px;
   margin: 6px 4px;

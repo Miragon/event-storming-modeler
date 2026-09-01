@@ -89,7 +89,10 @@ accepts an optional `(color #hex)` override.
 
 A line-based text format: `<kind> <Name> [x, y]` places a sticky (pixel coordinates, center),
 `A -> B` connects two stickies by name (optional label after `;`). Unknown lines survive
-round-trips untouched. The full example board
+round-trips untouched. An optional `level big-picture|process|design` statement records the
+workshop level and filters which sticky kinds the editor offers for creation (absent = `design`,
+everything available); existing elements of any kind stay valid on every level. The full example
+board
 ([`example/order-checkout.storm`](example/order-checkout.storm)):
 
 ```

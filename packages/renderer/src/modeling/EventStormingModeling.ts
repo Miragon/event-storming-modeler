@@ -1,11 +1,20 @@
+import type Canvas from 'diagram-js/lib/core/Canvas';
 import type CommandStack from 'diagram-js/lib/command/CommandStack';
-import type { DrawingStrokeStyle } from '@miragon/event-storming-schema-model';
+import type ElementRegistry from 'diagram-js/lib/core/ElementRegistry';
+import type { Root } from 'diagram-js/lib/model/Types';
+import {
+  DEFAULT_BOARD_LEVEL,
+  type BoardLevel,
+  type DrawingStrokeStyle,
+} from '@miragon/event-storming-schema-model';
 import {
   isStickyKind,
+  ROOT_ID,
   type EventStormingConnection,
   type EventStormingShape,
   type StickyKind,
 } from '../model/di-types.js';
+import type { RootBusinessObject } from '../io/types.js';
 import { STICKY_STYLES, noteMetrics } from '../draw/styles.js';
 import UpdatePropertiesHandler from './cmd/UpdatePropertiesHandler.js';
 
@@ -16,9 +25,13 @@ const UPDATE_PROPERTIES = 'element.updateProperties';
  * Registers the generic UpdatePropertiesHandler at bootstrap.
  */
 export default class EventStormingModeling {
-  static $inject = ['commandStack'];
+  static $inject = ['commandStack', 'canvas', 'elementRegistry'];
 
-  constructor(private readonly commandStack: CommandStack) {
+  constructor(
+    private readonly commandStack: CommandStack,
+    private readonly canvas: Canvas,
+    private readonly elementRegistry: ElementRegistry,
+  ) {
     commandStack.registerHandler(UPDATE_PROPERTIES, UpdatePropertiesHandler);
   }
 
@@ -76,5 +89,38 @@ export default class EventStormingModeling {
   /** Sets a drawing's stroke style (`undefined` = solid). */
   setStrokeStyle(element: EventStormingShape, strokeStyle: DrawingStrokeStyle | undefined): void {
     this.updateProperties(element, { strokeStyle });
+  }
+
+  /**
+   * Current effective workshop level (root `config.level`; absent means design). Reads via the
+   * element registry — NOT `canvas.getRootElement()`, which would CREATE an implicit root as a
+   * side effect (the palette asks for the level at bootstrap, before any board is imported, and
+   * a stale implicit root crashes the importer's root swap after `clear()`).
+   */
+  getLevel(): BoardLevel {
+    const root = this.elementRegistry.get(ROOT_ID) as
+      (Root & { businessObject?: RootBusinessObject }) | undefined;
+    return root?.businessObject?.config.level ?? DEFAULT_BOARD_LEVEL;
+  }
+
+  /**
+   * Sets the workshop level on the root config — undoable like any element mutation. The
+   * businessObject is replaced as a whole (not mutated) so the generic property handler can
+   * snapshot/restore it and the exporter picks the change up from the root config.
+   */
+  setLevel(level: BoardLevel): void {
+    if (this.getLevel() === level) return;
+    const root = this.root();
+    const meta = root.businessObject ?? { config: { title: 'Untitled Board' } };
+    this.commandStack.execute(UPDATE_PROPERTIES, {
+      element: root,
+      properties: { businessObject: { ...meta, config: { ...meta.config, level } } },
+    });
+  }
+
+  private root(): Root & { businessObject?: RootBusinessObject } {
+    return (this.elementRegistry.get(ROOT_ID) ?? this.canvas.getRootElement()) as Root & {
+      businessObject?: RootBusinessObject;
+    };
   }
 }

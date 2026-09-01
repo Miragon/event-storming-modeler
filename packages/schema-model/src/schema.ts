@@ -70,6 +70,7 @@ export const boardEdgeSchema = z.discriminatedUnion('edgeType', [arrowSchema]);
 const boardConfigSchema = z.object({
   title: z.string(),
   style: z.enum(['classic', 'dark']).optional(),
+  level: z.enum(['big-picture', 'process', 'design']).optional(),
 });
 
 export const eventStormingBoardSchema = z.object({

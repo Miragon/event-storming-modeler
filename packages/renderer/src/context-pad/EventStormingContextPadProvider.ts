@@ -8,6 +8,7 @@ import type {
   default as ContextPadProvider,
 } from 'diagram-js/lib/features/context-pad/ContextPadProvider';
 import type { Element } from 'diagram-js/lib/model/Types';
+import { LEVEL_STICKY_KINDS } from '@miragon/event-storming-schema-model';
 import {
   isEventStormingShape,
   isEventStormingConnection,
@@ -108,7 +109,10 @@ export default class EventStormingContextPadProvider implements ContextPadProvid
       // Append: drags out a new sticky of the chosen kind and creates the arrow automatically
       // (diagram-js Create with `source` -> modeling.appendShape). One entry per flow kind, shown
       // as the same colored square the palette uses, so the choice is visible at a glance.
+      // The workshop level filters the offered kinds the same way the palette does.
+      const allowed = LEVEL_STICKY_KINDS[this.eventStormingModeling.getLevel()];
       for (const nextKind of APPEND_KINDS) {
+        if (!allowed.includes(nextKind)) continue;
         const nextLabel = STICKY_STYLES[nextKind].label;
         const startAppend = (event: Event) => {
           const next = this.factory.createNew(nextKind, nextLabel);

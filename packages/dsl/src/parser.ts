@@ -3,6 +3,7 @@ import {
   validateBoard,
   type BoardConfig,
   type BoardEdge,
+  type BoardLevel,
   type BoardElement,
   type Coordinate,
   type DrawingElement,
@@ -32,6 +33,8 @@ function splitArrow(core: string): { left: string; right: string } | null {
 }
 
 const KNOWN_STYLES: ReadonlySet<string> = new Set(['classic', 'dark']);
+
+const KNOWN_LEVELS: ReadonlySet<string> = new Set(['big-picture', 'process', 'design']);
 
 /** Undoes the serializer's `\n` name escaping (line-based DSL, multi-line labels). */
 function decodeName(name: string): string {
@@ -195,8 +198,8 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
     // be misread as a (broken) `command` declaration and vanish on re-import. `title` is
     // exempt (its content may itself use `->`) UNLESS the left side is an already-declared
     // sticky name (e.g. one named "Title Page" — declarations always precede arrows in
-    // serialized DSL). `style`/`line` need no exemption: style values are single words and
-    // drawings always carry coordinate tuples.
+    // serialized DSL). `style`/`level`/`line` need no exemption: style and level values are
+    // single words and drawings always carry coordinate tuples.
     const semi = line.indexOf(';');
     const beforeAnnotation = semi >= 0 ? line.slice(0, semi) : line;
     const titleAsArrow = (): boolean => {
@@ -215,6 +218,13 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
       case 'style': {
         const s = after.toLowerCase();
         if (KNOWN_STYLES.has(s)) config = { ...config, style: s as 'classic' | 'dark' };
+        else failed(line);
+        break;
+      }
+
+      case 'level': {
+        const l = after.toLowerCase();
+        if (KNOWN_LEVELS.has(l)) config = { ...config, level: l as BoardLevel };
         else failed(line);
         break;
       }

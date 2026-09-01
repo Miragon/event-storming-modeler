@@ -19,7 +19,7 @@ import {
   ICON_IMAGE,
   ICON_SHARE,
 } from '@miragon/event-storming-renderer';
-import { createEmptyBoard } from '@miragon/event-storming-schema-model';
+import { createEmptyBoard, type BoardLevel } from '@miragon/event-storming-schema-model';
 import { readHashMap, writeHashMap, shareUrl } from './share.js';
 import { openFile, svgToPng, downloadBlob, downloadText } from './io.js';
 import { showToast } from './toast.js';
@@ -260,6 +260,34 @@ onMenu('m-dsl', () => openOutput('Export · DSL (.storm)', viewer.exportDSL()));
 onMenu('m-svg', exportSvg);
 onMenu('m-png', () => exportPng());
 onMenu('m-png-transparent', () => exportPng({ scale: 4, transparent: true }));
+
+// --- Workshop level (menu radio group) ---
+const LEVELS: ReadonlyArray<{ id: string; level: BoardLevel; label: string }> = [
+  { id: 'm-level-big-picture', level: 'big-picture', label: 'Big Picture' },
+  { id: 'm-level-process', level: 'process', label: 'Process Modelling' },
+  { id: 'm-level-design', level: 'design', label: 'Software Design' },
+];
+// check — Material Icons (same source as the renderer's icon set); marks the active level.
+const ICON_CHECK = 'M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z';
+const levelModeling = viewer.get('eventStormingModeling') as {
+  setLevel(level: BoardLevel): void;
+  getLevel(): BoardLevel;
+};
+function updateLevelMenu(): void {
+  const active = levelModeling.getLevel();
+  for (const { id, level, label } of LEVELS) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.setAttribute('aria-checked', String(level === active));
+    // Checkmark in the icon slot marks the active level; a spacer keeps the labels aligned.
+    if (level === active) setLabel(id, ICON_CHECK, label);
+    else el.innerHTML = `<span class="menu-icon-spacer"></span><span>${label}</span>`;
+  }
+}
+for (const { id, level } of LEVELS) onMenu(id, () => levelModeling.setLevel(level));
+// setLevel is undoable and the level also arrives via import — re-sync the checkmark on both.
+viewer.on('commandStack.changed', updateLevelMenu);
+viewer.on('import.done', updateLevelMenu);
 
 // --- Landing (start-screen) buttons ---
 document.getElementById('btn-new')?.addEventListener('click', () => {

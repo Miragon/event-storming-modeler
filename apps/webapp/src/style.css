@@ -166,6 +166,29 @@ body {
   color: var(--accent-ink);
 }
 
+/* Active workshop level (menuitemradio): accent like the expanded menu button, check via markup. */
+.menu-item[aria-checked='true'] {
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.menu-item[aria-checked='true'] svg {
+  color: var(--accent-ink);
+}
+/* Keeps unchecked labels aligned with the 16px icons of the other menu items. */
+.menu-item .menu-icon-spacer {
+  flex: none;
+  width: 16px;
+}
+
+.menu-label {
+  padding: 6px 10px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
 .menu-sep {
   height: 1px;
   margin: 5px 8px;

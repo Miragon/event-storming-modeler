@@ -180,6 +180,34 @@ test.describe('webapp modelling interactions', () => {
     await expect(elementGfx(page, id)).toHaveCount(0);
   });
 
+  test('switches the workshop level via the menu and the palette follows', async ({ page }) => {
+    const palette = page.locator('.djs-palette');
+    // A fresh board carries no level -> design, the full palette.
+    await expect(palette.locator('[data-action="create.aggregate"]')).toBeVisible();
+    await expect(palette.locator('[data-action="create.command"]')).toBeVisible();
+
+    await page.locator('#btn-menu').click();
+    await page.locator('#m-level-big-picture').click();
+
+    // Big picture: aggregate/command leave the palette; events and the annotations/tools stay.
+    await expect(palette.locator('[data-action="create.aggregate"]')).toHaveCount(0);
+    await expect(palette.locator('[data-action="create.command"]')).toHaveCount(0);
+    await expect(palette.locator('[data-action="create.event"]')).toBeVisible();
+    await expect(palette.locator('[data-action="create.note"]')).toBeVisible();
+    await expect(palette.locator('[data-action="lasso-tool"]')).toBeVisible();
+    await expect(palette.locator('[data-action="draw-tool"]')).toBeVisible();
+
+    // The level is part of the board -> serialized into the DSL, checked in the menu.
+    expect(await exportDSL(page)).toContain('level big-picture');
+    await expect(page.locator('#m-level-big-picture')).toHaveAttribute('aria-checked', 'true');
+
+    // Back to design: the full palette returns.
+    await page.locator('#btn-menu').click();
+    await page.locator('#m-level-design').click();
+    await expect(palette.locator('[data-action="create.aggregate"]')).toBeVisible();
+    await expect(palette.locator('[data-action="create.command"]')).toBeVisible();
+  });
+
   test('copies and pastes a sticky (labels stay unique)', async ({ page }) => {
     const id = await createStickyAt(page, 'event', 0.4, 0.5);
     await selectShape(page, id);

@@ -11,6 +11,7 @@ import {
   ICON_IMAGE,
 } from '@miragon/event-storming-renderer';
 import './style.css';
+import type { BoardLevel } from '@miragon/event-storming-schema-model';
 import { svgToPng, blobToBase64 } from './io.js';
 import type { HostToWebview, WebviewToHost } from '../protocol.js';
 
@@ -190,6 +191,57 @@ function menuSep(): HTMLDivElement {
   return sep;
 }
 
+function menuLabel(text: string): HTMLDivElement {
+  const label = document.createElement('div');
+  label.className = 'menu-label';
+  label.setAttribute('role', 'presentation');
+  label.textContent = text;
+  return label;
+}
+
+// --- Workshop level (menu radio group) ---
+
+// check — Material Icons (same source as the renderer's icon set); marks the active level.
+const ICON_CHECK = 'M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z';
+
+const LEVELS: ReadonlyArray<{ level: BoardLevel; label: string }> = [
+  { level: 'big-picture', label: 'Big Picture' },
+  { level: 'process', label: 'Process Modelling' },
+  { level: 'design', label: 'Software Design' },
+];
+
+function levelModeling(): { setLevel(level: BoardLevel): void; getLevel(): BoardLevel } {
+  return modeler.get('eventStormingModeling');
+}
+
+/** Checkmark in the icon slot marks the active level; a spacer keeps the labels aligned. */
+function levelMarkup(label: string, active: boolean): string {
+  return active
+    ? `${iconMarkup(ICON_CHECK, 16)}<span>${label}</span>`
+    : `<span class="menu-icon-spacer"></span><span>${label}</span>`;
+}
+
+const levelItems = LEVELS.map((spec) => {
+  const item = menuItem(ICON_CHECK, spec.label, () => levelModeling().setLevel(spec.level));
+  item.setAttribute('role', 'menuitemradio');
+  item.setAttribute('aria-checked', 'false');
+  // Unchecked until the first import reports the board's level (the click wiring survives).
+  item.innerHTML = levelMarkup(spec.label, false);
+  return { ...spec, item };
+});
+
+function updateLevelMenu(): void {
+  const active = levelModeling().getLevel();
+  for (const { level, label, item } of levelItems) {
+    item.setAttribute('aria-checked', String(level === active));
+    item.innerHTML = levelMarkup(label, level === active);
+  }
+}
+
+// setLevel is undoable and the level also arrives via document updates — re-sync on both.
+modeler.on('commandStack.changed', updateLevelMenu);
+modeler.on('import.done', updateLevelMenu);
+
 const menuBtn = document.createElement('button');
 menuBtn.type = 'button';
 menuBtn.className = 'menu-btn';
@@ -209,6 +261,9 @@ dropdown.append(
   menuSep(),
   menuItem(ICON_DOWNLOAD, 'Export · SVG', exportSvg),
   menuItem(ICON_IMAGE, 'Export · PNG', exportPng),
+  menuSep(),
+  menuLabel('Level'),
+  ...levelItems.map(({ item }) => item),
 );
 
 toolbar.append(menuBtn, dropdown);

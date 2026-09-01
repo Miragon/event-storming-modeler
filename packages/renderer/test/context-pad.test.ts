@@ -1,9 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Element } from 'diagram-js/lib/model/Types';
+import type { BoardLevel } from '@miragon/event-storming-schema-model';
 import EventStormingContextPadProvider from '../src/context-pad/EventStormingContextPadProvider.js';
 import { STICKY_STYLES } from '../src/draw/styles.js';
 
-function providerHarness() {
+function providerHarness(level: BoardLevel = 'design') {
   const created: Array<{ kind: string; label: string }> = [];
   const createStart = vi.fn();
   const provider = new EventStormingContextPadProvider(
@@ -12,7 +13,7 @@ function providerHarness() {
     { start: vi.fn() } as never,
     { start: createStart } as never,
     { open: vi.fn() } as never,
-    { setStrokeStyle: vi.fn() } as never,
+    { setStrokeStyle: vi.fn(), getLevel: () => level } as never,
     { activate: vi.fn(), activateConnection: vi.fn() } as never,
     {
       createNew: (kind: string, label: string) => {
@@ -70,5 +71,29 @@ describe('EventStormingContextPadProvider: typed append', () => {
       const entries = provider.getContextPadEntries(sticky(`${kind}_a`, kind));
       expect(Object.keys(entries).filter((key) => key.startsWith('append-'))).toEqual([]);
     }
+  });
+
+  // Levels filter the creation surfaces only — the append subset mirrors the palette.
+  it('offers per workshop level exactly the append kinds that level allows', () => {
+    const expected: Record<BoardLevel, string[]> = {
+      'big-picture': ['append-event'],
+      process: ['append-event', 'append-command'],
+      design: ['append-event', 'append-command', 'append-aggregate'],
+    };
+    for (const [level, keys] of Object.entries(expected)) {
+      const { provider } = providerHarness(level as BoardLevel);
+      const entries = provider.getContextPadEntries(sticky('cmd_a'));
+      expect(Object.keys(entries).filter((key) => key.startsWith('append-'))).toEqual(keys);
+    }
+  });
+
+  // An out-of-level sticky stays editable (levels are not validation): the append entries it
+  // offers are still the LEVEL's kinds, independent of the sticky's own kind.
+  it('keeps level filtering on out-of-level stickies without adding their own kind', () => {
+    const { provider } = providerHarness('big-picture');
+    const entries = provider.getContextPadEntries(sticky('agg_a', 'aggregate'));
+    expect(Object.keys(entries).filter((key) => key.startsWith('append-'))).toEqual([
+      'append-event',
+    ]);
   });
 });

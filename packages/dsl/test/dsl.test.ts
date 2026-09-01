@@ -289,6 +289,17 @@ describe('parseDSL – sticky names starting with config keywords', () => {
     expect(serializeDSL(parseDSL(out))).toBe(out);
   });
 
+  it('preserves arrows from a sticky named "Level Editor" while `level` config still parses', () => {
+    const src =
+      'title T\nlevel big-picture\nreadmodel Level Editor [80, 300]\ncommand B [240, 300]\nLevel Editor -> B';
+    const board = parseDSL(src);
+    expect(board.config.level).toBe('big-picture');
+    expect(board.edges).toHaveLength(1);
+    const out = serializeDSL(board);
+    expect(parseDSL(out).edges).toHaveLength(1);
+    expect(serializeDSL(parseDSL(out))).toBe(out);
+  });
+
   it('an arrow from a sticky named "Title Page" does NOT overwrite the board title', () => {
     const src = 'title Checkout\nevent Title Page [80, 300]\ncommand B [240, 300]\nTitle Page -> B';
     const board = parseDSL(src);
@@ -343,6 +354,48 @@ describe('parseDSL – style config', () => {
     const out = serializeDSL(withStyle);
     expect(out.match(/^style /gm)).toHaveLength(1);
     expect(out).toContain('style classic');
+  });
+});
+
+describe('parseDSL – level config', () => {
+  it('reads level big-picture|process|design', () => {
+    for (const level of ['big-picture', 'process', 'design'] as const) {
+      const board = parseDSL(`title T\nlevel ${level}`);
+      expect(board.config.level).toBe(level);
+      const once = serializeDSL(board);
+      expect(once).toContain(`level ${level}`);
+      expect(serializeDSL(parseDSL(once))).toBe(once);
+    }
+  });
+
+  it('serializes config statements in the order title, style, level', () => {
+    const once = serializeDSL(parseDSL('title T\nlevel process\nstyle dark\nevent A [100, 200]'));
+    expect(once.split('\n').slice(0, 4)).toEqual([
+      'title T',
+      'style dark',
+      'level process',
+      'event A [100, 200]',
+    ]);
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('keeps an unknown level losslessly in rawPassthrough with a line-numbered diagnostic', () => {
+    const { board, diagnostics } = parseDSLWithDiagnostics('title T\nlevel strategic\n');
+    expect(board.config.level).toBeUndefined();
+    expect(board.rawPassthrough).toContain('level strategic');
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.line).toBe(2);
+    expect(diagnostics[0]!.text).toContain('level strategic');
+  });
+
+  it('an unparsable level line is not emitted twice when config.level is set', () => {
+    // Unknown level -> lands in rawPassthrough, config.level stays undefined.
+    const board = parseDSL('title T\nlevel strategic');
+    // Now the editor sets a valid level: the stale line must NOT survive as a duplicate.
+    const withLevel = { ...board, config: { ...board.config, level: 'big-picture' as const } };
+    const out = serializeDSL(withLevel);
+    expect(out.match(/^level /gm)).toHaveLength(1);
+    expect(out).toContain('level big-picture');
   });
 });
 
@@ -401,6 +454,12 @@ describe('serializeDSL round-trip', () => {
     expect(reparsed.edges).toHaveLength(9);
     expect(reparsed.elements.map((e) => e.label)).toEqual(board.elements.map((e) => e.label));
     expect(serializeDSL(reparsed)).toBe(once);
+  });
+
+  it('is stable for the canonical example with a level statement added', () => {
+    const once = serializeDSL(parseDSL(ORDER_CHECKOUT + '\nlevel process'));
+    expect(once.split('\n')[1]).toBe('level process');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
   });
 
   it('rounds coordinates to 3 decimals deterministically', () => {

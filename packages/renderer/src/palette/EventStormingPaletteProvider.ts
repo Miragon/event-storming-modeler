@@ -1,5 +1,6 @@
 import type Palette from 'diagram-js/lib/features/palette/Palette';
 import type Create from 'diagram-js/lib/features/create/Create';
+import type EventBus from 'diagram-js/lib/core/EventBus';
 import type LassoTool from 'diagram-js/lib/features/lasso-tool/LassoTool';
 import type EventStormingDrawTool from '../draw-tool/EventStormingDrawTool.js';
 import type {
@@ -7,8 +8,10 @@ import type {
   PaletteEntry,
   default as PaletteProvider,
 } from 'diagram-js/lib/features/palette/PaletteProvider';
+import { LEVEL_STICKY_KINDS } from '@miragon/event-storming-schema-model';
 import type EventStormingElementFactory from '../model/EventStormingElementFactory.js';
-import type { EventStormingShapeType } from '../model/di-types.js';
+import type EventStormingModeling from '../modeling/EventStormingModeling.js';
+import { ROOT_ID, type EventStormingShapeType } from '../model/di-types.js';
 import { NOTE_STYLE, STICKY_STYLES } from '../draw/styles.js';
 import { PALETTE_ICONS } from '../draw/palette-icons.js';
 
@@ -98,6 +101,8 @@ export default class EventStormingPaletteProvider implements PaletteProvider {
     'eventStormingElementFactory',
     'lassoTool',
     'eventStormingDrawTool',
+    'eventStormingModeling',
+    'eventBus',
   ];
 
   constructor(
@@ -106,8 +111,26 @@ export default class EventStormingPaletteProvider implements PaletteProvider {
     private readonly factory: EventStormingElementFactory,
     private readonly lassoTool: LassoTool,
     private readonly drawTool: EventStormingDrawTool,
+    private readonly eventStormingModeling: EventStormingModeling,
+    eventBus: EventBus,
   ) {
     palette.registerProvider(this);
+
+    // The level filters the entries, but diagram-js renders the palette once — re-query the
+    // providers whenever the effective level may have changed: a (re)imported board and
+    // setLevel incl. its undo/redo (= any updateProperties on the root, where config lives).
+    // `_rebuild` is the internal diagram-js refresh; it guards against pre-init calls.
+    const rebuild = () => (palette as unknown as { _rebuild(): void })._rebuild();
+    eventBus.on('import.done', rebuild);
+    eventBus.on(
+      [
+        'commandStack.element.updateProperties.postExecuted',
+        'commandStack.element.updateProperties.reverted',
+      ],
+      (event: { context: { element: { id: string } } }) => {
+        if (event.context.element.id === ROOT_ID) rebuild();
+      },
+    );
   }
 
   getPaletteEntries(): PaletteEntries {
@@ -134,7 +157,10 @@ export default class EventStormingPaletteProvider implements PaletteProvider {
       },
     };
 
+    // Sticky kinds are filtered by the workshop level; notes are annotations and always stay.
+    const allowed = LEVEL_STICKY_KINDS[this.eventStormingModeling.getLevel()];
     for (const spec of SPECS) {
+      if (spec.type !== 'note' && !allowed.includes(spec.type)) continue;
       const start = (event: Event) => {
         const shape = this.factory.createNew(spec.type, spec.label);
         this.create.start(event, shape);

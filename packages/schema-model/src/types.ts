@@ -127,9 +127,18 @@ export interface Arrow {
 
 export type BoardEdge = Arrow;
 
+/**
+ * Workshop granularity of the board — big picture, process modelling or software design.
+ * Filters which sticky kinds the creation surfaces offer; NOT a validation rule (elements
+ * of any kind stay valid and editable on every level).
+ */
+export type BoardLevel = 'big-picture' | 'process' | 'design';
+
 export interface BoardConfig {
   readonly title: string;
   readonly style?: 'classic' | 'dark';
+  /** Workshop level; absent means `design` (everything available). */
+  readonly level?: BoardLevel;
 }
 
 /** Root object. Domain and layout are separated logically (not physically). */

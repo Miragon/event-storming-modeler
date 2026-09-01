@@ -51,8 +51,18 @@ external system ↔ events at the boundary
    names, invariants and consistency boundaries are decided. Output feeds directly into DDD
    tactical design.
 
-A `.storm` board can capture any level — big-picture boards are mostly `event`, `actor`,
-`external`, `hotspot`; design-level boards use the whole grammar.
+A `.storm` board records its level with the optional `level` statement (absent = `design`).
+Each level maps to the sticky kinds the editor offers for creation — annotations (`note`,
+drawings) are always available on top:
+
+| Level       | DSL value     | Sticky kinds offered                                                      |
+| ----------- | ------------- | ------------------------------------------------------------------------- |
+| Big Picture | `big-picture` | `event`, `actor`, `external`, `hotspot`                                   |
+| Process     | `process`     | `event`, `command`, `actor`, `policy`, `readmodel`, `external`, `hotspot` |
+| Design      | `design`      | the full grammar — adds `aggregate` to the process set                    |
+
+The level filters creation surfaces only; existing elements of any kind stay valid and editable
+on every level.
 
 ## Timeline, pivotal events, swimlanes
 

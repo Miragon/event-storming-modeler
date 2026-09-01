@@ -96,6 +96,7 @@ export function serializeDSL(board: EventStormingBoard): string {
 
   lines.push(`title ${board.config.title}`);
   if (board.config.style) lines.push(`style ${board.config.style}`);
+  if (board.config.level) lines.push(`level ${board.config.level}`);
 
   for (const el of board.elements) {
     lines.push(elementLine(el, nameOf(el)));
@@ -116,6 +117,7 @@ export function serializeDSL(board: EventStormingBoard): string {
   if (board.rawPassthrough) {
     const emitted = new Set<string>(['title']);
     if (board.config.style) emitted.add('style');
+    if (board.config.level) emitted.add('level');
     for (const raw of board.rawPassthrough) {
       if (emitted.has(raw.trim().split(/\s+/)[0]!)) continue;
       lines.push(raw);

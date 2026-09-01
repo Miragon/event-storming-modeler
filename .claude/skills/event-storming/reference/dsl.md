@@ -7,11 +7,28 @@ deterministic — the same board always produces the same text.
 
 ## Config statements
 
-| Statement                 | Meaning                                |
-| ------------------------- | -------------------------------------- |
-| `title <text>`            | Board title.                           |
-| `style classic` \| `dark` | Optional board style.                  |
-| `// comment`              | Comment — kept verbatim on round-trip. |
+| Statement                                    | Meaning                                                                                                  |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `title <text>`                               | Board title.                                                                                             |
+| `style classic` \| `dark`                    | Optional board style.                                                                                    |
+| `level big-picture` \| `process` \| `design` | Optional workshop level (see `concepts.md`) — filters which sticky kinds the editor offers for creation. |
+| `// comment`                                 | Comment — kept verbatim on round-trip.                                                                   |
+
+The serializer emits config statements in the order `title`, `style`, `level` (each only when
+present). An absent `level` means `design` — everything available. The level filters only the
+creation surfaces (palette, typed append, change-type popup); elements of any kind stay valid
+and editable on every level, so a board opened at a lower level never breaks:
+
+```
+title Payments Big Picture
+level big-picture
+
+event Payment Received [620, 300]
+hotspot Who reconciles refunds? [800, 520]
+```
+
+An invalid level value is not an error: the line is kept verbatim in the raw passthrough and
+reported as a diagnostic.
 
 ## Element statements
 

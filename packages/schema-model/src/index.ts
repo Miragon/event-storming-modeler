@@ -16,12 +16,16 @@ export type {
   BoardElement,
   Arrow,
   BoardEdge,
+  BoardLevel,
   BoardConfig,
   EventStormingBoard,
 } from './types.js';
 
 // Layout helpers — empty-board framing constant and deterministic timeline order
 export { DEFAULT_BOARD_SIZE, sortByTimeline } from './layout.js';
+
+// Workshop levels — default level and the sticky kinds each level offers
+export { DEFAULT_BOARD_LEVEL, LEVEL_STICKY_KINDS } from './levels.js';
 
 export {
   validateBoard,

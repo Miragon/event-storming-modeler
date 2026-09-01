@@ -1,13 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import {
   CURRENT_SCHEMA_VERSION,
+  DEFAULT_BOARD_LEVEL,
   DEFAULT_BOARD_SIZE,
+  LEVEL_STICKY_KINDS,
   sortByTimeline,
   loadBoard,
   serializeBoard,
   parseBoardJSON,
   validateBoard,
   createEmptyBoard,
+  type BoardLevel,
   type EventStormingBoard,
 } from '../src/index.js';
 
@@ -282,6 +285,18 @@ describe('Validation', () => {
     expect(() => loadBoard(board)).not.toThrow();
   });
 
+  it('accepts each of the three board levels', () => {
+    for (const level of ['big-picture', 'process', 'design'] as const) {
+      const board = { ...sample, config: { ...sample.config, level } };
+      expect(loadBoard(board).config.level).toBe(level);
+    }
+  });
+
+  it('rejects an unknown board level', () => {
+    const bad = { ...sample, config: { ...sample.config, level: 'overview' } };
+    expect(() => loadBoard(bad)).toThrow();
+  });
+
   it('rejects a drawing with fewer than 2 points', () => {
     const bad = {
       ...sample,
@@ -297,5 +312,42 @@ describe('Validation', () => {
       ],
     };
     expect(() => loadBoard(bad)).toThrow();
+  });
+});
+
+describe('Workshop levels', () => {
+  it('defaults to design; createEmptyBoard and loadBoard leave an absent level unset', () => {
+    expect(DEFAULT_BOARD_LEVEL).toBe('design');
+    expect(createEmptyBoard().config.level).toBeUndefined();
+    expect(loadBoard(sample).config.level).toBeUndefined();
+  });
+
+  it('pins the exact sticky kinds per level (annotations are not listed)', () => {
+    expect(LEVEL_STICKY_KINDS['big-picture']).toEqual(['event', 'actor', 'external', 'hotspot']);
+    expect(LEVEL_STICKY_KINDS['process']).toEqual([
+      'event',
+      'command',
+      'actor',
+      'policy',
+      'readmodel',
+      'external',
+      'hotspot',
+    ]);
+    expect(LEVEL_STICKY_KINDS['design']).toEqual([
+      'event',
+      'command',
+      'actor',
+      'aggregate',
+      'policy',
+      'readmodel',
+      'external',
+      'hotspot',
+    ]);
+    const levels: BoardLevel[] = ['big-picture', 'process', 'design'];
+    expect(Object.keys(LEVEL_STICKY_KINDS).sort()).toEqual([...levels].sort());
+    for (const level of levels) {
+      expect(LEVEL_STICKY_KINDS[level]).not.toContain('note');
+      expect(LEVEL_STICKY_KINDS[level]).not.toContain('drawing');
+    }
   });
 });
