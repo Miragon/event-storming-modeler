@@ -11,7 +11,7 @@ const wrap = (inner: string): string =>
 
 const stickySquare = (fill: string, stroke: string, tilt = 0): string =>
   wrap(
-    `<rect x="4" y="5" width="16" height="14" rx="2.5" fill="${fill}" stroke="${stroke}" stroke-width="1.5"${
+    `<rect x="4" y="5" width="16" height="14" fill="${fill}" stroke="${stroke}" stroke-width="1.5"${
       tilt ? ` transform="rotate(${tilt} 12 12)"` : ''
     }/>`,
   );
@@ -38,5 +38,5 @@ for (const kind of STICKY_KINDS) {
 
 /** Small colored square for the change-type popup menu entries. */
 export function kindSquare(fill: string, stroke: string): string {
-  return `<svg width="14" height="14" viewBox="0 0 14 14" class="event-storming-palette-svg"><rect x="1" y="1" width="12" height="12" rx="2" fill="${fill}" stroke="${stroke}" stroke-width="1"/></svg>`;
+  return `<svg width="14" height="14" viewBox="0 0 14 14" class="event-storming-palette-svg"><rect x="1" y="1" width="12" height="12" fill="${fill}" stroke="${stroke}" stroke-width="1"/></svg>`;
 }

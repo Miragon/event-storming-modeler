@@ -42,8 +42,8 @@ export const NOTE_STYLE = { label: 'Note', fill: '#ECECEC', stroke: '#C4C4C4' } 
 /** Smallest hand-resized note box — keeps a shrunken note grabbable and its handles apart. */
 export const NOTE_MIN_RESIZE = { width: 60, height: 40 } as const;
 
-/** Corner radius shared by all stickies (and the palette previews). */
-export const STICKY_RADIUS = 6;
+/** Corner radius shared by all stickies (and the palette previews) — 0: paper has sharp corners. */
+export const STICKY_RADIUS = 0;
 /** Inner text padding of a sticky (px, each side). */
 export const STICKY_PADDING = 8;
 
