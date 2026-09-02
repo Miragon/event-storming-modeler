@@ -10,8 +10,6 @@ The demo app for the `@miragon/event-storming-*` packages.
 
 ![The web app](../../docs/screenshots/editor.png)
 
-_Screenshot to be regenerated for the Event Storming UI._
-
 ## Run locally
 
 From the monorepo root:

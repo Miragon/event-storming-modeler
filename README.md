@@ -13,8 +13,6 @@ TypeScript library, a VS Code extension, and a web app, all built on
 
 ![The Event Storming editor](docs/screenshots/editor.png)
 
-_Screenshots still show the previous editor and will be regenerated for the Event Storming UI._
-
 ## Install
 
 ```bash
