@@ -6,7 +6,9 @@ import EventStormingRenderer, { KIND_CAPTION_CLASS } from '../src/draw/EventStor
 import type EventStormingViewOptions from '../src/view-options/EventStormingViewOptions.js';
 import { STICKY_KINDS } from '../src/model/di-types.js';
 import {
+  NOTE_BULLET_INDENT,
   STICKY_CHAR_WIDTH,
+  STICKY_LINE_HEIGHT,
   STICKY_PADDING,
   STICKY_STYLES,
   noteMetrics,
@@ -32,21 +34,146 @@ function textLines(visuals: SVGElement): string[] {
   );
 }
 
+/** A note shape sized by noteMetrics unless a manual box is given. */
+function note(
+  label: string,
+  extra: Record<string, unknown> = {},
+  box?: { width: number; height: number },
+): Record<string, unknown> {
+  const { width, height } = box ?? noteMetrics(label);
+  return {
+    eventStormingType: 'note',
+    eventStormingLabel: label,
+    x: 0,
+    y: 0,
+    width,
+    height,
+    ...extra,
+  };
+}
+
+/** Manual note box with an exact wrap budget of `maxChars` and room for `maxLines` rows. */
+function boxFor(maxChars: number, maxLines: number): { width: number; height: number } {
+  return {
+    width: 2 * STICKY_PADDING + maxChars * STICKY_CHAR_WIDTH,
+    height: 2 * STICKY_PADDING + maxLines * STICKY_LINE_HEIGHT,
+  };
+}
+
+/** First baseline of a top-anchored note row block. */
+const TOP_BASELINE = STICKY_PADDING + STICKY_LINE_HEIGHT / 2 + 4;
+
 describe('EventStormingRenderer: note text', () => {
   // Regression: noteMetrics padded with 6px while the renderer clipped with 8px padding, so
   // every multi-line note rendered one line short.
   it.each([2, 3, 5])('renders all %i lines of a noteMetrics-sized note', (lineCount) => {
     const label = Array.from({ length: lineCount }, (_, i) => `line ${i + 1}`).join('\n');
-    const { width, height } = noteMetrics(label);
-    const visuals = draw({
-      eventStormingType: 'note',
-      eventStormingLabel: label,
-      x: 0,
-      y: 0,
-      width,
-      height,
-    });
+    const visuals = draw(note(label));
     expect(textLines(visuals)).toHaveLength(lineCount);
+  });
+
+  it('renders a left-aligned, top-anchored document in regular #333 (not centered italic)', () => {
+    const texts = [...draw(note('first\nsecond')).querySelectorAll('text')] as SVGElement[];
+    expect(texts.map((t) => t.textContent)).toEqual(['first', 'second']);
+    texts.forEach((text, i) => {
+      expect(text.style.textAnchor).toBe('start');
+      expect(text.style.fontStyle).toBe('');
+      expect(text.style.fill).toBe('rgb(51, 51, 51)');
+      expect(text.getAttribute('x')).toBe(String(STICKY_PADDING));
+      expect(text.getAttribute('y')).toBe(String(TOP_BASELINE + i * STICKY_LINE_HEIGHT));
+    });
+  });
+
+  it('renders **bold** / *italic* / ***both*** as styled tspan runs, markers stripped', () => {
+    const visuals = draw(note('see **bold** and *italic* or ***both***'));
+    const text = visuals.querySelector('text')!;
+    expect(text.textContent).toBe('see bold and italic or both');
+    const tspans = [...text.querySelectorAll('tspan')];
+    expect(tspans.map((t) => t.textContent)).toEqual([
+      'see ',
+      'bold',
+      ' and ',
+      'italic',
+      ' or ',
+      'both',
+    ]);
+    expect(tspans[1]!.getAttribute('font-weight')).toBe('600');
+    expect(tspans[1]!.getAttribute('font-style')).toBeNull();
+    expect(tspans[3]!.getAttribute('font-style')).toBe('italic');
+    expect(tspans[3]!.getAttribute('font-weight')).toBeNull();
+    expect(tspans[5]!.getAttribute('font-weight')).toBe('600');
+    expect(tspans[5]!.getAttribute('font-style')).toBe('italic');
+    expect(tspans[0]!.getAttribute('font-weight')).toBeNull();
+  });
+
+  it('renders unmatched markers literally instead of eating text', () => {
+    const text = draw(note('a * b')).querySelector('text')!;
+    expect(text.textContent).toBe('a * b');
+    expect(text.querySelector('tspan[font-style="italic"]')).toBeNull();
+  });
+
+  it("renders bullet lines with a '• ' marker at the line start", () => {
+    const text = draw(note('- item')).querySelector('text')!;
+    expect(text.textContent).toBe('• item');
+    expect(text.querySelector('tspan')!.textContent).toBe('• ');
+    expect(text.getAttribute('x')).toBe(String(STICKY_PADDING));
+  });
+
+  it('keeps the hanging indent on wrapped bullet continuation rows', () => {
+    // 10-char budget minus the 2-char '• ' prefix -> 'alpha' / 'beta' split over two rows.
+    const texts = [...draw(note('- alpha beta', {}, boxFor(10, 2))).querySelectorAll('text')];
+    expect(texts.map((t) => t.textContent)).toEqual(['• alpha', 'beta']);
+    expect(texts[0]!.getAttribute('x')).toBe(String(STICKY_PADDING));
+    expect(texts[1]!.getAttribute('x')).toBe(String(STICKY_PADDING + NOTE_BULLET_INDENT));
+  });
+
+  it('keeps styled runs across the wrap point (run split, styling on both rows)', () => {
+    const texts = [...draw(note('**alpha beta**', {}, boxFor(8, 2))).querySelectorAll('text')];
+    expect(texts.map((t) => t.textContent)).toEqual(['alpha', 'beta']);
+    for (const text of texts) {
+      expect(text.querySelector('tspan')!.getAttribute('font-weight')).toBe('600');
+    }
+  });
+
+  it('clips overflowing rows in a hand-shrunken manual box', () => {
+    const texts = textLines(draw(note('one\ntwo\nthree', {}, boxFor(10, 2))));
+    expect(texts).toEqual(['one', 'two']);
+  });
+});
+
+describe('EventStormingRenderer: note alignment', () => {
+  it('anchors lines horizontally per alignHorizontal (left / center / right)', () => {
+    const label = 'x';
+    const box = boxFor(10, 1);
+
+    const centered = draw(note(label, { alignHorizontal: 'center' }, box)).querySelector('text')!;
+    expect(centered.style.textAnchor).toBe('middle');
+    expect(centered.getAttribute('x')).toBe(String(box.width / 2));
+
+    const right = draw(note(label, { alignHorizontal: 'right' }, box)).querySelector('text')!;
+    expect(right.style.textAnchor).toBe('end');
+    expect(right.getAttribute('x')).toBe(String(box.width - STICKY_PADDING));
+  });
+
+  it("keeps the '• ' marker at the line start of centered bullet lines", () => {
+    const text = draw(note('- x', { alignHorizontal: 'center' }, boxFor(10, 1))).querySelector(
+      'text',
+    )!;
+    expect(text.textContent).toBe('• x');
+    expect(text.style.textAnchor).toBe('middle');
+  });
+
+  it('anchors the text block vertically per alignVertical (top / middle / bottom)', () => {
+    const box = boxFor(10, 4);
+    const rowY = (visuals: SVGElement) => Number(visuals.querySelector('text')!.getAttribute('y'));
+
+    expect(rowY(draw(note('x', {}, box)))).toBe(TOP_BASELINE);
+    expect(rowY(draw(note('x', { alignVertical: 'middle' }, box)))).toBe(
+      (box.height - STICKY_LINE_HEIGHT) / 2 + STICKY_LINE_HEIGHT / 2 + 4,
+    );
+    expect(rowY(draw(note('x', { alignVertical: 'bottom' }, box)))).toBe(
+      box.height - STICKY_PADDING - STICKY_LINE_HEIGHT + STICKY_LINE_HEIGHT / 2 + 4,
+    );
   });
 });
 

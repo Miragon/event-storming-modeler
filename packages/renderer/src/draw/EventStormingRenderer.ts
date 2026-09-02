@@ -7,6 +7,7 @@ import {
   COLORS,
   DRAWING_INK,
   FONT,
+  NOTE_BULLET_INDENT,
   NOTE_STYLE,
   STICKY_CHAR_WIDTH,
   STICKY_LINE_HEIGHT,
@@ -14,6 +15,7 @@ import {
   STICKY_RADIUS,
   STICKY_STYLES,
 } from './styles.js';
+import { parseNoteMarkdown, type NoteLine, type NoteRun } from './note-markdown.js';
 import {
   isEventStormingConnection,
   isEventStormingShape,
@@ -150,7 +152,8 @@ export default class EventStormingRenderer extends BaseRenderer {
     }
     svgAppend(parent, rect);
 
-    drawStickyText(parent, shape, kind === 'note');
+    if (kind === 'note') drawNoteText(parent, shape);
+    else drawStickyText(parent, shape);
 
     // Small kind caption at the bottom — the 8 sticky kinds only (a note explains itself,
     // drawings never reach this method). Appended to `parent` so it tilts with a hotspot.
@@ -250,9 +253,9 @@ function wrapParagraph(paragraph: string, maxChars: number): string[] {
 /**
  * Centered multi-line text inside the sticky: explicit line breaks are honored, long lines are
  * word-wrapped into the padded box, and overflowing lines are clipped (fixed-size stickies never
- * grow; auto-sized notes fit via noteMetrics — only hand-shrunken note boxes clip).
+ * grow). Notes render via `drawNoteText` instead.
  */
-function drawStickyText(parent: SVGElement, shape: EventStormingShape, italic: boolean): void {
+function drawStickyText(parent: SVGElement, shape: EventStormingShape): void {
   const innerWidth = shape.width - 2 * STICKY_PADDING;
   const maxChars = Math.max(1, Math.floor(innerWidth / STICKY_CHAR_WIDTH));
   const maxLines = Math.max(
@@ -274,10 +277,168 @@ function drawStickyText(parent: SVGElement, shape: EventStormingShape, italic: b
       label(line, cx, y0 + i * STICKY_LINE_HEIGHT, {
         'text-anchor': 'middle',
         fill: COLORS.stickyText,
-        ...(italic ? { 'font-style': 'italic' } : {}),
       }),
     );
   });
+}
+
+/** Chars the '• ' prefix occupies in the estimate — matches `plainNoteText`, so the wrap budget
+ * stays consistent with the `noteMetrics` box. */
+const BULLET_PREFIX_CHARS = 2;
+
+/** Baseline offset within a line row — chosen so a middle-anchored block sits exactly where the
+ * old centered note layout put it (`height/2 - (n-1)*LH/2 + 4`). */
+const NOTE_ROW_BASELINE = STICKY_LINE_HEIGHT / 2 + 4;
+
+interface NoteRow {
+  readonly runs: NoteRun[];
+  /** First row of a bullet line — rendered with the leading '• ' marker. */
+  readonly marker: boolean;
+  /** Wrapped continuation row of a bullet line — keeps the hanging indent (left alignment). */
+  readonly indent: boolean;
+}
+
+/**
+ * Note text is a small document, not a centered label: markdown runs (bold/italic tspans) and
+ * bullet lines with a '•' hanging indent, laid out per the note's alignment — horizontal per
+ * line (anchor at padding / center / width-minus-padding), vertical anchoring the whole block
+ * top/middle/bottom inside `STICKY_PADDING`. Defaults: left/top. Wrapping (hand-shrunken boxes)
+ * splits runs at the wrap point so styling survives; overflowing rows are clipped like stickies.
+ */
+function drawNoteText(parent: SVGElement, shape: EventStormingShape): void {
+  const innerWidth = shape.width - 2 * STICKY_PADDING;
+  const maxChars = Math.max(1, Math.floor(innerWidth / STICKY_CHAR_WIDTH));
+  const maxLines = Math.max(
+    1,
+    Math.floor((shape.height - 2 * STICKY_PADDING) / STICKY_LINE_HEIGHT),
+  );
+
+  const rows = parseNoteMarkdown(shape.eventStormingLabel ?? '')
+    .flatMap((line) => wrapNoteLine(line, maxChars))
+    .slice(0, maxLines);
+
+  const horizontal = shape.alignHorizontal ?? 'left';
+  const vertical = shape.alignVertical ?? 'top';
+  const anchor = horizontal === 'left' ? 'start' : horizontal === 'center' ? 'middle' : 'end';
+  const blockHeight = rows.length * STICKY_LINE_HEIGHT;
+  const blockTop =
+    vertical === 'top'
+      ? STICKY_PADDING
+      : vertical === 'middle'
+        ? (shape.height - blockHeight) / 2
+        : shape.height - STICKY_PADDING - blockHeight;
+
+  rows.forEach((row, i) => {
+    // The hanging indent only exists as an x-offset when lines share a left edge; centered/right
+    // rows are anchored like any other line (the '• ' marker still sticks to its row's start).
+    const x =
+      horizontal === 'left'
+        ? STICKY_PADDING + (row.indent ? NOTE_BULLET_INDENT : 0)
+        : horizontal === 'center'
+          ? shape.width / 2
+          : shape.width - STICKY_PADDING;
+    const text = svgAttr(svgCreate('text'), {
+      x,
+      y: blockTop + i * STICKY_LINE_HEIGHT + NOTE_ROW_BASELINE,
+      'font-family': FONT.family,
+      'font-size': FONT.label,
+      fill: COLORS.stickyText,
+      'text-anchor': anchor,
+    });
+    const runs: NoteRun[] = row.marker
+      ? [{ text: '• ', bold: false, italic: false }, ...row.runs]
+      : row.runs;
+    for (const run of runs) {
+      const tspan = svgCreate('tspan');
+      tspan.textContent = run.text;
+      // Plain attributes (like the kind caption): exports and e2e selectors see them directly.
+      if (run.bold) tspan.setAttribute('font-weight', '600');
+      if (run.italic) tspan.setAttribute('font-style', 'italic');
+      svgAppend(text, tspan);
+    }
+    svgAppend(parent, text);
+  });
+}
+
+/** Wraps one markdown line into rows; bullet rows reserve the '• ' prefix in their budget. */
+function wrapNoteLine(line: NoteLine, maxChars: number): NoteRow[] {
+  const budget = Math.max(1, maxChars - (line.bullet ? BULLET_PREFIX_CHARS : 0));
+  return wrapRuns(line.runs, budget).map((runs, i) => ({
+    runs,
+    marker: line.bullet && i === 0,
+    indent: line.bullet && i > 0,
+  }));
+}
+
+/**
+ * Word-wraps styled runs by wrapping their concatenated plain text into index ranges and
+ * slicing the runs along them — a run split by the wrap point keeps its styling on both rows.
+ * A line that fits stays verbatim (auto-sized boxes always hit this path via noteMetrics).
+ */
+function wrapRuns(runs: NoteRun[], maxChars: number): NoteRun[][] {
+  const plain = runs.map((run) => run.text).join('');
+  if (plain.length <= maxChars) return [runs];
+  return wrapRanges(plain, maxChars).map(([start, end]) => sliceRuns(runs, start, end));
+}
+
+/**
+ * Greedy word wrap as index ranges over the original string (same semantics as
+ * `wrapParagraph`, incl. hard-breaking over-long words) — whitespace only collapses AT the
+ * wrap points, so run offsets stay valid.
+ */
+function wrapRanges(plain: string, maxChars: number): Array<[number, number]> {
+  const words = [...plain.matchAll(/\S+/g)];
+  if (!words.length) return [[0, 0]];
+  const rows: Array<[number, number]> = [];
+  let start = -1;
+  let end = -1;
+  const flush = () => {
+    if (start >= 0) rows.push([start, end]);
+    start = end = -1;
+  };
+  for (const match of words) {
+    let wordStart = match.index;
+    const wordEnd = wordStart + match[0].length;
+    if (match[0].length > maxChars) {
+      flush();
+      while (wordEnd - wordStart > maxChars) {
+        rows.push([wordStart, wordStart + maxChars]);
+        wordStart += maxChars;
+      }
+      start = wordStart;
+      end = wordEnd;
+      continue;
+    }
+    if (start < 0 || wordEnd - start <= maxChars) {
+      if (start < 0) start = wordStart;
+      end = wordEnd;
+      continue;
+    }
+    flush();
+    start = wordStart;
+    end = wordEnd;
+  }
+  flush();
+  return rows;
+}
+
+/** The runs overlapping [start, end) of the concatenated plain text, cut at the boundaries. */
+function sliceRuns(runs: NoteRun[], start: number, end: number): NoteRun[] {
+  const out: NoteRun[] = [];
+  let offset = 0;
+  for (const run of runs) {
+    const runStart = offset;
+    offset += run.text.length;
+    const from = Math.max(start, runStart);
+    const to = Math.min(end, offset);
+    if (from >= to) continue;
+    out.push({
+      text: run.text.slice(from - runStart, to - runStart),
+      bold: run.bold,
+      italic: run.italic,
+    });
+  }
+  return out;
 }
 
 function label(content: string, x: number, y: number, attrs: Attrs = {}): SVGElement {

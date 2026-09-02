@@ -40,6 +40,8 @@ const SHAPE_PROPS = [
   'drawingPoints',
   'closed',
   'strokeStyle',
+  'alignHorizontal',
+  'alignVertical',
 ] as const;
 const CONNECTION_PROPS = ['eventStormingType', 'linkLabel'] as const;
 

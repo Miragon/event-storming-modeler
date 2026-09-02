@@ -8,6 +8,7 @@ import {
   type BoardEdge,
   type BoardElement,
   type EventStormingBoard,
+  type NoteAlign,
 } from '@miragon/event-storming-schema-model';
 import {
   isEventStormingConnection,
@@ -88,6 +89,7 @@ export default class EventStormingExporter {
       el.eventStormingType === 'note' && isManualNoteBox(el.eventStormingLabel, el)
         ? { width: el.width, height: el.height }
         : undefined;
+    const align = el.eventStormingType === 'note' ? noteAlignOf(el) : undefined;
     return {
       id: el.id,
       elementType: el.eventStormingType,
@@ -95,9 +97,23 @@ export default class EventStormingExporter {
       position: { x: el.x + el.width / 2, y: el.y + el.height / 2 },
       ...(el.color ? { color: el.color } : {}),
       ...(manualSize ? { size: manualSize } : {}),
+      ...(align ? { align } : {}),
       // Pinning lives in the diagram-js host/attachers refs — only actor/hotspot/note ever
       // carry a host (attach rule), matching the schema's attachedTo placement.
       ...(el.host ? { attachedTo: el.host.id } : {}),
     };
   }
+}
+
+/**
+ * Canonical model alignment from the DI props: default axes (left/top) collapse to absent —
+ * even when a caller wrote them explicitly — so unaligned boards keep serializing
+ * byte-identically (the DSL emits `(align …)` only when this returns a value).
+ */
+function noteAlignOf(el: EventStormingShape): NoteAlign | undefined {
+  const horizontal =
+    el.alignHorizontal && el.alignHorizontal !== 'left' ? el.alignHorizontal : undefined;
+  const vertical = el.alignVertical && el.alignVertical !== 'top' ? el.alignVertical : undefined;
+  if (!horizontal && !vertical) return undefined;
+  return { ...(horizontal ? { horizontal } : {}), ...(vertical ? { vertical } : {}) };
 }

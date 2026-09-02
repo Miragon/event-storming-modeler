@@ -1,4 +1,8 @@
-import type { BoardElement, EventStormingBoard } from '@miragon/event-storming-schema-model';
+import type {
+  BoardElement,
+  EventStormingBoard,
+  NoteElement,
+} from '@miragon/event-storming-schema-model';
 import { ID_CHARSET_RE, slug } from './lexer.js';
 
 /**
@@ -76,6 +80,17 @@ function serializedNames(board: EventStormingBoard): Map<string, string> {
 /** Color override extension: `(color …)` after the coordinates. */
 function colorSuffix(el: { color?: string }): string {
   return el.color ? ` (color ${el.color})` : '';
+}
+
+/**
+ * Alignment extension: `(align <horizontal> <vertical>)` — both words always emitted together
+ * using the EFFECTIVE values, and only when at least one axis differs from the default
+ * left/top, so existing boards serialize byte-identically.
+ */
+function alignSuffix(el: NoteElement): string {
+  const horizontal = el.align?.horizontal ?? 'left';
+  const vertical = el.align?.vertical ?? 'top';
+  return horizontal === 'left' && vertical === 'top' ? '' : ` (align ${horizontal} ${vertical})`;
 }
 
 /**
@@ -173,11 +188,11 @@ function elementLine(el: BoardElement, name: string, idSuffix: string, attach: s
     case 'note': {
       // Escape line breaks/comment starters -> the line-based DSL stays single-line. `->` is
       // fine in note text (notes are never arrow endpoints), so no `→` replacement here.
-      // Canonical note suffix order: `(color …) (size WxH) (on …)` — `(on …)` stays last
-      // (final-paren rule, see above); size/attachment are only present when set, so plain
-      // boards stay byte-identical.
+      // Canonical note suffix order: `(color …) (size WxH) (align h v) (on …)` — `(on …)`
+      // stays last (final-paren rule, see above); size/align/attachment are only present when
+      // set, so plain boards stay byte-identical.
       const size = el.size ? ` (size ${r(el.size.width)}x${r(el.size.height)})` : '';
-      return `note ${escapeText(name)} [${r(p.x)}, ${r(p.y)}]${colorSuffix(el)}${size}${attach}`;
+      return `note ${escapeText(name)} [${r(p.x)}, ${r(p.y)}]${colorSuffix(el)}${size}${alignSuffix(el)}${attach}`;
     }
     case 'drawing': {
       // Project extension (freeform drawing): tuple list + style flags.

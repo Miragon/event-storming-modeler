@@ -90,6 +90,16 @@ export interface HotspotElement extends BoardElementBase {
   readonly attachedTo?: string;
 }
 
+export type NoteAlignHorizontal = 'left' | 'center' | 'right';
+
+export type NoteAlignVertical = 'top' | 'middle' | 'bottom';
+
+/** Per-note text alignment. An absent axis means the default: left / top. */
+export interface NoteAlign {
+  readonly horizontal?: NoteAlignHorizontal;
+  readonly vertical?: NoteAlignVertical;
+}
+
 /** Free-text note; auto-sizes to its text unless a manual `size` is set. */
 export interface NoteElement extends BoardElementBase {
   readonly elementType: 'note';
@@ -99,6 +109,12 @@ export interface NoteElement extends BoardElementBase {
    * override. DSL: the `(size <w>x<h>)` suffix.
    */
   readonly size?: { readonly width: number; readonly height: number };
+  /**
+   * Text alignment inside the note box. Absent (object or axis) = the default left/top —
+   * rendering lives in the renderer, the model only carries the override. DSL: the
+   * `(align <horizontal> <vertical>)` suffix.
+   */
+  readonly align?: NoteAlign;
   /** Pinning: id of the host sticky this note is attached to (see ActorElement.attachedTo). */
   readonly attachedTo?: string;
 }

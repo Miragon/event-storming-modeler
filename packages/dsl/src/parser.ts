@@ -12,11 +12,15 @@ import {
   type DrawingStrokeStyle,
   type ElementType,
   type EventStormingBoard,
+  type NoteAlign,
+  type NoteAlignHorizontal,
+  type NoteAlignVertical,
   type NoteElement,
 } from '@miragon/event-storming-schema-model';
 import {
   indexOfOutsideQuotes,
   keywordOf,
+  parseAlign,
   parseColor,
   parseCoords,
   parseId,
@@ -87,6 +91,22 @@ function compact<T extends Record<string, unknown>>(obj: T): T {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(obj)) if (v !== undefined) out[k] = v;
   return out as T;
+}
+
+/**
+ * Text `(align <h> <v>)` pair -> model value: default axes (left/top) are dropped, both-default
+ * collapses to absent — `(align left top)` and no suffix are the same board (the serializer
+ * emits the suffix only when an axis differs from the default).
+ */
+function modelAlign(
+  align: { horizontal: NoteAlignHorizontal; vertical: NoteAlignVertical } | undefined,
+): NoteAlign | undefined {
+  if (!align) return undefined;
+  const out = compact({
+    horizontal: align.horizontal === 'left' ? undefined : align.horizontal,
+    vertical: align.vertical === 'top' ? undefined : align.vertical,
+  }) as NoteAlign;
+  return Object.keys(out).length ? out : undefined;
 }
 
 /** Finding produced while parsing — line is 1-based; `text` is the (comment-stripped) line. */
@@ -305,6 +325,9 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
         if (node.sizeSuffix) {
           diag(`Size: a ${kw} cannot be resized — only notes support (size …)`);
         }
+        if (node.alignSuffix) {
+          diag(`Align: a ${kw} cannot be aligned — only notes support (align …)`);
+        }
         break;
       }
 
@@ -317,11 +340,17 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
         // Suffixes ONLY after the coordinates (mirrors parseSticky) — notes are free text, so
         // `(on …)`, `(color …)` or `(size 1x1)` may legitimately appear inside it. `(on …)` is
         // stripped FIRST: it is always the last suffix and its host name runs to the final `)`,
-        // so it may itself contain a `(color …)` or `(size …)`.
+        // so it may itself contain a `(color …)`, `(size …)` or `(align …)`.
         const on = parseOn(split ? split.suffix : after);
-        const sz = parseSize(on.rest);
+        const al = parseAlign(on.rest);
+        const sz = parseSize(al.rest);
         const idp = parseId(sz.rest);
         const col = parseColor(idp.rest);
+        if (al.invalid) {
+          diag(
+            `Align: could not read "${al.invalid.trim()}" — expected (align left|center|right top|middle|bottom)`,
+          );
+        }
         if (sz.invalid) {
           diag(
             `Size: could not read "${sz.invalid.trim()}" — expected (size <w>x<h>) with positive numbers`,
@@ -340,6 +369,7 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
           position: split ? pos(split.coords.a, split.coords.b) : pos(0, 0),
           color: col.color,
           size: sz.size,
+          align: modelAlign(al.align),
         }) as NoteElement;
         elements.push(note);
         if (on.host !== undefined) {
@@ -363,6 +393,10 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
         const szDrawing = parseSize(onDrawing.rest);
         if (szDrawing.size || szDrawing.invalid) {
           diag('Size: a drawing cannot be resized — only notes support (size …)');
+        }
+        const alDrawing = parseAlign(onDrawing.rest);
+        if (alDrawing.align || alDrawing.invalid) {
+          diag('Align: a drawing cannot be aligned — only notes support (align …)');
         }
         const idDrawing = parseId(onDrawing.rest);
         if (idDrawing.id !== undefined || idDrawing.invalid) {
@@ -501,6 +535,8 @@ interface ParsedSticky {
   readonly idInvalid?: string;
   /** A `(size …)` suffix appeared — only notes support it, the caller reports a diagnostic. */
   readonly sizeSuffix?: boolean;
+  /** An `(align …)` suffix appeared — only notes support it, the caller reports a diagnostic. */
+  readonly alignSuffix?: boolean;
 }
 
 /**
@@ -517,7 +553,8 @@ function parseSticky(after: string): ParsedSticky | null {
     if (!split.name) return null;
     const on = parseOn(split.suffix);
     const idp = parseId(on.rest);
-    const sz = parseSize(idp.rest);
+    const al = parseAlign(idp.rest);
+    const sz = parseSize(al.rest);
     const col = parseColor(sz.rest);
     return compact({
       name: decodeName(split.name),
@@ -527,12 +564,14 @@ function parseSticky(after: string): ParsedSticky | null {
       id: idp.id,
       idInvalid: idp.invalid,
       sizeSuffix: sz.size || sz.invalid ? true : undefined,
+      alignSuffix: al.align || al.invalid ? true : undefined,
     }) as ParsedSticky;
   }
   if (after.includes('[')) return null;
   const on = parseOn(after);
   const idp = parseId(on.rest);
-  const sz = parseSize(idp.rest);
+  const al = parseAlign(idp.rest);
+  const sz = parseSize(al.rest);
   const col = parseColor(sz.rest);
   const name = col.rest.trim();
   if (!name) return null;
@@ -544,5 +583,6 @@ function parseSticky(after: string): ParsedSticky | null {
     id: idp.id,
     idInvalid: idp.invalid,
     sizeSuffix: sz.size || sz.invalid ? true : undefined,
+    alignSuffix: al.align || al.invalid ? true : undefined,
   }) as ParsedSticky;
 }

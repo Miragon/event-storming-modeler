@@ -36,7 +36,7 @@ reported as a diagnostic.
 <kind> <Name> [x, y]
 <kind> <Name> [x, y] (color #rrggbb)
 <kind> <Name> [x, y] (color #rrggbb) (id <id>) (on <Host Name>)
-note <Text> [x, y] (color #rrggbb) (size <w>x<h>) (on <Host Name>)
+note <Text> [x, y] (color #rrggbb) (size <w>x<h>) (align <h> <v>) (on <Host Name>)
 ```
 
 - `<kind>` is one of: `event`, `command`, `actor`, `aggregate`, `policy`, `readmodel`,
@@ -57,10 +57,22 @@ note <Text> [x, y] (color #rrggbb) (size <w>x<h>) (on <Host Name>)
   the host name runs to the line's final `)`, so names containing parentheses work. An unresolved
   or invalid host is reported as a diagnostic and the element stays unpinned.
 - `(size <w>x<h>)` — `note` only: the note's manual size in board pixels (the note was resized
-  by hand). Absent = the note auto-sizes to its text. Always the last suffix before `(on …)` on
-  note lines; the serializer writes no spaces around the `x`, the parser tolerates them. A
-  malformed size, or a size on any other kind, is reported as a diagnostic and ignored — the
-  element is still created.
+  by hand). Absent = the note auto-sizes to its text. Canonical note suffix order is
+  `(color …) (size …) (align …) (on …)`; the serializer writes no spaces around the `x`, the
+  parser tolerates them. A malformed size, or a size on any other kind, is reported as a
+  diagnostic and ignored — the element is still created.
+- `(align <horizontal> <vertical>)` — `note` only: the note's text alignment, `left|center|right`
+  then `top|middle|bottom`. Both words are always written together using the effective values
+  (e.g. `(align center middle)`), but the suffix is emitted only when at least one axis differs
+  from the default `left top` — unaligned boards serialize byte-identically. A malformed align,
+  or an align on any other kind, is reported as a diagnostic and ignored — the element is still
+  created.
+
+Note labels may carry a tiny Markdown subset rendered on the canvas: `**bold**`, `*italic*`,
+`***bold italic***` inline runs and lines starting with `- ` as bullet items (shown with a `•`
+hanging indent). Everything else — including unmatched markers — stays literal text; stickies
+are always plain. The markers live inside the label string itself, so they survive every
+round-trip unchanged (line breaks are `\n`-escaped as usual).
 
 ```
 command Approve Order [240, 300]

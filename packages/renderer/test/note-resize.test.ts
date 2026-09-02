@@ -213,3 +213,101 @@ describe('isManualNoteBox: the shared auto-vs-manual rule', () => {
     );
   });
 });
+
+describe('noteMetrics: measures the plain note text (markdown markers are invisible)', () => {
+  it('sizes markdown labels by their rendered text, not the raw marker characters', () => {
+    expect(noteMetrics('**Check legal**')).toEqual(noteMetrics('Check legal'));
+    expect(noteMetrics('*a* and ***b***')).toEqual(noteMetrics('a and b'));
+  });
+
+  it("counts the visible '• ' prefix of bullet lines", () => {
+    // Rendered as '• todo' (6 chars): 2 chars wider than bare 'todo', markers not counted.
+    expect(noteMetrics('- **todo**').width).toBe(noteMetrics('• todo').width);
+    expect(noteMetrics('- todo').width).toBeGreaterThan(noteMetrics('todo').width);
+  });
+
+  it('keeps the auto-vs-manual verdict stable for formatted labels', () => {
+    expect(isManualNoteBox('**Check legal**', noteMetrics('**Check legal**'))).toBe(false);
+    expect(isManualNoteBox('**Check legal**', noteMetrics('Check legal'))).toBe(false);
+  });
+});
+
+describe('Note align: import -> export round-trip', () => {
+  it('mirrors NoteElement.align into the DI props and exports it back', () => {
+    const { importer, exporter, byId } = ioHarness();
+    importer.import(
+      board([
+        {
+          id: 'note_kickoff',
+          elementType: 'note',
+          label: 'Kickoff',
+          position: { x: 300, y: 200 },
+          align: { horizontal: 'center', vertical: 'middle' },
+        },
+      ]),
+    );
+
+    const shape = byId('note_kickoff')!;
+    expect(shape.alignHorizontal).toBe('center');
+    expect(shape.alignVertical).toBe('middle');
+
+    const exported = exporter.export().elements.find((e) => e.id === 'note_kickoff');
+    if (exported?.elementType !== 'note') throw new Error('note missing');
+    expect(exported.align).toEqual({ horizontal: 'center', vertical: 'middle' });
+  });
+
+  it('keeps unaligned notes align-free (defaults never serialize)', () => {
+    const { importer, exporter, byId } = ioHarness();
+    importer.import(
+      board([
+        { id: 'note_hint', elementType: 'note', label: 'Hint', position: { x: 100, y: 100 } },
+      ]),
+    );
+
+    expect(byId('note_hint')!.alignHorizontal).toBeUndefined();
+    expect(byId('note_hint')!.alignVertical).toBeUndefined();
+
+    const exported = exporter.export().elements.find((e) => e.id === 'note_hint');
+    if (exported?.elementType !== 'note') throw new Error('note missing');
+    expect('align' in exported).toBe(false);
+  });
+
+  it('collapses explicitly-default axes to absent on export', () => {
+    const { importer, exporter, byId } = ioHarness();
+    importer.import(
+      board([
+        {
+          id: 'note_hint',
+          elementType: 'note',
+          label: 'Hint',
+          position: { x: 100, y: 100 },
+          align: { horizontal: 'left', vertical: 'bottom' },
+        },
+      ]),
+    );
+
+    // The default axis never reaches the DI props; the deviating one does.
+    expect(byId('note_hint')!.alignHorizontal).toBeUndefined();
+    expect(byId('note_hint')!.alignVertical).toBe('bottom');
+
+    // An editor writing defaults back (instead of deleting the props) still exports canonically.
+    byId('note_hint')!.alignVertical = 'top';
+    const exported = exporter.export().elements.find((e) => e.id === 'note_hint');
+    if (exported?.elementType !== 'note') throw new Error('note missing');
+    expect('align' in exported).toBe(false);
+  });
+
+  it('exports the CURRENT align DI props (edits picked up without extra bookkeeping)', () => {
+    const { importer, exporter, byId } = ioHarness();
+    importer.import(
+      board([
+        { id: 'note_hint', elementType: 'note', label: 'Hint', position: { x: 100, y: 100 } },
+      ]),
+    );
+
+    byId('note_hint')!.alignHorizontal = 'right';
+    const exported = exporter.export().elements.find((e) => e.id === 'note_hint');
+    if (exported?.elementType !== 'note') throw new Error('note missing');
+    expect(exported.align).toEqual({ horizontal: 'right' });
+  });
+});

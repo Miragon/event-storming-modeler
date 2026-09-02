@@ -12,3 +12,10 @@ export const eventStormingDrawModule: ModuleDeclaration = {
 };
 
 export { default as EventStormingRenderer } from './EventStormingRenderer.js';
+export {
+  parseNoteMarkdown,
+  serializeNoteMarkdown,
+  plainNoteText,
+  type NoteLine,
+  type NoteRun,
+} from './note-markdown.js';

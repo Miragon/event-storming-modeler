@@ -7,9 +7,27 @@ import {
   type EventStormingShape,
 } from '../model/di-types.js';
 import type EventStormingModeling from '../modeling/EventStormingModeling.js';
+import { isManualNoteBox, noteMetrics } from '../draw/styles.js';
+import {
+  NOTE_BULLET_CLASS,
+  HORIZONTAL_CYCLE,
+  VERTICAL_CYCLE,
+  applyAlignPreview,
+  createNoteToolbar,
+  domToNoteMarkdown,
+  insertPlainText,
+  nextInCycle,
+  noteMarkdownToDom,
+  selectAllContent,
+  selectedLineDivs,
+  toggleBulletLines,
+  updateAlignButton,
+  type NoteAlignState,
+  type NoteToolbarAction,
+} from './note-editor-dom.js';
 
 interface ActiveEdit {
-  field: HTMLInputElement | HTMLTextAreaElement;
+  field: HTMLElement;
   /** Saves the current value and closes (for Enter, blur, click outside). */
   commit: () => void;
   /** Discards and closes (only for Escape). */
@@ -36,9 +54,11 @@ export function sanitizeLabel(raw: string): string {
 
 /**
  * Custom inline label editing as an HTML overlay (deliberately not diagram-js direct-editing).
- * Commit goes through `eventStormingModeling.updateLabel` -> commandStack (undo). Sticky text is
- * multi-line, so every shape is edited in a `<textarea>` (Enter = line break, Cmd/Ctrl+Enter or
- * click outside = save); connection labels use a single-line `<input>` (Enter = save).
+ * Commit goes through `eventStormingModeling` -> commandStack (undo). Sticky text is
+ * multi-line, so stickies are edited in a `<textarea>` (Enter = line break, Cmd/Ctrl+Enter or
+ * click outside = save); connection labels use a single-line `<input>` (Enter = save). NOTES
+ * get the WYSIWYG contenteditable overlay instead (see `activateNote`) — same commit/cancel
+ * semantics, plus live bold/italic/bullet formatting and the floating alignment toolbar.
  */
 export default class EventStormingLabelEditing {
   static $inject = ['eventBus', 'canvas', 'eventStormingModeling'];
@@ -63,6 +83,10 @@ export default class EventStormingLabelEditing {
   activate(element: EventStormingShape): void {
     this.active?.commit();
     if (element.eventStormingType === 'drawing') return; // pure geometry, no label
+    if (element.eventStormingType === 'note') {
+      this.activateNote(element);
+      return;
+    }
 
     const container = this.canvas.getContainer();
     const scale = this.canvas.zoom();
@@ -128,6 +152,152 @@ export default class EventStormingLabelEditing {
   }
 
   /**
+   * WYSIWYG editing for notes: a contenteditable overlay rendering the markdown subset live
+   * (bold/italic/bullets) plus the floating format/alignment toolbar. Commit/cancel semantics
+   * are identical to the textarea path (click outside / Cmd-Ctrl+Enter save, Escape discards,
+   * plain Enter breaks the line); the committed value is the canonical markdown string run
+   * through the same `sanitizeLabel`, and label + alignment land in ONE updateProperties.
+   */
+  private activateNote(element: EventStormingShape): void {
+    const container = this.canvas.getContainer();
+    const scale = this.canvas.zoom();
+    const vb = this.canvas.viewbox();
+    const left = (element.x + element.width / 2 - vb.x) * scale;
+    const top = (element.y + element.height / 2 - vb.y) * scale;
+
+    const editor = document.createElement('div');
+    editor.className = 'event-storming-label-input event-storming-note-editor';
+    editor.contentEditable = 'true';
+    editor.style.position = 'absolute';
+    editor.style.left = `${left}px`;
+    editor.style.top = `${top}px`;
+    editor.style.transform = 'translate(-50%, -50%)';
+    // min- (not fixed) box: the editor covers the note's footprint but grows with new lines.
+    editor.style.minWidth = `${element.width * scale}px`;
+    editor.style.minHeight = `${element.height * scale}px`;
+    noteMarkdownToDom(editor, element.eventStormingLabel ?? '');
+
+    const align: NoteAlignState = {
+      horizontal: element.alignHorizontal ?? 'left',
+      vertical: element.alignVertical ?? 'top',
+    };
+    applyAlignPreview(editor, align);
+
+    const toolbar = createNoteToolbar(document, (action) => onAction(action));
+    // Floats just above the note's top edge, x-centered like the editor.
+    toolbar.style.left = `${left}px`;
+    toolbar.style.top = `${(element.y - vb.y) * scale - 8}px`;
+    toolbar.style.transform = 'translate(-50%, -100%)';
+
+    container.appendChild(editor);
+    container.appendChild(toolbar);
+    editor.focus();
+    selectAllContent(editor);
+
+    const buttonOf = (action: NoteToolbarAction) =>
+      toolbar.querySelector<HTMLElement>(`[data-action="${action}"]`);
+    const setActive = (action: NoteToolbarAction, on: boolean) => {
+      const button = buttonOf(action);
+      button?.classList.toggle('active', on);
+      button?.setAttribute('aria-pressed', String(on));
+    };
+    const refreshToolbar = () => {
+      setActive('note-bold', queryCommandState('bold'));
+      setActive('note-italic', queryCommandState('italic'));
+      const lines = selectedLineDivs(editor);
+      setActive(
+        'note-bullet',
+        lines.length > 0 && lines.every((line) => line.classList.contains(NOTE_BULLET_CLASS)),
+      );
+      const horizontal = buttonOf('note-align-horizontal');
+      if (horizontal) updateAlignButton(horizontal, 'horizontal', align.horizontal);
+      const vertical = buttonOf('note-align-vertical');
+      if (vertical) updateAlignButton(vertical, 'vertical', align.vertical);
+    };
+    const exec = (command: 'bold' | 'italic') => {
+      // Deprecated but still the only dependency-free selection-formatting primitive for
+      // contenteditable; absent in jsdom, hence the guard.
+      if (typeof document.execCommand === 'function') document.execCommand(command, false);
+      refreshToolbar();
+    };
+    const cycle = (axis: 'horizontal' | 'vertical') => {
+      if (axis === 'horizontal') align.horizontal = nextInCycle(HORIZONTAL_CYCLE, align.horizontal);
+      else align.vertical = nextInCycle(VERTICAL_CYCLE, align.vertical);
+      applyAlignPreview(editor, align);
+      refreshToolbar();
+    };
+    const onAction = (action: NoteToolbarAction) => {
+      if (action === 'note-bold') exec('bold');
+      else if (action === 'note-italic') exec('italic');
+      else if (action === 'note-bullet') {
+        toggleBulletLines(editor);
+        refreshToolbar();
+      } else cycle(action === 'note-align-horizontal' ? 'horizontal' : 'vertical');
+    };
+    // Bold/italic active states follow the caret, not just toolbar clicks.
+    const onSelectionChange = () => refreshToolbar();
+    document.addEventListener('selectionchange', onSelectionChange);
+
+    let done = false;
+    const cleanup = () => {
+      if (done) return;
+      done = true;
+      document.removeEventListener('selectionchange', onSelectionChange);
+      editor.removeEventListener('keydown', onKey as EventListener);
+      editor.removeEventListener('blur', onBlur as EventListener);
+      editor.removeEventListener('paste', onPaste as EventListener);
+      editor.remove();
+      toolbar.remove();
+      this.active = null;
+    };
+    const commit = () => {
+      if (done) return;
+      // Same metacharacter defusing as the textarea path, applied to the COMMITTED markdown.
+      const value = sanitizeLabel(domToNoteMarkdown(editor));
+      const properties = noteCommitProperties(element, value, align);
+      cleanup();
+      if (properties) this.modeling.updateProperties(element, properties);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        cleanup();
+        return;
+      }
+      if (e.key === 'Enter') {
+        // Save only with Cmd/Ctrl -> plain Enter inserts a line break (notes are multi-line).
+        if (!(e.metaKey || e.ctrlKey)) return;
+        e.preventDefault();
+        commit();
+        return;
+      }
+      const key = e.key.toLowerCase();
+      if ((e.metaKey || e.ctrlKey) && (key === 'b' || key === 'i')) {
+        e.preventDefault();
+        exec(key === 'b' ? 'bold' : 'italic');
+      }
+    };
+    const onBlur = (e: FocusEvent) => {
+      // Focus moving INTO the toolbar is not "outside" (its mousedown is prevented, but be
+      // safe for keyboard focus and engines that blur anyway).
+      if (e.relatedTarget instanceof Node && toolbar.contains(e.relatedTarget)) return;
+      commit();
+    };
+    const onPaste = (e: ClipboardEvent) => {
+      // PLAIN text only — foreign HTML must never enter the DOM the commit reads back.
+      e.preventDefault();
+      const text = e.clipboardData?.getData('text/plain') ?? '';
+      if (text) insertPlainText(editor, text);
+    };
+    editor.addEventListener('keydown', onKey as EventListener);
+    editor.addEventListener('blur', onBlur as EventListener);
+    editor.addEventListener('paste', onPaste as EventListener);
+
+    refreshToolbar();
+    this.active = { field: editor, commit, cleanup };
+  }
+
+  /**
    * Inline editing for connections: the arrow's `; annotation` text. An empty input clears the
    * field. Undo-safe via updateProperties.
    */
@@ -190,5 +360,52 @@ export default class EventStormingLabelEditing {
 
   cancel(): void {
     this.active?.cleanup();
+  }
+}
+
+/**
+ * Everything a note commit changes, as ONE updateProperties payload — label, (for auto-sized
+ * boxes) the recentered metrics box, and the align DI props: a single command, a single undo
+ * step. Returns null when nothing changed. The auto-resize mirrors
+ * `EventStormingModeling.updateLabel`'s manual-vs-auto rule; it is inlined here because the
+ * alignment must land in the SAME command as the label.
+ */
+function noteCommitProperties(
+  element: EventStormingShape,
+  value: string,
+  align: NoteAlignState,
+): Record<string, unknown> | null {
+  const labelChanged = !!value && value !== element.eventStormingLabel;
+  const alignChanged =
+    align.horizontal !== (element.alignHorizontal ?? 'left') ||
+    align.vertical !== (element.alignVertical ?? 'top');
+  if (!labelChanged && !alignChanged) return null;
+  const properties: Record<string, unknown> = {};
+  if (labelChanged) {
+    properties.eventStormingLabel = value;
+    if (!isManualNoteBox(element.eventStormingLabel, element)) {
+      const { width, height } = noteMetrics(value);
+      properties.width = width;
+      properties.height = height;
+      properties.x = element.x + element.width / 2 - width / 2;
+      properties.y = element.y + element.height / 2 - height / 2;
+    }
+  }
+  if (alignChanged) {
+    // Default axes collapse to ABSENT DI props (undefined deletes) — the exporter/factory
+    // contract that keeps unaligned boards serializing byte-identically.
+    properties.alignHorizontal = align.horizontal === 'left' ? undefined : align.horizontal;
+    properties.alignVertical = align.vertical === 'top' ? undefined : align.vertical;
+  }
+  return properties;
+}
+
+/** Bold/italic state at the caret — absent in jsdom (the button simply never shows active). */
+function queryCommandState(command: string): boolean {
+  if (typeof document.queryCommandState !== 'function') return false;
+  try {
+    return document.queryCommandState(command);
+  } catch {
+    return false;
   }
 }

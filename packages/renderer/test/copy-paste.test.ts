@@ -19,6 +19,8 @@ interface CreatedShape {
   width: number;
   height: number;
   host?: CreatedShape;
+  alignHorizontal?: string;
+  alignVertical?: string;
 }
 
 function harness(selected: Array<Record<string, unknown>>) {
@@ -144,6 +146,50 @@ describe('EventStormingCopyPaste: pasted note box', () => {
     expect(clone.height).toBe(160);
     expect(clone.x).toBe(note.x);
     expect(clone.y).toBe(note.y);
+  });
+
+  it('carries the align DI props onto the clone (alignment travels with the paste)', () => {
+    const base = noteMetrics('Risk');
+    const note = {
+      id: 'note_risk',
+      eventStormingType: 'note',
+      // The markdown subset lives INSIDE the label, so it round-trips with the verbatim copy.
+      eventStormingLabel: '**Risk**',
+      x: 100,
+      y: 100,
+      width: base.width,
+      height: base.height,
+      alignHorizontal: 'center',
+      alignVertical: 'bottom',
+    };
+    const { copyPaste, created } = harness([note]);
+
+    expect(copyPaste.duplicate()).toBe(true);
+
+    const clone = created[0]![0]!;
+    expect(clone.eventStormingLabel).toBe('**Risk**');
+    expect(clone.alignHorizontal).toBe('center');
+    expect(clone.alignVertical).toBe('bottom');
+  });
+
+  it('leaves absent align props absent on the clone (defaults stay canonical)', () => {
+    const base = noteMetrics('Risk');
+    const note = {
+      id: 'note_risk',
+      eventStormingType: 'note',
+      eventStormingLabel: 'Risk',
+      x: 100,
+      y: 100,
+      width: base.width,
+      height: base.height,
+    };
+    const { copyPaste, created } = harness([note]);
+
+    expect(copyPaste.duplicate()).toBe(true);
+
+    const clone = created[0]![0]!;
+    expect('alignHorizontal' in clone).toBe(false);
+    expect('alignVertical' in clone).toBe(false);
   });
 });
 

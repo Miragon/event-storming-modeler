@@ -33,6 +33,11 @@ const NOTE_PINNED_DSL = `title Note Attachment Fixture
 command Place Order [420, 320]
 note Check credit limit [430, 220] (size 240x160) (on Place Order)`;
 
+// Rich note: the markdown subset lives INSIDE the '\n'-escaped label; alignment is the
+// `(align <horizontal> <vertical>)` suffix (canonically before the final `(on …)`).
+const RICH_NOTE_DSL = `title Rich Note Fixture
+note **Check legal**\\n- tomorrow [300, 200] (align center middle)`;
+
 // Duplicate labels: the aggregate "Order" appears twice; `(id …)` suffixes plus `#id` references
 // keep the arrows unambiguous (the spec's canonical design-level example).
 const DUPLICATE_DSL = `title Duplicate Fixture
@@ -230,6 +235,40 @@ describe('Modeler integration (real browser DOM)', () => {
     const exported = modeler.exportMap().elements.find((e) => e.id === noteId);
     if (exported?.elementType !== 'note') throw new Error('note missing in export');
     expect(exported.attachedTo).toBe(placeOrderId);
+  });
+
+  it('round-trips an aligned bold-bullet note through DSL, real DOM and re-import', async () => {
+    const { warnings } = await modeler.importDSL(RICH_NOTE_DSL);
+    expect(warnings).toEqual([]);
+
+    // The label keeps the raw markdown; alignment arrives as DI props on the note shape.
+    const registry = modeler.get<ElementRegistry>('elementRegistry');
+    const note = findByLabel(registry, '**Check legal**\n- tomorrow');
+    expect(note.alignHorizontal).toBe('center');
+    expect(note.alignVertical).toBe('middle');
+
+    // Real SVG DOM: a bold tspan run with the markers stripped, the bullet line with its '•'
+    // marker, and every line centered per the horizontal alignment.
+    const gfx = registry.getGraphics(note) as SVGGraphicsElement;
+    const bold = gfx.querySelector('tspan[font-weight="600"]');
+    expect(bold?.textContent).toBe('Check legal');
+    const texts = [...gfx.querySelectorAll('text')] as SVGElement[];
+    expect(texts.map((t) => t.textContent)).toEqual(['Check legal', '• tomorrow']);
+    for (const text of texts) expect(text.style.textAnchor).toBe('middle');
+
+    // Export: markdown stays in the escaped label, alignment as the `(align …)` suffix.
+    const out = modeler.exportDSL();
+    expect(out).toContain('note **Check legal**\\n- tomorrow [300, 200] (align center middle)');
+
+    // Reload of the export keeps formatting and alignment; the second export is byte-identical.
+    await modeler.importDSL(out);
+    const reloaded = findByLabel(
+      modeler.get<ElementRegistry>('elementRegistry'),
+      '**Check legal**\n- tomorrow',
+    );
+    expect(reloaded.alignHorizontal).toBe('center');
+    expect(reloaded.alignVertical).toBe('middle');
+    expect(modeler.exportDSL()).toBe(out);
   });
 
   it('round-trips a manually resized note via (size …) and keeps the box on relabel', async () => {

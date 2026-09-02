@@ -15,6 +15,8 @@ export {
   VIEW_OPTIONS_CHANGED_EVENT,
 } from './view-options/index.js';
 export { COLORS, STICKY_STYLES, NOTE_STYLE } from './draw/styles.js';
+export { parseNoteMarkdown, serializeNoteMarkdown, plainNoteText } from './draw/note-markdown.js';
+export type { NoteLine, NoteRun } from './draw/note-markdown.js';
 
 /* Miragon brand tokens (single source of truth for colour) — for consumers theming their own chrome. */
 export { MIRAGON } from './theme/index.js';

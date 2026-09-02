@@ -236,6 +236,97 @@
   text-align: center;
 }
 
+/* WYSIWYG note editor: a contenteditable overlay instead of the plain textarea — the markdown
+   subset (bold/italic/bullets) renders live while typing. Flex column: `justify-content`
+   previews the note's VERTICAL alignment, `text-align` the horizontal one. */
+.event-storming-container .event-storming-note-editor {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  min-width: 120px;
+  padding: 4px 6px;
+  line-height: 17px;
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  cursor: text;
+}
+.event-storming-container .event-storming-note-editor b,
+.event-storming-container .event-storming-note-editor strong {
+  font-weight: 600; /* matches the canvas tspans (600, not the browser default 700) */
+}
+/* Bullet rows: '•' marker + hanging indent, mirroring the canvas NOTE_BULLET_INDENT (12px). */
+.event-storming-container .event-storming-note-editor .bullet {
+  padding-left: 12px;
+  text-indent: -12px;
+}
+.event-storming-container .event-storming-note-editor .bullet::before {
+  content: '• ';
+}
+
+/* Floating note toolbar (B / I / • + the two alignment cycle buttons) — Miragon chrome tokens,
+   same surface/shadow/radius family as the palette and the color picker. */
+.event-storming-container .event-storming-note-toolbar {
+  position: absolute;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  background: var(--event-storming-surface);
+  border: 1px solid var(--event-storming-border);
+  border-radius: var(--event-storming-radius-sm);
+  box-shadow:
+    0 1px 2px var(--event-storming-shadow),
+    0 6px 24px var(--event-storming-shadow);
+}
+.event-storming-container .event-storming-note-toolbar button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: var(--event-storming-radius-sm);
+  background: transparent;
+  color: var(--event-storming-ink);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    color 150ms ease;
+}
+.event-storming-container .event-storming-note-toolbar button:hover {
+  /* Accent tint LAYERED over the solid surface — same pattern as the palette hover. */
+  background:
+    linear-gradient(var(--event-storming-accent-soft), var(--event-storming-accent-soft)),
+    var(--event-storming-surface);
+  color: var(--event-storming-accent);
+}
+/* Active formatting at the caret/selection: branded like the palette's armed tool. */
+.event-storming-container .event-storming-note-toolbar button.active {
+  background: var(--event-storming-accent);
+  color: #fff;
+}
+.event-storming-container .event-storming-note-toolbar-separator {
+  align-self: stretch;
+  width: 1px;
+  margin: 3px 4px;
+  background: var(--event-storming-border);
+}
+
+/* Dark boards: the note editor chrome stays light (like all floating chrome), but the
+   light-token shadow is invisible on navy — deepen it so editor and toolbar still lift off. */
+.event-storming-container.event-storming-dark .event-storming-note-editor,
+.event-storming-container.event-storming-dark .event-storming-note-toolbar {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.55),
+    0 10px 26px rgba(0, 0, 0, 0.4);
+}
+
 .event-storming-container.drag-over::after {
   content: 'Drop event storming board here (.storm · .json · .txt)';
   position: absolute;

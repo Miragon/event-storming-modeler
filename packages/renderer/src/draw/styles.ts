@@ -2,6 +2,7 @@
 
 import { MIRAGON } from '../theme/index.js';
 import type { StickyKind } from '../model/di-types.js';
+import { plainNoteText } from './note-markdown.js';
 
 export interface StickyStyle {
   /** Default label for a freshly created sticky. */
@@ -50,6 +51,8 @@ export const STICKY_PADDING = 8;
 export const STICKY_LINE_HEIGHT = 17;
 /** Estimated character width at the 13px label size — good enough for wrapping/box sizing. */
 export const STICKY_CHAR_WIDTH = 7.5;
+/** Hanging indent (px) of note bullet lines — '•' rows and their wrapped continuations. */
+export const NOTE_BULLET_INDENT = 12;
 /** Minimum note box edge length (so even empty notes stay clickable). */
 const NOTE_MIN_SIZE = 34;
 
@@ -57,10 +60,13 @@ const NOTE_MIN_SIZE = 34;
  * Box dimensions of a note from its (possibly multi-line) text. The note shape grows as large as
  * its text -> the move/click hitbox grows with it (instead of a fixed minimum box). Vertical
  * padding matches the renderer's clip padding (`STICKY_PADDING`) — a smaller padding here would
- * make the renderer's maxLines clip drop the last text line.
+ * make the renderer's maxLines clip drop the last text line. Measured on `plainNoteText`: the
+ * markdown markers are invisible on canvas, so they must not widen the box (bullets count their
+ * visible '• ' prefix).
  */
 export function noteMetrics(label: string): { lines: string[]; width: number; height: number } {
-  const lines = (label && label.length ? label : 'note').split('\n');
+  const plain = plainNoteText(label);
+  const lines = (plain && plain.length ? plain : 'note').split('\n');
   const maxLen = Math.max(1, ...lines.map((l) => l.length));
   return {
     lines,

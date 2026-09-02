@@ -124,6 +124,41 @@ describe('EventStormingElementFactory.createNote: auto vs manual size', () => {
   });
 });
 
+describe('EventStormingElementFactory.createNote: alignment pass-through', () => {
+  it('mirrors deviating align axes into the DI props', () => {
+    const shape = factory([]).createNote({
+      id: 'note_kickoff',
+      elementType: 'note',
+      label: 'Kickoff',
+      position: { x: 300, y: 200 },
+      align: { horizontal: 'right', vertical: 'middle' },
+    });
+    expect(shape.alignHorizontal).toBe('right');
+    expect(shape.alignVertical).toBe('middle');
+  });
+
+  it('keeps default axes absent — canonical DI form even for explicit left/top', () => {
+    const bare = factory([]).createNote({
+      id: 'note_hint',
+      elementType: 'note',
+      label: 'Hint',
+      position: { x: 100, y: 100 },
+    });
+    expect(bare.alignHorizontal).toBeUndefined();
+    expect(bare.alignVertical).toBeUndefined();
+
+    const explicit = factory([]).createNote({
+      id: 'note_hint2',
+      elementType: 'note',
+      label: 'Hint',
+      position: { x: 100, y: 100 },
+      align: { horizontal: 'left', vertical: 'top' },
+    });
+    expect(explicit.alignHorizontal).toBeUndefined();
+    expect(explicit.alignVertical).toBeUndefined();
+  });
+});
+
 describe('EventStormingElementFactory.createSticky: center -> top-left', () => {
   it('places the shape so the schema position is its center', () => {
     const shape = factory([]).createSticky({

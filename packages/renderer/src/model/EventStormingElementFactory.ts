@@ -99,6 +99,10 @@ export default class EventStormingElementFactory {
     // A manual `size` (the user resized the note by hand) wins over the text metrics.
     // Centered on the position (consistent with the center back-calculation on export).
     const { width, height } = el.size ?? noteMetrics(el.label);
+    // Alignment DI props stay canonical: default axes (left/top) are absent, mirroring the
+    // model's canonical form — so the exporter emits `align` only for real deviations.
+    const horizontal = el.align?.horizontal;
+    const vertical = el.align?.vertical;
     const shape = this.elementFactory.createShape({
       id: el.id,
       x: el.position.x - width / 2,
@@ -109,6 +113,8 @@ export default class EventStormingElementFactory {
       eventStormingLabel: el.label,
       businessObject: el,
       ...(el.color ? { color: el.color } : {}),
+      ...(horizontal && horizontal !== 'left' ? { alignHorizontal: horizontal } : {}),
+      ...(vertical && vertical !== 'top' ? { alignVertical: vertical } : {}),
     });
     return shape as unknown as EventStormingShape;
   }

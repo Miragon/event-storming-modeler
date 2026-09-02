@@ -1254,6 +1254,181 @@ describe('note size (project extension: `(size …)`)', () => {
   });
 });
 
+describe('note alignment (project extension: `(align …)`)', () => {
+  it('parses `(align center top)` and round-trips to a fixed point (default axis dropped)', () => {
+    const src = 'title T\nnote Kickoff [80, 80] (align center top)';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    const note = board.elements.find((e) => e.elementType === 'note');
+    expect(note).toMatchObject({ label: 'Kickoff', align: { horizontal: 'center' } });
+    if (note?.elementType === 'note') expect(note.align?.vertical).toBeUndefined();
+    const once = serializeDSL(board);
+    expect(once).toContain('note Kickoff [80, 80] (align center top)');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('parses both non-default axes and round-trips to a fixed point', () => {
+    const src = 'title T\nnote Kickoff [80, 80] (align right bottom)';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    expect(board.elements.find((e) => e.elementType === 'note')).toMatchObject({
+      align: { horizontal: 'right', vertical: 'bottom' },
+    });
+    const once = serializeDSL(board);
+    expect(once).toContain('note Kickoff [80, 80] (align right bottom)');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('canonicalizes all four suffixes to `(color …) (size …) (align …) (on …)` — on stays last', () => {
+    const src =
+      'title T\nevent Order Placed [620, 300]\nnote Kickoff [640, 260] (align center middle) (size 240x160) (color #15803d) (on Order Placed)';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    expect(board.elements.find((e) => e.elementType === 'note')).toMatchObject({
+      label: 'Kickoff',
+      color: '#15803d',
+      size: { width: 240, height: 160 },
+      align: { horizontal: 'center', vertical: 'middle' },
+      attachedTo: 'event_order_placed',
+    });
+    const once = serializeDSL(board);
+    expect(once).toContain(
+      'note Kickoff [640, 260] (color #15803d) (size 240x160) (align center middle) (on Order Placed)',
+    );
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('drops a default `(align left top)` on emit — only non-default alignments surface', () => {
+    const src =
+      'title T\nnote Plain [80, 80] (align left top)\nnote Low [80, 200] (align left bottom)';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    const notes = board.elements.filter((e) => e.elementType === 'note');
+    expect(notes[0]).not.toHaveProperty('align');
+    expect(notes[1]).toMatchObject({ align: { vertical: 'bottom' } });
+    const once = serializeDSL(board);
+    expect(once).toContain('note Plain [80, 80]\n');
+    expect(once).toContain('note Low [80, 200] (align left bottom)');
+    expect(once.match(/\(align /g)).toHaveLength(1);
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('emits both words from a partial model align (effective values)', () => {
+    const board = parseDSL('title T\nnote Kickoff [80, 80]\nnote Plain [80, 200]');
+    const aligned = {
+      ...board,
+      elements: board.elements.map((e) =>
+        e.label === 'Kickoff' ? { ...e, align: { horizontal: 'center' as const } } : e,
+      ),
+    };
+    const out = serializeDSL(aligned);
+    expect(out).toContain('note Kickoff [80, 80] (align center top)');
+    expect(out).toContain('note Plain [80, 200]\n');
+    expect(serializeDSL(parseDSL(out))).toBe(out);
+  });
+
+  it('malformed align: line-numbered diagnostic, suffix ignored, note still created', () => {
+    const { board, diagnostics } = parseDSLWithDiagnostics(
+      'title T\nnote Kickoff [80, 80] (align center)',
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.line).toBe(2);
+    expect(diagnostics[0]!.message).toContain('(align center)');
+    expect(diagnostics[0]!.text).toContain('note Kickoff');
+    const note = board.elements.find((e) => e.elementType === 'note');
+    expect(note).toMatchObject({ label: 'Kickoff', position: { x: 80, y: 80 } });
+    expect(note).not.toHaveProperty('align');
+    const once = serializeDSL(board);
+    expect(once).toContain('note Kickoff [80, 80]');
+    expect(once).not.toContain('(align');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('a swapped axis order is malformed (`middle center`)', () => {
+    const { board, diagnostics } = parseDSLWithDiagnostics(
+      'title T\nnote K [80, 80] (align middle center)',
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.message).toContain('left|center|right top|middle|bottom');
+    expect(board.elements.find((e) => e.elementType === 'note')).not.toHaveProperty('align');
+  });
+
+  it('`(align …)` on a sticky line yields a diagnostic and is ignored', () => {
+    const { board, diagnostics } = parseDSLWithDiagnostics(
+      'title T\nevent A [0, 0] (align center middle)',
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.line).toBe(2);
+    expect(diagnostics[0]!.message).toContain('only notes support');
+    expect(board.elements[0]).toMatchObject({ elementType: 'event', label: 'A' });
+    const once = serializeDSL(board);
+    expect(once).toContain('event A [0, 0]');
+    expect(once).not.toContain('(align');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('`(align …)` on a drawing yields a diagnostic and is ignored', () => {
+    const { board, diagnostics } = parseDSLWithDiagnostics(
+      'title T\nline [[100, 100], [200, 150]] (dashed) (align center top)',
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]!.message).toContain('only notes support');
+    expect(board.elements.find((e) => e.elementType === 'drawing')).toBeDefined();
+    const once = serializeDSL(board);
+    expect(once).toContain('line [[100, 100], [200, 150]] (dashed)');
+    expect(once).not.toContain('(align');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('keeps `(align center middle)` inside the note text (align is only read after the coordinates)', () => {
+    const src =
+      'title T\nnote try (align center middle) here [80, 80]\nnote try (align center middle) here [80, 200] (align center middle)';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    const notes = board.elements.filter((e) => e.elementType === 'note');
+    expect(notes[0]).toMatchObject({ label: 'try (align center middle) here' });
+    expect(notes[0]).not.toHaveProperty('align');
+    expect(notes[1]).toMatchObject({
+      label: 'try (align center middle) here',
+      align: { horizontal: 'center', vertical: 'middle' },
+    });
+    const once = serializeDSL(board);
+    expect(once).toContain('note try (align center middle) here [80, 80]');
+    expect(once).toContain('note try (align center middle) here [80, 200] (align center middle)');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('does not steal an `(align …)` inside a sticky name or a host name', () => {
+    const src =
+      'title T\nevent Pay (align center top) now [620, 300]\nnote N [640, 280] (align center top) (on Pay (align center top) now)';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    expect(board.elements.find((e) => e.elementType === 'event')?.label).toBe(
+      'Pay (align center top) now',
+    );
+    expect(board.elements.find((e) => e.elementType === 'note')).toMatchObject({
+      attachedTo: 'event_pay_align_center_top_now',
+      align: { horizontal: 'center' },
+    });
+    const once = serializeDSL(board);
+    expect(once).toContain('note N [640, 280] (align center top) (on Pay (align center top) now)');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('accepts mixed case and canonicalizes suffix order (align before on)', () => {
+    const src = 'title T\nevent E [620, 300]\nnote K [640, 260] (ALIGN Center Middle) (on E)';
+    const { board, diagnostics } = parseDSLWithDiagnostics(src);
+    expect(diagnostics).toHaveLength(0);
+    expect(board.elements.find((e) => e.elementType === 'note')).toMatchObject({
+      align: { horizontal: 'center', vertical: 'middle' },
+      attachedTo: 'event_e',
+    });
+    const once = serializeDSL(board);
+    expect(once).toContain('note K [640, 260] (align center middle) (on E)');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+});
+
 describe('serializeDSL – huge coordinates', () => {
   it('serializes magnitudes >= 1e21 without exponent notation', () => {
     const board = parseDSL('title T\nevent A [800, 300]\ncommand B [500, 600]\nA -> B');

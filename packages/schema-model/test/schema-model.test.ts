@@ -345,6 +345,46 @@ describe('Note size (manual resize)', () => {
   });
 });
 
+describe('Note alignment', () => {
+  const withAlign = (align: unknown) => ({
+    ...sample,
+    elements: [
+      ...sample.elements,
+      { id: 'note_1', elementType: 'note', label: 'Kickoff', position: { x: 80, y: 80 }, align },
+    ],
+  });
+
+  it('accepts both axes and round-trips them through the JSON serialization', () => {
+    const board = loadBoard(withAlign({ horizontal: 'center', vertical: 'middle' }));
+    const note = board.elements.find((el) => el.id === 'note_1');
+    expect(note).toMatchObject({ align: { horizontal: 'center', vertical: 'middle' } });
+    const out = serializeBoard(board);
+    expect(out).toContain('"horizontal": "center"');
+    expect(out).toContain('"vertical": "middle"');
+    expect(serializeBoard(parseBoardJSON(out))).toBe(out);
+  });
+
+  it('accepts a single axis (the absent axis means the default left/top)', () => {
+    const note = loadBoard(withAlign({ vertical: 'bottom' })).elements.find(
+      (el) => el.id === 'note_1',
+    );
+    expect(note).toMatchObject({ align: { vertical: 'bottom' } });
+    if (note?.elementType === 'note') expect(note.align?.horizontal).toBeUndefined();
+  });
+
+  it('rejects an unknown horizontal value', () => {
+    expect(() => loadBoard(withAlign({ horizontal: 'justify' }))).toThrow();
+  });
+
+  it('rejects a horizontal word on the vertical axis', () => {
+    expect(() => loadBoard(withAlign({ vertical: 'center' }))).toThrow();
+  });
+
+  it('rejects a non-object align', () => {
+    expect(() => loadBoard(withAlign('center'))).toThrow();
+  });
+});
+
 describe('Attachments (pinning)', () => {
   it('pins the exact attachable and host kind sets', () => {
     expect(ATTACHABLE_STICKY_KINDS).toEqual(['actor', 'hotspot', 'note']);

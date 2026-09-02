@@ -8,3 +8,14 @@ export const labelEditingModule: ModuleDeclaration = {
 };
 
 export { default as EventStormingLabelEditing } from './EventStormingLabelEditing.js';
+export {
+  noteMarkdownToDom,
+  domToNoteMarkdown,
+  createNoteToolbar,
+  updateAlignButton,
+  applyAlignPreview,
+  toggleBulletLines,
+  insertPlainText,
+  NOTE_BULLET_CLASS,
+} from './note-editor-dom.js';
+export type { NoteToolbarAction, NoteAlignState } from './note-editor-dom.js';

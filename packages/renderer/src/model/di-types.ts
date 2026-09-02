@@ -5,6 +5,8 @@ import {
   type BoardEdge,
   type BoardElement,
   type DrawingStrokeStyle,
+  type NoteAlignHorizontal,
+  type NoteAlignVertical,
 } from '@miragon/event-storming-schema-model';
 
 /**
@@ -44,6 +46,10 @@ export interface EventStormingShape extends Shape {
   strokeStyle?: DrawingStrokeStyle;
   /** Optional color override (CSS color/hex from the swatch palette) — any element type. */
   color?: string;
+  /** note only: horizontal text alignment, mirrored from `NoteElement.align` — absent = 'left'. */
+  alignHorizontal?: NoteAlignHorizontal;
+  /** note only: vertical text-block anchoring, mirrored from `NoteElement.align` — absent = 'top'. */
+  alignVertical?: NoteAlignVertical;
   businessObject?: BoardElement;
 }
 

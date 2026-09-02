@@ -168,6 +168,39 @@ export function parseSize(line: string): {
   return { invalid: p[0], rest: line.replace(SIZE_PRESENT_RE, ' ') };
 }
 
+// Alignment extension: `(align <horizontal> <vertical>)` — canonically between `(size …)` and
+// `(on …)` on note lines, both words always present. Values are matched case-insensitively and
+// canonicalized to lowercase. Deliberately looked up only after the coordinates so an
+// `(align center middle)` inside note text survives.
+const ALIGN_RE = /\(\s*align\s+(left|center|right)\s+(top|middle|bottom)\s*\)/i;
+
+// Any `(align …)` group — catches malformed variants so the caller can report a diagnostic.
+const ALIGN_PRESENT_RE = /\(\s*align\b[^)]*\)/i;
+
+export function parseAlign(line: string): {
+  align?: {
+    horizontal: 'left' | 'center' | 'right';
+    vertical: 'top' | 'middle' | 'bottom';
+  };
+  /** The matched `(align …)` text when present but unreadable (unknown/missing axis words). */
+  invalid?: string;
+  rest: string;
+} {
+  const m = ALIGN_RE.exec(line);
+  if (m) {
+    return {
+      align: {
+        horizontal: m[1]!.toLowerCase() as 'left' | 'center' | 'right',
+        vertical: m[2]!.toLowerCase() as 'top' | 'middle' | 'bottom',
+      },
+      rest: line.replace(ALIGN_RE, ' '),
+    };
+  }
+  const p = ALIGN_PRESENT_RE.exec(line);
+  if (!p) return { rest: line };
+  return { invalid: p[0], rest: line.replace(ALIGN_PRESENT_RE, ' ') };
+}
+
 /** First word (keyword) of a line, lowercased. */
 export function keywordOf(line: string): string {
   const m = /^\s*([A-Za-z][\w-]*)/.exec(line);

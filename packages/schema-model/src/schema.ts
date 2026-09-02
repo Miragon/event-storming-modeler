@@ -43,10 +43,17 @@ const noteSizeSchema = z.object({
   height: z.number().positive(),
 });
 
+// Per-note text alignment — an absent axis means the default left / top.
+const noteAlignSchema = z.object({
+  horizontal: z.enum(['left', 'center', 'right']).optional(),
+  vertical: z.enum(['top', 'middle', 'bottom']).optional(),
+});
+
 const noteSchema = z.object({
   ...baseFields,
   elementType: z.literal('note'),
   size: noteSizeSchema.optional(),
+  align: noteAlignSchema.optional(),
   attachedTo,
 });
 

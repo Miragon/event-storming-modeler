@@ -317,6 +317,69 @@ test.describe('webapp modelling interactions', () => {
     expect(relabelled.size?.height).toBeCloseTo(resized!.height, 2);
   });
 
+  test('formats a note WYSIWYG and the markdown + alignment survive a DSL round-trip', async ({
+    page,
+  }) => {
+    const id = await createStickyAt(page, 'note', 0.4, 0.4);
+
+    // Notes open a rich contenteditable editor with a floating format toolbar on dblclick
+    // (stickies keep the plain textarea — see renameShape).
+    await elementGfx(page, id).locator('.djs-hit').dblclick();
+    const editor = page.locator('.event-storming-note-editor');
+    await expect(editor).toBeVisible();
+    const toolbar = page.locator('.event-storming-note-toolbar');
+    await expect(toolbar).toBeVisible();
+
+    // Replace the default "Note" text, then bold the whole first line via the toolbar.
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type('Check legal');
+    await page.keyboard.press('ControlOrMeta+a');
+    await toolbar.locator('[data-action="note-bold"]').click();
+
+    // Collapse the selection to the line end — Enter on a full selection would eat the text.
+    await page.keyboard.press('End');
+    await page.keyboard.press('Enter');
+    // Chrome carries the bold typing state onto the new line — switch it off for plain text.
+    await page.keyboard.press('ControlOrMeta+b');
+    await toolbar.locator('[data-action="note-bullet"]').click();
+    await page.keyboard.type('tomorrow');
+
+    // One horizontal cycle: left (the default) -> center; vertical stays top.
+    await toolbar.locator('[data-action="note-align-horizontal"]').click();
+
+    await page.keyboard.press('ControlOrMeta+Enter');
+    await expect(editor).toBeHidden();
+
+    // The label stores the markdown subset ('\n'-escaped); alignment gets its own note suffix.
+    const dsl = await exportDSL(page);
+    expect(dsl).toContain('**Check legal**');
+    expect(dsl).toContain('- tomorrow');
+    expect(dsl).toContain('(align center top)');
+
+    // The canvas renders the formatting: a bold run and a '•' bullet marker line. The bold
+    // weight may land as an SVG presentation attribute or inline style — computed style
+    // covers both.
+    const boldWeightOf = async (gfxId: string) =>
+      elementGfx(page, gfxId)
+        .locator('tspan', { hasText: 'Check legal' })
+        .first()
+        .evaluate((node) => getComputedStyle(node).fontWeight);
+    const bulletLineOf = (gfxId: string) =>
+      elementGfx(page, gfxId).locator('tspan').filter({ hasText: /^•/ }).first();
+    expect(await boldWeightOf(id)).toBe('600');
+    await expect(bulletLineOf(id)).toBeVisible();
+
+    // Export -> re-import: markdown label, formatting and alignment are all preserved.
+    await page.evaluate((text) => window.__eventStormingViewer.importDSL(text), dsl);
+    const note = (await exportBoard(page)).elements.find(
+      (element) => element.elementType === 'note',
+    )!;
+    expect(note.label).toBe('**Check legal**\n- tomorrow');
+    expect(await exportDSL(page)).toContain('(align center top)');
+    expect(await boldWeightOf(note.id)).toBe('600');
+    await expect(bulletLineOf(note.id)).toBeVisible();
+  });
+
   test('pins an actor onto a command, moves it with the host and detaches on empty canvas', async ({
     page,
   }) => {
