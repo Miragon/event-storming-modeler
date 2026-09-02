@@ -47,8 +47,7 @@ earlier events sit to the left of later ones — and arrows connect the stickies
 - **Self-hosted font** — no CDN, offline-capable.
 
 > TODO: `icon.png` is a placeholder carried over from the previous project and needs Event
-> Storming artwork; the screenshot above will 404 until the repository is published and the
-> screenshots are regenerated.
+> Storming artwork.
 
 ## Development
 
