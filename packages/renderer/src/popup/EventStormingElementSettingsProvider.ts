@@ -46,14 +46,17 @@ export default class EventStormingElementSettingsProvider implements PopupMenuPr
 
   private kindEntries(shape: EventStormingShape): PopupMenuEntries {
     const entries: PopupMenuEntries = {};
+    // A provisional (blank append) sticky has no current type yet: its placeholder kind must
+    // neither show a checkmark nor bypass the level filter.
+    const provisional = shape.provisional === true;
     // The workshop level filters the offered kinds; the element's CURRENT kind always shows,
     // so an out-of-level sticky (levels are not validation) still displays its type checked.
     const allowed = LEVEL_STICKY_KINDS[this.modeling.getLevel()];
     for (const kind of STICKY_KINDS) {
-      if (!allowed.includes(kind) && kind !== shape.eventStormingType) continue;
+      if (!allowed.includes(kind) && (provisional || kind !== shape.eventStormingType)) continue;
       const style = STICKY_STYLES[kind];
       entries[`kind-${kind}`] = {
-        label: mark(shape.eventStormingType === kind, style.label),
+        label: provisional ? style.label : mark(shape.eventStormingType === kind, style.label),
         imageHtml: kindSquare(style.fill, style.stroke),
         group: KIND_GROUP,
         action: () => this.modeling.setStickyKind(shape, kind as StickyKind),

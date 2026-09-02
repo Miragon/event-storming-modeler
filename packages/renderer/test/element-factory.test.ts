@@ -96,6 +96,24 @@ describe('EventStormingElementFactory.createNew: per-kind defaults', () => {
   });
 });
 
+describe('EventStormingElementFactory.createProvisional: blank append sticky', () => {
+  // The kind is chosen AFTER placing (change-type popup): the placeholder kind keeps the model
+  // valid, the empty label and the renderer-only `provisional` prop make it render blank.
+  it('creates an event-sized placeholder with empty label and the provisional marker', () => {
+    const shape = factory([]).createProvisional();
+    expect(shape.provisional).toBe(true);
+    expect(shape.eventStormingType).toBe('event');
+    expect(shape.eventStormingLabel).toBe('');
+    expect(shape.width).toBe(STICKY_STYLES.event.width);
+    expect(shape.height).toBe(STICKY_STYLES.event.height);
+  });
+
+  it('allocates a DSL-style id like any interactive create', () => {
+    expect(factory([]).createProvisional().id).toBe('event_1');
+    expect(factory([{ id: 'event_1' }]).createProvisional().id).toBe('event_2');
+  });
+});
+
 describe('EventStormingElementFactory.createNote: auto vs manual size', () => {
   it('uses the text metrics when no size is stored', () => {
     const shape = factory([]).createNote({

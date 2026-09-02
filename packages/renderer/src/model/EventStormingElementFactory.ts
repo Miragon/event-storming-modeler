@@ -178,6 +178,24 @@ export default class EventStormingElementFactory {
     return shape as unknown as EventStormingShape;
   }
 
+  /**
+   * Blank append create: the kind is chosen AFTER placing (change-type popup). The placeholder
+   * kind 'event' keeps the model valid; the empty label plus the renderer-only `provisional`
+   * DI prop make the sticky render blank until the choice lands (which clears the prop).
+   */
+  createProvisional(): EventStormingShape {
+    const { width, height } = STICKY_STYLES.event;
+    const shape = this.elementFactory.createShape({
+      id: this.allocateId('event'),
+      width,
+      height,
+      eventStormingType: 'event',
+      eventStormingLabel: '',
+      provisional: true,
+    });
+    return shape as unknown as EventStormingShape;
+  }
+
   createArrow(
     edge: BoardEdge,
     source: EventStormingShape,

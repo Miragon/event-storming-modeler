@@ -180,6 +180,65 @@ test.describe('webapp modelling interactions', () => {
     expect([edge.from, edge.to].sort()).toEqual([source, target].sort());
   });
 
+  test('appends a blank sticky, picks its type in the popup and labels it inline', async ({
+    page,
+  }) => {
+    const source = await createStickyAt(page, 'event', 0.3, 0.4);
+
+    // The single append entry drags out a BLANK sticky — the kind is chosen after placing.
+    await selectShape(page, source);
+    await page.locator('.djs-context-pad [data-action="append"]').click();
+    await dropAt(page, 0.65, 0.55);
+
+    // Landing the provisional sticky opens the change-type popup instead of the label editor.
+    const popup = page.locator('.djs-popup');
+    await expect(popup).toBeVisible();
+    await popup.locator('[data-id="kind-policy"]').click();
+    await expect(popup).toBeHidden();
+
+    // Choosing "Policy" retypes the blank sticky; the append auto-arrow connects it to the source.
+    await expect.poll(async () => (await exportBoard(page)).elements.length).toBe(2);
+    const board = await exportBoard(page);
+    const appended = board.elements.find((element) => element.id !== source)!;
+    expect(appended.elementType).toBe('policy');
+    expect(board.edges).toHaveLength(1);
+    expect([board.edges[0]!.from, board.edges[0]!.to].sort()).toEqual([source, appended.id].sort());
+
+    // After the kind is picked, inline label editing follows (the old append auto-edit).
+    const input = page.locator('.event-storming-label-input');
+    await expect(input).toBeVisible();
+    await input.fill('Notify Warehouse');
+    await input.press('ControlOrMeta+Enter');
+    await expect(input).toBeHidden();
+    expect(
+      (await exportBoard(page)).elements.find((element) => element.id === appended.id)!.label,
+    ).toBe('Notify Warehouse');
+  });
+
+  test('dismissing the type popup removes the appended blank sticky again', async ({ page }) => {
+    const source = await createStickyAt(page, 'event', 0.3, 0.4);
+
+    await selectShape(page, source);
+    await page.locator('.djs-context-pad [data-action="append"]').click();
+    await dropAt(page, 0.65, 0.55);
+
+    const popup = page.locator('.djs-popup');
+    await expect(popup).toBeVisible();
+    // The popup binds its global Escape handler (and takes focus) in a mount effect — wait for
+    // the focus to land inside the popup so Escape cannot race the listener registration.
+    await expect
+      .poll(() => page.evaluate(() => Boolean(document.activeElement?.closest('.djs-popup'))))
+      .toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(popup).toBeHidden();
+
+    // No kind chosen -> the provisional sticky and its auto-arrow are removed again.
+    await expect.poll(async () => (await exportBoard(page)).elements.length).toBe(1);
+    const board = await exportBoard(page);
+    expect(board.elements[0]!.id).toBe(source);
+    expect(board.edges).toHaveLength(0);
+  });
+
   test('renames a sticky inline and the new label survives a round-trip', async ({ page }) => {
     const id = await createStickyAt(page, 'event', 0.45, 0.5);
 

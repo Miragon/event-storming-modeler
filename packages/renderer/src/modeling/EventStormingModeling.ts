@@ -68,17 +68,20 @@ export default class EventStormingModeling {
   /**
    * Retypes a sticky among the eight sticky kinds, keeping id/label/position/color. The box is
    * resized to the new kind's size around the current center; the changed element re-renders.
+   * On a provisional (blank append) sticky the SAME single command also clears the provisional
+   * marker — picking its placeholder kind again is a real confirmation, not a no-op.
    */
   setStickyKind(element: EventStormingShape, elementType: StickyKind): void {
     if (!isStickyKind(element.eventStormingType) || !isStickyKind(elementType)) {
       throw new Error(`setStickyKind: only sticky kinds can be retyped`);
     }
-    if (element.eventStormingType === elementType) return;
+    if (element.eventStormingType === elementType && !element.provisional) return;
     const { width, height } = STICKY_STYLES[elementType];
     const cx = element.x + element.width / 2;
     const cy = element.y + element.height / 2;
     this.updateProperties(element, {
       eventStormingType: elementType,
+      ...(element.provisional ? { provisional: undefined } : {}),
       width,
       height,
       x: cx - width / 2,

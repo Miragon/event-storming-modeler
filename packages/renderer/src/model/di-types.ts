@@ -50,6 +50,11 @@ export interface EventStormingShape extends Shape {
   alignHorizontal?: NoteAlignHorizontal;
   /** note only: vertical text-block anchoring, mirrored from `NoteElement.align` — absent = 'top'. */
   alignVertical?: NoteAlignVertical;
+  /**
+   * Blank append sticky awaiting its kind (chosen in the change-type popup after placing).
+   * Renderer-only: never exported, never copied, never persisted — cleared by the retype.
+   */
+  provisional?: boolean;
   businessObject?: BoardElement;
 }
 

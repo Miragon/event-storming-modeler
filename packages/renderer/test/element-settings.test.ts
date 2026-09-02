@@ -66,3 +66,40 @@ describe('EventStormingElementSettingsProvider: level filtering', () => {
     expect(entries['kind-event']!.label).toBe('Domain Event');
   });
 });
+
+describe('EventStormingElementSettingsProvider: provisional (blank append) sticky', () => {
+  const provisional = () =>
+    ({
+      id: 'event_1',
+      eventStormingType: 'event',
+      eventStormingLabel: '',
+      provisional: true,
+    }) as unknown as PopupMenuTarget;
+
+  // The blank sticky has NO current type yet — its placeholder kind gets neither a checkmark
+  // nor a level-filter bypass.
+  it('shows the level-filtered kinds without any checkmark', () => {
+    const { provider } = providerHarness('design');
+    const entries = provider.getPopupMenuEntries(provisional());
+    for (const [key, entry] of Object.entries(entries)) {
+      expect(entry.label, key).not.toContain('✓');
+    }
+    expect(entries['kind-event']!.label).toBe('Domain Event');
+  });
+
+  // The current-kind exception exists for elements that ARE something; a provisional
+  // placeholder kind must not sneak past the level filter.
+  it('applies the plain level filter without the current-kind exception', () => {
+    const { provider } = providerHarness('big-picture');
+    const entries = provider.getPopupMenuEntries({
+      ...(provisional() as object),
+      eventStormingType: 'aggregate',
+    } as unknown as PopupMenuTarget);
+    expect(Object.keys(entries)).toEqual([
+      'kind-event',
+      'kind-actor',
+      'kind-external',
+      'kind-hotspot',
+    ]);
+  });
+});

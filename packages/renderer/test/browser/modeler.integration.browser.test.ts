@@ -2,13 +2,16 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type Canvas from 'diagram-js/lib/core/Canvas';
 import type ElementRegistry from 'diagram-js/lib/core/ElementRegistry';
 import type CommandStack from 'diagram-js/lib/command/CommandStack';
+import type Create from 'diagram-js/lib/features/create/Create';
+import type Dragging from 'diagram-js/lib/features/dragging/Dragging';
 import type Modeling from 'diagram-js/lib/features/modeling/Modeling';
-import type { Shape } from 'diagram-js/lib/model/Types';
+import type { Element, Shape } from 'diagram-js/lib/model/Types';
 import { Modeler } from '../../src/index.js';
 import type EventStormingModeling from '../../src/modeling/EventStormingModeling.js';
 import type EventStormingViewOptions from '../../src/view-options/EventStormingViewOptions.js';
 import type EventStormingElementFactory from '../../src/model/EventStormingElementFactory.js';
 import { isEventStormingShape, type EventStormingShape } from '../../src/model/di-types.js';
+import { STICKY_STYLES } from '../../src/draw/styles.js';
 // Pull the real stylesheet in so layout (getBBox) matches production. src/index.ts also imports it.
 import '../../src/assets/event-storming.css';
 
@@ -58,6 +61,36 @@ function findByLabel(registry: ElementRegistry, label: string): EventStormingSha
   ) as EventStormingShape | undefined;
   if (!shape) throw new Error(`shape not found: ${label}`);
   return shape;
+}
+
+/** Lets the deferred chain steps (popup open, label edit — setTimeout 0) run. */
+function tick(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 20));
+}
+
+function mouseAt(clientX: number, clientY: number): MouseEvent {
+  return new MouseEvent('mousemove', { clientX, clientY, bubbles: true });
+}
+
+/**
+ * Drives the REAL create/dragging services exactly like the context pad's append entry: start a
+ * create of a provisional blank sticky with `source` set, move, hover the root, drop.
+ */
+function appendBlank(modeler: Modeler, source: EventStormingShape): EventStormingShape {
+  const factory = modeler.get<EventStormingElementFactory>('eventStormingElementFactory');
+  const create = modeler.get<Create>('create');
+  const dragging = modeler.get<Dragging>('dragging');
+  const canvas = modeler.get<Canvas>('canvas');
+  const blank = factory.createProvisional();
+  create.start(mouseAt(300, 300), blank as unknown as Element, {
+    source: source as unknown as Element,
+  });
+  dragging.move(mouseAt(340, 340), false);
+  const root = canvas.getRootElement();
+  dragging.hover({ element: root, gfx: canvas.getGraphics(root.id) });
+  dragging.move(mouseAt(700, 500), false);
+  dragging.end(undefined);
+  return blank;
 }
 
 describe('Modeler integration (real browser DOM)', () => {
@@ -421,6 +454,91 @@ describe('Modeler integration (real browser DOM)', () => {
     // Back on: captions re-appear without a re-import.
     viewOptions.setTypeCaptionsVisible(true);
     expect(captionTexts()).toEqual(['Actor', 'Command']);
+  });
+
+  it('runs the blank-append chain: kind chooser -> ONE-step retype -> label editor', async () => {
+    await modeler.importDSL(DSL);
+    const registry = modeler.get<ElementRegistry>('elementRegistry');
+    const source = findByLabel(registry, 'Place Order');
+
+    const blank = appendBlank(modeler, source);
+    expect(blank.provisional).toBe(true);
+    expect(registry.get(blank.id)).toBeDefined();
+    // The auto-arrow exists already while the sticky is still blank.
+    expect((source.outgoing ?? []).some((conn) => conn.target === (blank as unknown))).toBe(true);
+
+    // Blank rendering in the real DOM: dashed neutral shell, no kind caption (captions are ON
+    // by default and the imported stickies do caption — asserted in the captions test above).
+    const gfx = registry.getGraphics(blank) as SVGGraphicsElement;
+    const rect = gfx.querySelector('rect')!;
+    expect(rect.style.strokeDasharray).not.toBe('');
+    expect(gfx.querySelector('text.event-storming-kind-caption')).toBeNull();
+
+    // The renderer-only marker leaks into no export — the placeholder exports as a plain event.
+    const provisionalExport = modeler.exportMap();
+    expect(JSON.stringify(provisionalExport)).not.toContain('provisional');
+    expect(provisionalExport.elements.find((e) => e.id === blank.id)?.elementType).toBe('event');
+
+    await tick();
+    // Landing the provisional sticky opened the change-type popup — with NO checkmark anywhere
+    // (the blank sticky has no current type yet).
+    const popup = container.querySelector('.djs-popup');
+    expect(popup).not.toBeNull();
+    expect(popup!.textContent).not.toContain('✓');
+
+    popup!
+      .querySelector('[data-id="kind-policy"]')!
+      .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await tick();
+
+    // The choice retyped the blank sticky (recentered policy box) and closed the popup.
+    expect(blank.eventStormingType).toBe('policy');
+    expect(blank.provisional).toBeUndefined();
+    expect(blank.width).toBe(STICKY_STYLES.policy.width);
+    expect(blank.height).toBe(STICKY_STYLES.policy.height);
+    expect(container.querySelector('.djs-popup')).toBeNull();
+
+    // Step 2 of the chain: the inline label editor opened on the confirmed sticky.
+    const field = container.querySelector<HTMLTextAreaElement>('.event-storming-label-input');
+    expect(field).not.toBeNull();
+    field!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    // The retype is ONE undo step: a single undo restores the blank provisional state entirely.
+    modeler.undo();
+    expect(blank.provisional).toBe(true);
+    expect(blank.eventStormingType).toBe('event');
+    expect(blank.width).toBe(STICKY_STYLES.event.width);
+    modeler.redo();
+    expect(blank.provisional).toBeUndefined();
+    expect(blank.eventStormingType).toBe('policy');
+  });
+
+  it('dismissing the kind chooser removes the blank sticky and its auto-arrow again', async () => {
+    await modeler.importDSL(DSL);
+    const registry = modeler.get<ElementRegistry>('elementRegistry');
+    const source = findByLabel(registry, 'Place Order');
+    const elementsBefore = modeler.exportMap().elements.length;
+
+    const blank = appendBlank(modeler, source);
+    await tick();
+    expect(container.querySelector('.djs-popup')).not.toBeNull();
+
+    // Escape closes the popup without a choice (the diagram-js popup's own dismiss handling).
+    document.documentElement.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    );
+    await tick();
+
+    expect(container.querySelector('.djs-popup')).toBeNull();
+    expect(registry.get(blank.id)).toBeUndefined();
+    expect(source.outgoing ?? []).toHaveLength(0);
+    const board = modeler.exportMap();
+    expect(board.elements).toHaveLength(elementsBefore);
+    expect(board.edges.some((edge) => edge.from === blank.id || edge.to === blank.id)).toBe(false);
+
+    // The dismissal is a regular undoable removal — undo brings the blank sticky back.
+    modeler.undo();
+    expect((registry.get(blank.id) as EventStormingShape | undefined)?.provisional).toBe(true);
   });
 
   it('deletes attachers with their host in ONE undoable step and restores the pinning on undo', async () => {

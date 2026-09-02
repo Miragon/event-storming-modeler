@@ -302,6 +302,54 @@ describe('EventStormingRenderer: type captions', () => {
   });
 });
 
+describe('EventStormingRenderer: provisional (blank append) sticky', () => {
+  const provisional = () => ({
+    eventStormingType: 'event',
+    eventStormingLabel: '',
+    provisional: true,
+    x: 0,
+    y: 0,
+    width: STICKY_STYLES.event.width,
+    height: STICKY_STYLES.event.height,
+  });
+
+  it('renders a neutral dashed shell instead of the placeholder kind look', () => {
+    const rect = draw(provisional()).querySelector('rect')! as SVGElement;
+    expect(rect.style.fill).toBe('rgb(251, 251, 251)');
+    expect(rect.style.stroke).toBe('rgb(185, 185, 185)');
+    expect(rect.style.getPropertyValue('stroke-dasharray')).not.toBe('');
+    expect(rect.style.getPropertyValue('stroke-width')).toBe('1.5px');
+  });
+
+  it('renders no kind caption and no text even with captions visible', () => {
+    // Control: a regular event sticky drawn the same way captions and labels.
+    const regular = draw({ ...provisional(), provisional: undefined, eventStormingLabel: 'A' });
+    expect(regular.querySelectorAll(`text.${KIND_CAPTION_CLASS}`)).toHaveLength(1);
+    const blank = draw(provisional(), true);
+    expect(blank.querySelectorAll('text')).toHaveLength(0);
+  });
+
+  it('keeps the paper drop shadow while blank', () => {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const visuals = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    svg.appendChild(visuals);
+    renderer().drawShape(visuals, provisional() as unknown as ShapeLike);
+    expect(visuals.querySelector('rect')!.getAttribute('filter')).toBe(
+      'url(#event-storming-sticky-shadow)',
+    );
+  });
+
+  it('leaves non-provisional stickies untouched (kind fill, solid border)', () => {
+    const rect = draw({
+      ...provisional(),
+      provisional: undefined,
+      eventStormingLabel: 'A',
+    }).querySelector('rect')! as SVGElement;
+    expect(rect.style.fill).not.toBe('rgb(251, 251, 251)');
+    expect(rect.style.getPropertyValue('stroke-dasharray')).toBe('');
+  });
+});
+
 describe('EventStormingRenderer: sticky shadow', () => {
   function drawAttached(shape: Record<string, unknown>, svg?: SVGSVGElement) {
     const root = svg ?? document.createElementNS('http://www.w3.org/2000/svg', 'svg');

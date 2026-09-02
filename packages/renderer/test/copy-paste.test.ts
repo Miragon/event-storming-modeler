@@ -101,6 +101,27 @@ describe('EventStormingCopyPaste: clones keep the label, get fresh DSL-style ids
   });
 });
 
+describe('EventStormingCopyPaste: provisional marker never travels', () => {
+  // `provisional` is renderer-only state of the blank-append flow — deliberately OUT of the
+  // SHAPE_PROPS allowlist, so a copied blank sticky clones as a plain (placeholder) event.
+  it('clones a provisional blank sticky without the provisional prop', () => {
+    const sticky = {
+      id: 'event_1',
+      eventStormingType: 'event',
+      eventStormingLabel: '',
+      provisional: true,
+      x: 200,
+      y: 300,
+      width: STICKY_STYLES.event.width,
+      height: STICKY_STYLES.event.height,
+    };
+    const { copyPaste, created } = harness([sticky]);
+
+    expect(copyPaste.duplicate()).toBe(true);
+    expect('provisional' in created[0]![0]!).toBe(false);
+  });
+});
+
 describe('EventStormingCopyPaste: pasted note box', () => {
   it('keeps an AUTO-sized box as-is (same label => same text metrics)', () => {
     const base = noteMetrics('Risk');

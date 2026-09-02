@@ -41,6 +41,11 @@ const CAPTION_FILL = '#606060';
 /** Caption baseline sits this many px above the sticky's bottom edge. */
 const CAPTION_BOTTOM_OFFSET = 7;
 
+/** Provisional (blank append) sticky: neutral paper with a dashed hint border, no kind yet. */
+const PROVISIONAL_FILL = '#FBFBFB';
+const PROVISIONAL_STROKE = '#B9B9B9';
+const PROVISIONAL_DASH = '6 4';
+
 /** Soft drop shadow that makes stickies read as paper on the board (defs id, per canvas SVG). */
 export const STICKY_SHADOW_FILTER_ID = 'event-storming-sticky-shadow';
 
@@ -124,6 +129,9 @@ export default class EventStormingRenderer extends BaseRenderer {
   private drawSticky(visuals: SVGElement, shape: EventStormingShape): SVGElement {
     const kind = shape.eventStormingType;
     const style = isStickyKind(kind) ? STICKY_STYLES[kind] : NOTE_STYLE;
+    // A provisional (blank append) sticky renders as a neutral dashed shell — its placeholder
+    // kind must not leak: no kind colors, no caption, no text (the label is empty anyway).
+    const provisional = shape.provisional === true;
 
     // Hotspots are tilted like a hastily slapped-on sticky; rotate the whole visual group
     // around the center so rect and text stay together.
@@ -142,15 +150,18 @@ export default class EventStormingRenderer extends BaseRenderer {
       width: Math.max(shape.width, 1),
       height: Math.max(shape.height, 1),
       rx: STICKY_RADIUS,
-      fill: shape.color ?? style.fill,
-      stroke: style.stroke,
+      fill: provisional ? PROVISIONAL_FILL : (shape.color ?? style.fill),
+      stroke: provisional ? PROVISIONAL_STROKE : style.stroke,
       'stroke-width': 1.5,
+      ...(provisional ? { 'stroke-dasharray': PROVISIONAL_DASH } : {}),
     });
     // Attribute (not tiny-svg attr, which routes `filter` into inline style) so exports carry it.
     if (ensureStickyShadowFilter(visuals)) {
       rect.setAttribute('filter', `url(#${STICKY_SHADOW_FILTER_ID})`);
     }
     svgAppend(parent, rect);
+
+    if (provisional) return rect;
 
     if (kind === 'note') drawNoteText(parent, shape);
     else drawStickyText(parent, shape);
@@ -282,12 +293,16 @@ function drawStickyText(parent: SVGElement, shape: EventStormingShape): void {
   });
 }
 
-/** Chars the '• ' prefix occupies in the estimate — matches `plainNoteText`, so the wrap budget
- * stays consistent with the `noteMetrics` box. */
+/**
+ * Chars the '• ' prefix occupies in the estimate — matches `plainNoteText`, so the wrap budget
+ * stays consistent with the `noteMetrics` box.
+ */
 const BULLET_PREFIX_CHARS = 2;
 
-/** Baseline offset within a line row — chosen so a middle-anchored block sits exactly where the
- * old centered note layout put it (`height/2 - (n-1)*LH/2 + 4`). */
+/**
+ * Baseline offset within a line row — chosen so a middle-anchored block sits exactly where the
+ * old centered note layout put it (`height/2 - (n-1)*LH/2 + 4`).
+ */
 const NOTE_ROW_BASELINE = STICKY_LINE_HEIGHT / 2 + 4;
 
 interface NoteRow {

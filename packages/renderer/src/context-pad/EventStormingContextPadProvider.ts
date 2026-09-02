@@ -8,23 +8,20 @@ import type {
   default as ContextPadProvider,
 } from 'diagram-js/lib/features/context-pad/ContextPadProvider';
 import type { Element } from 'diagram-js/lib/model/Types';
-import { LEVEL_STICKY_KINDS } from '@miragon/event-storming-schema-model';
 import {
   isEventStormingShape,
   isEventStormingConnection,
   isStickyKind,
   type EventStormingShape,
-  type StickyKind,
 } from '../model/di-types.js';
 import type EventStormingModeling from '../modeling/EventStormingModeling.js';
 import type EventStormingLabelEditing from '../label-editing/EventStormingLabelEditing.js';
 import type EventStormingElementFactory from '../model/EventStormingElementFactory.js';
 import type EventStormingColorPicker from '../color-picker/EventStormingColorPicker.js';
 import { POPUP_PROVIDER_ID } from '../popup/index.js';
-import { STICKY_STYLES } from '../draw/styles.js';
-import { PALETTE_ICONS } from '../draw/palette-icons.js';
 import {
   iconMarkup,
+  ICON_ADD,
   ICON_ARROW_FORWARD,
   ICON_AUTORENEW,
   ICON_DELETE,
@@ -33,12 +30,8 @@ import {
   ICON_SWAP_HORIZ,
 } from '../draw/icons.js';
 
-/**
- * The append choices offered on every sticky — the three kinds that carry the Event Storming
- * flow (a command hits an aggregate, an aggregate emits an event, an event triggers the next
- * command). Everything else comes from the palette.
- */
-const APPEND_KINDS = ['event', 'command', 'aggregate'] as const satisfies readonly StickyKind[];
+/** Title of the single append entry — the kind is chosen in the popup, not in the pad. */
+const APPEND_TITLE = 'Append sticky (auto-connect, choose the type after placing)';
 
 /**
  * ContextPad entry as HTML with a Material icon. `draggable=true` is mandatory for entries with a
@@ -46,11 +39,6 @@ const APPEND_KINDS = ['event', 'command', 'aggregate'] as const satisfies readon
  */
 function cpHtml(icon: string, title: string, draggable = false): string {
   return `<div class="entry event-storming-cp-entry"${draggable ? ' draggable="true"' : ''} title="${title}">${iconMarkup(icon)}</div>`;
-}
-
-/** Append entry showing the target kind as its palette square (WYSIWYG choice). */
-function cpAppendHtml(kind: StickyKind, title: string): string {
-  return `<div class="entry event-storming-cp-entry event-storming-cp-append" draggable="true" title="${title}">${PALETTE_ICONS[kind]}</div>`;
 }
 
 /** Context actions per element. */
@@ -106,27 +94,22 @@ export default class EventStormingContextPadProvider implements ContextPadProvid
     const kind = shape.eventStormingType;
 
     if (isStickyKind(kind)) {
-      // Append: drags out a new sticky of the chosen kind and creates the arrow automatically
-      // (diagram-js Create with `source` -> modeling.appendShape). One entry per flow kind, shown
-      // as the same colored square the palette uses, so the choice is visible at a glance.
-      // The workshop level filters the offered kinds the same way the palette does.
-      const allowed = LEVEL_STICKY_KINDS[this.eventStormingModeling.getLevel()];
-      for (const nextKind of APPEND_KINDS) {
-        if (!allowed.includes(nextKind)) continue;
-        const nextLabel = STICKY_STYLES[nextKind].label;
-        const startAppend = (event: Event) => {
-          const next = this.factory.createNew(nextKind, nextLabel);
-          this.create.start(event as MouseEvent, next as unknown as Element, {
-            source: shape as unknown as Element,
-          });
-        };
-        entries[`append-${nextKind}`] = {
-          group: 'append',
-          title: `Append ${nextLabel} (auto-connect)`,
-          html: cpAppendHtml(nextKind, `Append ${nextLabel}`),
-          action: { click: startAppend, dragstart: startAppend },
-        };
-      }
+      // Append: drags out a BLANK sticky and creates the arrow automatically (diagram-js Create
+      // with `source` -> modeling.appendShape). The kind is chosen in the change-type popup that
+      // opens on placement (see EventStormingAppendBehavior), so ONE entry suffices and it is
+      // available on every workshop level — the popup applies the level filter.
+      const startAppend = (event: Event) => {
+        const next = this.factory.createProvisional();
+        this.create.start(event as MouseEvent, next as unknown as Element, {
+          source: shape as unknown as Element,
+        });
+      };
+      entries['append'] = {
+        group: 'append',
+        title: APPEND_TITLE,
+        html: cpHtml(ICON_ADD, APPEND_TITLE, true),
+        action: { click: startAppend, dragstart: startAppend },
+      };
 
       const startConnect = (event: Event) => {
         this.connect.start(event as MouseEvent, shape as unknown as Element);
