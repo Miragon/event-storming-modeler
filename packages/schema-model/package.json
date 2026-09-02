@@ -1,6 +1,6 @@
 {
   "name": "@miragon/event-storming-schema-model",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "The Event Storming board data model with types, validation, migrations and stable JSON serialization.",
   "license": "MIT",
   "repository": {
