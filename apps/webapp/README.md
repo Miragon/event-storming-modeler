@@ -6,7 +6,7 @@ A browser editor for [Event Storming](https://www.eventstorming.com/) boards: an
 canvas with URL sharing, drag-and-drop import of `.storm`/`.json`, and PNG/SVG picture export.
 The demo app for the `@miragon/event-storming-*` packages.
 
-**[Live demo](https://event-storming-modeler.netlify.app)**
+**[Live demo](https://event-storming.netlify.app)**
 
 ![The web app](../../docs/screenshots/editor.png)
 
