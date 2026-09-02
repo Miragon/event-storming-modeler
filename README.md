@@ -9,7 +9,7 @@ Create, edit and embed digital [Event Storming](https://www.eventstorming.com/) 
 TypeScript library, a VS Code extension, and a web app, all built on
 [diagram-js](https://github.com/bpmn-io/diagram-js).
 
-**[Try the web app →](https://event-storming-modeler.netlify.app)**
+**[Try the web app →](https://event-storming.netlify.app)**
 
 ![The Event Storming editor](docs/screenshots/editor.png)
 
