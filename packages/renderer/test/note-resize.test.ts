@@ -13,7 +13,12 @@ import EventStormingModeling from '../src/modeling/EventStormingModeling.js';
 import EventStormingResizeBehavior from '../src/resize/EventStormingResizeBehavior.js';
 import type BoardBounds from '../src/board-bounds/BoardBounds.js';
 import type { EventStormingShape } from '../src/model/di-types.js';
-import { NOTE_MIN_RESIZE, isManualNoteBox, noteMetrics } from '../src/draw/styles.js';
+import {
+  NOTE_MIN_RESIZE,
+  STICKY_STYLES,
+  isManualNoteBox,
+  noteMetrics,
+} from '../src/draw/styles.js';
 import { ROOT_ID } from '../src/io/types.js';
 
 /** Importer + exporter over the same shape store — the mock factory returns plain attrs. */
@@ -215,20 +220,38 @@ describe('isManualNoteBox: the shared auto-vs-manual rule', () => {
 });
 
 describe('noteMetrics: measures the plain note text (markdown markers are invisible)', () => {
+  // Labels stay longer than the default box on purpose: below it every width clamps to the same
+  // value, so the measurement assertions would pass without measuring anything.
+  const formatted = '**Check the legal implications**';
+  const plain = 'Check the legal implications';
+
+  it('starts at the aggregate block format and only grows beyond it', () => {
+    expect(noteMetrics('Note')).toMatchObject({
+      width: STICKY_STYLES.aggregate.width,
+      height: STICKY_STYLES.aggregate.height,
+    });
+    expect(noteMetrics(plain).width).toBeGreaterThan(STICKY_STYLES.aggregate.width);
+    expect(noteMetrics('a\nb\nc\nd\ne\nf\ng').height).toBeGreaterThan(
+      STICKY_STYLES.aggregate.height,
+    );
+  });
+
   it('sizes markdown labels by their rendered text, not the raw marker characters', () => {
-    expect(noteMetrics('**Check legal**')).toEqual(noteMetrics('Check legal'));
-    expect(noteMetrics('*a* and ***b***')).toEqual(noteMetrics('a and b'));
+    expect(noteMetrics(formatted)).toEqual(noteMetrics(plain));
+    expect(noteMetrics('*a* and ***b*** on a line past the default box')).toEqual(
+      noteMetrics('a and b on a line past the default box'),
+    );
   });
 
   it("counts the visible '• ' prefix of bullet lines", () => {
-    // Rendered as '• todo' (6 chars): 2 chars wider than bare 'todo', markers not counted.
-    expect(noteMetrics('- **todo**').width).toBe(noteMetrics('• todo').width);
-    expect(noteMetrics('- todo').width).toBeGreaterThan(noteMetrics('todo').width);
+    // Rendered as '• …': 2 chars wider than the bare text, markers not counted.
+    expect(noteMetrics(`- ${formatted}`).width).toBe(noteMetrics(`• ${plain}`).width);
+    expect(noteMetrics(`- ${plain}`).width).toBeGreaterThan(noteMetrics(plain).width);
   });
 
   it('keeps the auto-vs-manual verdict stable for formatted labels', () => {
-    expect(isManualNoteBox('**Check legal**', noteMetrics('**Check legal**'))).toBe(false);
-    expect(isManualNoteBox('**Check legal**', noteMetrics('Check legal'))).toBe(false);
+    expect(isManualNoteBox(formatted, noteMetrics(formatted))).toBe(false);
+    expect(isManualNoteBox(formatted, noteMetrics(plain))).toBe(false);
   });
 });
 

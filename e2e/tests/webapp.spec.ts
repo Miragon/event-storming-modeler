@@ -492,8 +492,7 @@ test.describe('webapp modelling interactions', () => {
     const positionOf = async (id: string) =>
       (await exportBoard(page)).elements.find((element) => element.id === id)!.position;
 
-    // Drop the note onto the command's lower-right quarter: still over the host (attach verdict),
-    // but the smaller auto-sized note leaves the command's center uncovered and grabbable.
+    // Drop the note onto the command's lower-right quarter: still over the host (attach verdict).
     await dragShapeTo(page, note, command, { x: 55, y: 35 });
     await expect
       .poll(
@@ -506,7 +505,9 @@ test.describe('webapp modelling interactions', () => {
     // Moving the host carries the pinned note along by the exact same delta.
     const commandBefore = await positionOf(command);
     const noteBefore = await positionOf(note);
-    await dragShape(page, command, 0.7, 0.7);
+    // A default note box is wider than a command, so the pinned note covers the host's center —
+    // grab the command on its left edge strip, which the note dropped to the right leaves clear.
+    await dragShape(page, command, 0.7, 0.7, { x: -50, y: 0 });
     const commandAfter = await positionOf(command);
     const delta = { x: commandAfter.x - commandBefore.x, y: commandAfter.y - commandBefore.y };
     expect(Math.abs(delta.x) + Math.abs(delta.y)).toBeGreaterThan(50);

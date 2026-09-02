@@ -37,7 +37,7 @@ export const STICKY_STYLES: Record<StickyKind, StickyStyle> = {
   hotspot: { label: 'Hotspot', width: 130, height: 90, fill: '#E85D75', stroke: '#C43B55' },
 } as const;
 
-/** Free-text note: auto-sizes to its text (see `noteMetrics`) unless resized by hand, neutral grey. */
+/** Free-text note: grows with its text (see `noteMetrics`) unless resized by hand, neutral grey. */
 export const NOTE_STYLE = { label: 'Note', fill: '#ECECEC', stroke: '#C4C4C4' } as const;
 
 /** Smallest hand-resized note box — keeps a shrunken note grabbable and its handles apart. */
@@ -53,12 +53,19 @@ export const STICKY_LINE_HEIGHT = 17;
 export const STICKY_CHAR_WIDTH = 7.5;
 /** Hanging indent (px) of note bullet lines — '•' rows and their wrapped continuations. */
 export const NOTE_BULLET_INDENT = 12;
-/** Minimum note box edge length (so even empty notes stay clickable). */
-const NOTE_MIN_SIZE = 34;
+/**
+ * Default note box — the aggregate block format, so a fresh note reads as a full sticky instead of
+ * a text-sized speck. Notes only grow beyond it; shrinking below it stays a hand resize
+ * (`NOTE_MIN_RESIZE`).
+ */
+const NOTE_DEFAULT_SIZE = {
+  width: STICKY_STYLES.aggregate.width,
+  height: STICKY_STYLES.aggregate.height,
+} as const;
 
 /**
  * Box dimensions of a note from its (possibly multi-line) text. The note shape grows as large as
- * its text -> the move/click hitbox grows with it (instead of a fixed minimum box). Vertical
+ * its text -> the move/click hitbox grows with it (never below `NOTE_DEFAULT_SIZE`). Vertical
  * padding matches the renderer's clip padding (`STICKY_PADDING`) — a smaller padding here would
  * make the renderer's maxLines clip drop the last text line. Measured on `plainNoteText`: the
  * markdown markers are invisible on canvas, so they must not widen the box (bullets count their
@@ -70,8 +77,14 @@ export function noteMetrics(label: string): { lines: string[]; width: number; he
   const maxLen = Math.max(1, ...lines.map((l) => l.length));
   return {
     lines,
-    width: Math.max(NOTE_MIN_SIZE, Math.round(maxLen * STICKY_CHAR_WIDTH) + STICKY_PADDING * 2),
-    height: Math.max(NOTE_MIN_SIZE, lines.length * STICKY_LINE_HEIGHT + STICKY_PADDING * 2),
+    width: Math.max(
+      NOTE_DEFAULT_SIZE.width,
+      Math.round(maxLen * STICKY_CHAR_WIDTH) + STICKY_PADDING * 2,
+    ),
+    height: Math.max(
+      NOTE_DEFAULT_SIZE.height,
+      lines.length * STICKY_LINE_HEIGHT + STICKY_PADDING * 2,
+    ),
   };
 }
 

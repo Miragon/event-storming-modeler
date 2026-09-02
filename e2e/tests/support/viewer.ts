@@ -190,14 +190,20 @@ export async function connectShapes(page: Page, sourceId: string, targetId: stri
   await dropAtPoint(page, await centerOf(shapeHit(page, targetId)));
 }
 
-/** Drag a shape by its hit box to a new canvas fraction (a real mouse drag → modeling.moveShape). */
+/**
+ * Drag a shape by its hit box to a new canvas fraction (a real mouse drag → modeling.moveShape).
+ * `grabOffset` moves the grab point off the hit-box center — needed when an attached sticky covers
+ * the host's center, which would grab the sticky instead of the host.
+ */
 export async function dragShape(
   page: Page,
   id: string,
   toFractionX: number,
   toFractionY: number,
+  grabOffset: Point = { x: 0, y: 0 },
 ): Promise<void> {
-  const from = await centerOf(shapeHit(page, id));
+  const center = await centerOf(shapeHit(page, id));
+  const from = { x: center.x + grabOffset.x, y: center.y + grabOffset.y };
   const to = await canvasPoint(page, toFractionX, toFractionY);
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
