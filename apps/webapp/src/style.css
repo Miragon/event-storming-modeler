@@ -1,0 +1,605 @@
+/* Webapp chrome — Miragon corporate identity (official CI: Miragon/corporate-identity, brand/tokens.json).
+   Blue leads (buttons/links/focus), green accents (brand mark/gradient/highlights), Geist typeface.
+   A single mode (the CI defines no dark theme); tokens mirror the renderer's `--event-storming-*`
+   where they overlap. See the Miragon design system (the `miragon-brand:modeler-tool-design` skill;
+   CLAUDE.md § "Design system"). */
+:root {
+  /* neutrals (gray = warm off-white surface) */
+  --paper: #f9f7f7;
+  --surface: #ffffff;
+  --surface-2: #f9f7f7;
+  --ink: #1d1d1d;
+  --ink-soft: #5b5b5b;
+  --ink-faint: #8c8c8c;
+  --line: #e6e2e2;
+
+  /* brand: blue leads, green accents */
+  --accent: #335de5; /* blue — primary fill (buttons, active) */
+  --accent-hover: #2b50d4; /* blue link — button hover */
+  --accent-ink: #2b50d4; /* interactive text / links / focus (AA on white) */
+  --accent-soft: rgba(51, 93, 229, 0.12);
+  --brand: #00e676; /* green — accent / highlight */
+  --gradient-brand: linear-gradient(120deg, #335de5 30%, #00e676);
+
+  /* functional (status) layer */
+  --success: #0b7a55;
+  --warning: #92610a;
+  --danger: #c92a2a;
+  --info: #2b50d4;
+
+  /* radius (CI: md = standard for buttons/inputs/cards) */
+  --radius-sm: 6px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* elevation (CI, tinted with brand black) */
+  --shadow-1: 0 1px 2px rgba(29, 29, 29, 0.06), 0 1px 3px rgba(29, 29, 29, 0.1);
+  --shadow-2: 0 4px 12px rgba(29, 29, 29, 0.1);
+  --shadow-3: 0 12px 32px rgba(29, 29, 29, 0.16);
+
+  /* motion (CI) */
+  --motion-fast: 150ms;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+
+  color-scheme: light;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family:
+    'Geist',
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#app {
+  position: relative;
+}
+
+/* --- Floating chrome over the canvas (no header bar, Excalidraw style) --- */
+.app-menu {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 30;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  padding: 8px 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--ease),
+    border-color var(--motion-fast) var(--ease),
+    color var(--motion-fast) var(--ease),
+    transform 60ms var(--ease);
+}
+.icon-btn svg {
+  display: block;
+  flex: none;
+}
+.icon-btn:hover,
+.icon-btn[aria-expanded='true'] {
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+}
+.icon-btn:active {
+  transform: translateY(1px);
+}
+
+.menu-dropdown[hidden] {
+  display: none;
+}
+.menu-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 40;
+  min-width: 236px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-3);
+  animation: menu-pop var(--motion-fast) var(--ease-out);
+}
+@keyframes menu-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  text-align: left;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background 120ms var(--ease),
+    color 120ms var(--ease);
+}
+.menu-item svg {
+  flex: none;
+  color: var(--ink-soft);
+}
+.menu-item:hover {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+.menu-item:hover svg {
+  color: var(--accent-ink);
+}
+
+/* Active workshop level (menuitemradio): accent like the expanded menu button, check via markup. */
+.menu-item[aria-checked='true'] {
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.menu-item[aria-checked='true'] svg {
+  color: var(--accent-ink);
+}
+/* Keeps unchecked labels aligned with the 16px icons of the other menu items. */
+.menu-item .menu-icon-spacer {
+  flex: none;
+  width: 16px;
+}
+
+.menu-label {
+  padding: 6px 10px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.menu-sep {
+  height: 1px;
+  margin: 5px 8px;
+  background: var(--line);
+}
+
+/* --- Toolbar (floating top-right: Share) --- */
+.app-toolbar {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.app-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 16px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--ease),
+    box-shadow var(--motion-fast) var(--ease),
+    transform 80ms var(--ease);
+}
+.app-toolbar button svg {
+  display: block;
+  flex: none;
+}
+.app-toolbar button.primary {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  box-shadow: var(--shadow-1);
+}
+.app-toolbar button.primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  box-shadow: var(--shadow-2);
+  transform: translateY(-1px);
+}
+.app-toolbar button.primary:active {
+  transform: translateY(0);
+}
+
+/* --- Stage (canvas + empty state) --- */
+.app-stage {
+  position: absolute;
+  inset: 0;
+}
+.app-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.app-stage.drag-over::after {
+  content: 'Drop Event Storming board here';
+  position: absolute;
+  inset: 12px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--accent);
+  border-radius: var(--radius-lg);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 15px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+/* --- Empty-State --- */
+.empty-state[hidden] {
+  display: none;
+}
+.app-canvas.event-storming-draw-mode + .empty-state {
+  display: none;
+}
+.empty-state {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.empty-card {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  max-width: 380px;
+  padding: 36px 40px;
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-3);
+  backdrop-filter: blur(8px);
+  animation: card-in 200ms var(--ease-out);
+}
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+/* The Miragon app icon (green Komet on blue) — the brand mark. */
+.empty-mark {
+  width: 60px;
+  height: 60px;
+  border-radius: 15px;
+  box-shadow: 0 8px 22px rgba(51, 93, 229, 0.3);
+}
+.empty-card h2 {
+  margin: 8px 0 0;
+  font-weight: 600;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+}
+.empty-card p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.empty-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+.empty-card .primary,
+.empty-card .ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--ease),
+    border-color var(--motion-fast) var(--ease),
+    color var(--motion-fast) var(--ease),
+    transform 80ms var(--ease),
+    box-shadow var(--motion-fast) var(--ease);
+}
+.empty-card .primary {
+  color: #fff;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  box-shadow: var(--shadow-1);
+}
+.empty-card .primary:hover {
+  background: var(--accent-hover);
+  box-shadow: var(--shadow-2);
+  transform: translateY(-1px);
+}
+.empty-card .ghost {
+  color: var(--ink);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.empty-card .ghost:hover {
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+}
+.empty-card .primary:active,
+.empty-card .ghost:active {
+  transform: translateY(0);
+}
+.empty-hint {
+  margin-top: 2px;
+  color: var(--ink-faint);
+  font-size: 12px;
+  letter-spacing: 0.01em;
+}
+
+/* Landing (empty & not yet started): keep the Menu, Share and palette so a user can already open
+ * another file or drag an element onto the canvas to start. Only the zoom control is hidden — it
+ * has nothing to act on yet. */
+#app.app--landing .app-zoom {
+  display: none;
+}
+
+/* --- Export-Panel (JSON/DSL) --- */
+.output-overlay[hidden] {
+  display: none;
+}
+.output-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 10, 32, 0.42);
+  backdrop-filter: blur(3px);
+  animation: overlay-in 140ms var(--ease-out);
+}
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+}
+.output-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(720px, 92vw);
+  height: min(70vh, 640px);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-3);
+  overflow: hidden;
+}
+.output-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  font-weight: 600;
+  font-size: 15px;
+}
+.output-actions {
+  display: flex;
+  gap: 8px;
+}
+.output-actions button {
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  transition:
+    border-color 120ms var(--ease),
+    color 120ms var(--ease),
+    background 120ms var(--ease);
+}
+.output-actions button:hover {
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+}
+.output-panel textarea {
+  flex: 1;
+  border: 0;
+  outline: 0;
+  resize: none;
+  padding: 14px;
+  font-family: 'Geist Mono', ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--surface-2);
+  white-space: pre;
+}
+
+/* --- Toaster (transient feedback, bottom-center) --- */
+.toaster {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(420px, 90vw);
+  padding: 11px 15px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--info);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-3);
+  font-size: 13px;
+  font-weight: 500;
+  animation: toast-in 180ms var(--ease-out);
+}
+.toast.is-leaving {
+  animation: toast-out 160ms var(--ease) forwards;
+}
+.toast__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--info);
+}
+.toast--success {
+  border-left-color: var(--success);
+}
+.toast--success .toast__dot {
+  background: var(--success);
+}
+.toast--error {
+  border-left-color: var(--danger);
+}
+.toast--error .toast__dot {
+  background: var(--danger);
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* --- Zoom controls (bottom right) --- */
+.app-zoom {
+  position: absolute;
+  bottom: 14px;
+  right: 14px;
+  z-index: 30;
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+.app-zoom button {
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 6px 11px;
+  transition:
+    background 120ms var(--ease),
+    color 120ms var(--ease);
+}
+.app-zoom button:hover {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+.app-zoom .zoom-level {
+  min-width: 52px;
+  font-variant-numeric: tabular-nums;
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+}
+
+/* --- Legal notice (bottom left) --- */
+.app-legal {
+  position: absolute;
+  bottom: 16px;
+  left: 14px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+.app-legal a {
+  color: var(--ink-faint);
+  text-decoration: none;
+}
+.app-legal a:hover {
+  color: var(--accent-ink);
+  text-decoration: underline;
+}
+
+@media (max-width: 540px) {
+  .app-legal {
+    bottom: 8px;
+    left: 8px;
+    font-size: 11px;
+  }
+}
+
+/* Respect users who prefer less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

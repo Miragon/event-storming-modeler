@@ -1,0 +1,387 @@
+@import 'diagram-js/assets/diagram-js.css';
+
+/* Miragon design tokens for the in-canvas chrome. The VALUES here are hand-mirrored from the single
+   source of truth in `src/theme/palette.ts` (CHROME_VARS / DARK_BOARD_VARS); a unit test
+   (`test/theme.sync.test.ts`) fails if they drift. See the Miragon design system (the
+   `miragon-brand:modeler-tool-design` skill; CLAUDE.md § "Design system"). */
+:root {
+  --event-storming-paper: #f9f7f7;
+  --event-storming-ink: #1d1d1d;
+  --event-storming-ink-soft: #5b5b5b;
+  --event-storming-surface: #ffffff;
+  --event-storming-border: #e6e2e2;
+  --event-storming-accent: #335de5;
+  --event-storming-accent-soft: rgba(51, 93, 229, 0.12);
+  --event-storming-brand: #00e676;
+  --event-storming-danger: #c92a2a;
+  --event-storming-shadow: rgba(29, 29, 29, 0.1);
+  --event-storming-drawing-ink: #1d1d1d;
+
+  --event-storming-radius-sm: 6px;
+  --event-storming-radius: 12px;
+  --event-storming-radius-lg: 16px;
+}
+
+/* Per-board `style dark` directive (serialized in the DSL). This is the ONLY dark surface —
+   there is no app-level dark mode (the Miragon CI defines no dark theme). It turns the surround
+   navy; the stickies keep their SVG presentation colours so exports stay stable, and the
+   in-canvas floating chrome (palette, context-pad, colour-picker, label input) stays light too. */
+.event-storming-container.event-storming-dark {
+  --event-storming-paper: #080a20;
+  --event-storming-drawing-ink: #f9f7f7;
+}
+
+.event-storming-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background-color: var(--event-storming-paper);
+  background-image: radial-gradient(rgba(29, 29, 29, 0.045) 0.6px, transparent 0.6px);
+  background-size: 22px 22px;
+  font-family:
+    'Geist',
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  overflow: hidden;
+}
+
+.event-storming-container .djs-element text {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Hover / selection emphasis: darken+saturate the WHOLE visual group so elements keep their own
+   (possibly user-picked) colour; the branded blue outline (below) signals the actual selection. */
+.event-storming-container .djs-element.hover > .djs-visual,
+.event-storming-container .djs-element.selected > .djs-visual {
+  filter: brightness(0.72) saturate(1.15);
+}
+
+.event-storming-container .djs-outline {
+  stroke: var(--event-storming-accent);
+  stroke-dasharray: 3 3;
+}
+/* diagram-js drives selection/lasso outlines via CSS variables (default: its own blue), scoped on
+   `.djs-parent` — override there with the Miragon interactive blue. */
+.event-storming-container .djs-parent {
+  --element-hover-outline-fill-color: var(--event-storming-accent-soft);
+  --element-selected-outline-stroke-color: var(--event-storming-accent);
+  --element-selected-outline-secondary-stroke-color: var(--event-storming-accent-soft);
+  --lasso-fill-color: var(--event-storming-accent-soft);
+  --lasso-stroke-color: var(--event-storming-accent);
+}
+
+.event-storming-container .djs-resizer-visual {
+  fill: var(--event-storming-surface);
+  stroke: var(--event-storming-accent);
+}
+.event-storming-container .djs-resizer-hit {
+  fill: none;
+}
+
+/* Palette: horizontal floating toolbar (Excalidraw style). Styling on the element itself
+   (.djs-palette), NOT on .event-storming-container — so it travels along when the consumer mounts
+   the palette elsewhere (e.g. the webapp into the header). Default = floating top-center;
+   overridable by the consumer. */
+.djs-palette {
+  left: 50%;
+  top: 12px;
+  transform: translateX(-50%);
+  width: auto; /* diagram-js otherwise sets a fixed 48px (vertical) */
+  display: flex;
+  align-items: center;
+  padding: 5px 7px;
+  background: var(--event-storming-surface);
+  border: 1px solid var(--event-storming-border);
+  border-radius: var(--event-storming-radius);
+  box-shadow:
+    0 1px 2px var(--event-storming-shadow),
+    0 10px 26px var(--event-storming-shadow);
+}
+.djs-palette .djs-palette-entries,
+.djs-palette .group {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+.djs-palette .entry {
+  float: none; /* diagram-js uses float:left -> redundant in the flex row */
+  width: 40px;
+  height: 40px;
+  line-height: normal;
+  border-radius: var(--event-storming-radius-sm);
+  color: var(--event-storming-ink);
+  transition:
+    background 150ms ease,
+    color 150ms ease;
+}
+.djs-palette .entry:hover {
+  /* Accent tint LAYERED over the solid surface — a bare alpha background would let the canvas
+     shine through and make the hovered entry look transparent. */
+  background:
+    linear-gradient(var(--event-storming-accent-soft), var(--event-storming-accent-soft)),
+    var(--event-storming-surface);
+  color: var(--event-storming-accent);
+}
+/* Draw mode: crosshair over the whole canvas. */
+.event-storming-container.event-storming-draw-mode,
+.event-storming-container.event-storming-draw-mode * {
+  cursor: crosshair !important;
+}
+
+/* Vertex handles of a selected drawing (drag to move single points). */
+.event-storming-container .event-storming-drawing-handle {
+  cursor: grab;
+  pointer-events: all;
+}
+
+/* Active tool (e.g. the lasso): branded — the interactive blue, so the "armed" tool is obvious. */
+.djs-palette .entry.highlighted-entry {
+  background: var(--event-storming-accent);
+  color: #fff;
+}
+
+/* Subtle vertical separator between the groups (diagram-js does not separate groups on its own). */
+.djs-palette .group + .group {
+  position: relative;
+  margin-left: 9px;
+  padding-left: 9px;
+}
+.djs-palette .group + .group::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 0;
+  width: 1px;
+  background: var(--event-storming-border);
+}
+
+/* Palette icons (custom HTML icons) — unscoped, travel along with the relocated palette. */
+.event-storming-palette-entry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-width: 24px;
+  min-height: 24px;
+  line-height: 1;
+  color: var(--event-storming-ink);
+}
+.event-storming-palette-svg {
+  display: block;
+}
+
+/* ContextPad icons (stay in the canvas -> scoped) */
+.event-storming-container .event-storming-cp-entry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-width: 24px;
+  min-height: 24px;
+  font-size: 17px;
+  line-height: 1;
+  color: var(--event-storming-ink);
+}
+
+.event-storming-container .djs-context-pad .entry {
+  border-radius: var(--event-storming-radius-sm);
+  box-shadow:
+    0 1px 2px var(--event-storming-shadow),
+    0 2px 8px var(--event-storming-shadow);
+  background: var(--event-storming-surface);
+  color: var(--event-storming-ink);
+  transition:
+    background 150ms ease,
+    color 150ms ease;
+}
+.event-storming-container .djs-context-pad .entry:hover {
+  /* Same layering as the palette hover: solid surface below the accent tint, never see-through. */
+  background:
+    linear-gradient(var(--event-storming-accent-soft), var(--event-storming-accent-soft)),
+    var(--event-storming-surface);
+  color: var(--event-storming-accent);
+}
+
+.event-storming-container .event-storming-label-input {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 2px 6px;
+  border: 1.5px solid var(--event-storming-accent);
+  border-radius: 6px;
+  background: var(--event-storming-surface);
+  color: var(--event-storming-ink);
+  outline: none;
+  box-shadow: 0 2px 12px var(--event-storming-accent-soft);
+  z-index: 100;
+  min-width: 90px;
+}
+.event-storming-container .event-storming-label-textarea {
+  resize: none;
+  line-height: 17px;
+  white-space: pre;
+  min-width: 120px;
+  text-align: center;
+}
+
+/* WYSIWYG note editor: a contenteditable overlay instead of the plain textarea — the markdown
+   subset (bold/italic/bullets) renders live while typing. Flex column: `justify-content`
+   previews the note's VERTICAL alignment, `text-align` the horizontal one. */
+.event-storming-container .event-storming-note-editor {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  min-width: 120px;
+  padding: 4px 6px;
+  line-height: 17px;
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  cursor: text;
+}
+.event-storming-container .event-storming-note-editor b,
+.event-storming-container .event-storming-note-editor strong {
+  font-weight: 600; /* matches the canvas tspans (600, not the browser default 700) */
+}
+/* Bullet rows: '•' marker + hanging indent, mirroring the canvas NOTE_BULLET_INDENT (12px). */
+.event-storming-container .event-storming-note-editor .bullet {
+  padding-left: 12px;
+  text-indent: -12px;
+}
+.event-storming-container .event-storming-note-editor .bullet::before {
+  content: '• ';
+}
+
+/* Floating note toolbar (B / I / • + the two alignment cycle buttons) — Miragon chrome tokens,
+   same surface/shadow/radius family as the palette and the color picker. */
+.event-storming-container .event-storming-note-toolbar {
+  position: absolute;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  background: var(--event-storming-surface);
+  border: 1px solid var(--event-storming-border);
+  border-radius: var(--event-storming-radius-sm);
+  box-shadow:
+    0 1px 2px var(--event-storming-shadow),
+    0 6px 24px var(--event-storming-shadow);
+}
+.event-storming-container .event-storming-note-toolbar button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: var(--event-storming-radius-sm);
+  background: transparent;
+  color: var(--event-storming-ink);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    color 150ms ease;
+}
+.event-storming-container .event-storming-note-toolbar button:hover {
+  /* Accent tint LAYERED over the solid surface — same pattern as the palette hover. */
+  background:
+    linear-gradient(var(--event-storming-accent-soft), var(--event-storming-accent-soft)),
+    var(--event-storming-surface);
+  color: var(--event-storming-accent);
+}
+/* Active formatting at the caret/selection: branded like the palette's armed tool. */
+.event-storming-container .event-storming-note-toolbar button.active {
+  background: var(--event-storming-accent);
+  color: #fff;
+}
+.event-storming-container .event-storming-note-toolbar-separator {
+  align-self: stretch;
+  width: 1px;
+  margin: 3px 4px;
+  background: var(--event-storming-border);
+}
+
+/* Dark boards: the note editor chrome stays light (like all floating chrome), but the
+   light-token shadow is invisible on navy — deepen it so editor and toolbar still lift off. */
+.event-storming-container.event-storming-dark .event-storming-note-editor,
+.event-storming-container.event-storming-dark .event-storming-note-toolbar {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.55),
+    0 10px 26px rgba(0, 0, 0, 0.4);
+}
+
+.event-storming-container.drag-over::after {
+  content: 'Drop event storming board here (.storm · .json · .txt)';
+  position: absolute;
+  inset: 10px;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--event-storming-accent);
+  border-radius: var(--event-storming-radius-lg);
+  background: var(--event-storming-accent-soft);
+  color: var(--event-storming-accent);
+  font-size: 15px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+/* Dark surround dot-grid: light dots on navy (the stickies stay bright — see the token block). */
+.event-storming-container.event-storming-dark {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 0.6px, transparent 0.6px);
+}
+
+/* Sticky color picker (bpmn.io style): compact 3x3 grid of small color squares, no text.
+   Positioned absolutely WITHIN .event-storming-container (relative reference). */
+.event-storming-container .event-storming-color-picker {
+  position: absolute;
+  z-index: 300;
+  display: grid;
+  grid-template-columns: repeat(3, 22px);
+  gap: 6px;
+  padding: 8px;
+  background: var(--event-storming-surface);
+  border: 1px solid var(--event-storming-border);
+  border-radius: var(--event-storming-radius-sm);
+  box-shadow:
+    0 1px 2px var(--event-storming-shadow),
+    0 6px 24px var(--event-storming-shadow);
+}
+.event-storming-container .event-storming-cp-swatch {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 5px;
+  border: 1px solid var(--event-storming-border);
+  cursor: pointer;
+  transition: transform 0.08s ease;
+}
+.event-storming-container .event-storming-cp-swatch:hover {
+  transform: scale(1.1);
+}
+.event-storming-container .event-storming-cp-active {
+  outline: 2px solid var(--event-storming-accent);
+  outline-offset: 1px;
+}
+.event-storming-container .event-storming-cp-none {
+  background: var(--event-storming-surface);
+  background-image: linear-gradient(
+    45deg,
+    transparent 44%,
+    var(--event-storming-danger) 45%,
+    var(--event-storming-danger) 55%,
+    transparent 56%
+  );
+}

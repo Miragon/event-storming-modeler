@@ -1,0 +1,65 @@
+{
+  "name": "@miragon/event-storming-modeler",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "workspaces": [
+    "packages/schema-model",
+    "packages/dsl",
+    "packages/transforms",
+    "packages/renderer",
+    "apps/webapp",
+    "apps/vscode",
+    "e2e"
+  ],
+  "scripts": {
+    "build": "npm run build -w packages/schema-model -w packages/dsl -w packages/transforms -w packages/renderer",
+    "build:webapp": "npm run build -w apps/webapp",
+    "build:vscode": "npm run build -w apps/vscode",
+    "typecheck": "tsc -p tsconfig.json && npm run typecheck -w apps/vscode && npm run typecheck -w e2e",
+    "lint": "eslint . && npm run typecheck",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run --project=unit",
+    "test:coverage": "vitest run --project=unit --coverage",
+    "test:browser": "vitest run --project=browser",
+    "test:e2e": "npm run test:e2e -w e2e",
+    "dev": "npm run dev:webapp",
+    "dev:webapp": "npm run dev -w apps/webapp",
+    "dev:webapp:plain": "npm run dev:app -w apps/webapp",
+    "dev:vscode": "npm run watch -w apps/vscode",
+    "depcruise": "depcruise packages apps --config .dependency-cruiser.cjs",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,jsonc,md,yaml,yml,css,html}": [
+      "prettier --write"
+    ]
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.2.0",
+    "@vitest/browser-playwright": "4.1.11",
+    "@vitest/coverage-v8": "4.1.11",
+    "dependency-cruiser": "18.2.0",
+    "eslint": "10.9.0",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-jsdoc": "64.2.1",
+    "globals": "17.11.0",
+    "husky": "9.1.7",
+    "lint-staged": "17.3.0",
+    "playwright": "1.62.1",
+    "prettier": "3.9.6",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.67.0",
+    "vitest": "4.1.11"
+  }
+}

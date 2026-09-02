@@ -1,0 +1,53 @@
+{
+  "name": "@miragon/event-storming-renderer",
+  "version": "0.1.0",
+  "description": "Render and edit Event Storming boards in the browser, with a viewer and modeler built on diagram-js.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Miragon/event-storming-modeler.git",
+    "directory": "packages/renderer"
+  },
+  "homepage": "https://github.com/Miragon/event-storming-modeler/tree/main/packages/renderer#readme",
+  "bugs": "https://github.com/Miragon/event-storming-modeler/issues",
+  "type": "module",
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./assets/event-storming.css": "./dist/event-storming.css",
+    "./package.json": "./package.json"
+  },
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vite build",
+    "test": "npm --prefix ../.. run test",
+    "test:browser": "npm --prefix ../.. run test:browser"
+  },
+  "dependencies": {
+    "@miragon/event-storming-dsl": "0.1.0",
+    "@miragon/event-storming-schema-model": "0.1.0",
+    "clsx": "2.1.1",
+    "diagram-js": "15.24.1",
+    "didi": "11.0.0",
+    "tiny-svg": "4.1.4"
+  },
+  "devDependencies": {
+    "jsdom": "30.0.1",
+    "typescript": "6.0.3",
+    "vite": "8.2.2",
+    "vite-plugin-dts": "5.0.3",
+    "vitest": "4.1.11"
+  }
+}

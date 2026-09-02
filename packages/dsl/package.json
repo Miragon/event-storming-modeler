@@ -1,0 +1,43 @@
+{
+  "name": "@miragon/event-storming-dsl",
+  "version": "0.1.0",
+  "description": "Convert between the Event Storming .storm text format and the Event Storming board model, with lossless round-trips.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Miragon/event-storming-modeler.git",
+    "directory": "packages/dsl"
+  },
+  "homepage": "https://github.com/Miragon/event-storming-modeler/tree/main/packages/dsl#readme",
+  "bugs": "https://github.com/Miragon/event-storming-modeler/issues",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@miragon/event-storming-schema-model": "0.1.0"
+  },
+  "devDependencies": {
+    "tsup": "8.5.1",
+    "typescript": "6.0.3",
+    "vitest": "4.1.11"
+  }
+}

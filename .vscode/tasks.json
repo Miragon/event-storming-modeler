@@ -1,0 +1,20 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "event-storming-vscode: build",
+      "type": "shell",
+      "command": "npm run build -w apps/vscode",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "event-storming-vscode: watch",
+      "type": "shell",
+      "command": "npm run watch -w apps/vscode",
+      "isBackground": true,
+      "group": "build",
+      "problemMatcher": []
+    }
+  ]
+}

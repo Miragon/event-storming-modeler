@@ -1,0 +1,19 @@
+name: Setup
+description: Install Node and restore dependencies with a clean, lockfile-pinned npm install.
+
+inputs:
+  node-version:
+    description: Node.js version (defaults to the engines floor so CI verifies the declared minimum).
+    required: false
+    default: 22.13.0
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: npm
+
+    - run: npm ci
+      shell: bash
