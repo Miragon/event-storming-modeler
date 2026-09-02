@@ -115,6 +115,19 @@ export async function dropAt(page: Page, fractionX: number, fractionY: number): 
   await dropAtPoint(page, await canvasPoint(page, fractionX, fractionY));
 }
 
+/**
+ * Drop with HUMAN click timing: the create commits on mousedown, the gesture's trailing
+ * click follows only ~150ms later — after deferred UI (like the blank-append type chooser)
+ * has appeared. Guards against that UI treating the trailing click as an outside click.
+ */
+export async function slowDropAt(page: Page, fractionX: number, fractionY: number): Promise<void> {
+  const point = await canvasPoint(page, fractionX, fractionY);
+  await page.mouse.move(point.x, point.y, { steps: 6 });
+  await page.mouse.down();
+  await page.waitForTimeout(150);
+  await page.mouse.up();
+}
+
 /** Clear the selection so exported SVG/state does not depend on what happened to be selected. */
 export async function deselectAll(page: Page): Promise<void> {
   await page.evaluate(() => {

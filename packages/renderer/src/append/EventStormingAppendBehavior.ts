@@ -158,6 +158,21 @@ export default class EventStormingAppendBehavior {
       if (shape.provisional && popupMenu && modeling && canvas) {
         // Open only after render/cleanup — like the label edit below, plus the create's own
         // commandStack.changed would auto-close a popup opened synchronously.
+        const original = (event as { originalEvent?: Event }).originalEvent;
+        if (original?.type === 'mousedown') {
+          // Click-to-place: the create ends on MOUSEDOWN, so the gesture's trailing click is
+          // still pending — it would hit the freshly opened popup as an outside click and
+          // dismiss it (removing the blank sticky right away). Open after that click passed;
+          // the timeout covers gestures whose click never fires (e.g. mouseup off-window).
+          const openAfterClick = () => {
+            document.removeEventListener('click', openAfterClick, true);
+            clearTimeout(fallback);
+            setTimeout(() => openKindChooser(shape), 0);
+          };
+          document.addEventListener('click', openAfterClick, true);
+          const fallback = setTimeout(openAfterClick, 300);
+          return;
+        }
         setTimeout(() => openKindChooser(shape), 0);
         return;
       }

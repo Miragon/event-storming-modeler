@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import EventBus from 'diagram-js/lib/core/EventBus';
 import type { Injector } from 'didi';
@@ -49,9 +50,14 @@ function provisionalShape() {
   } as Record<string, unknown>;
 }
 
-function fireCreateEnd(eventBus: EventBus, shape: Record<string, unknown>) {
+function fireCreateEnd(
+  eventBus: EventBus,
+  shape: Record<string, unknown>,
+  originalEvent?: { type: string },
+) {
   eventBus.fire('create.end', {
     context: { source: { x: 0, y: 0, width: 130, height: 90 }, shape, canExecute: {} },
+    ...(originalEvent ? { originalEvent } : {}),
   });
 }
 
@@ -155,3 +161,42 @@ function popupCloseThenDestroy(eventBus: EventBus, closePopup: () => void) {
   closePopup();
   eventBus.fire('diagram.destroy');
 }
+
+describe('EventStormingAppendBehavior: click-to-place gesture', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  // Regression: a create ending on MOUSEDOWN (click-to-place) has its gesture's click still
+  // pending; a popup opened before that click treated it as an outside click and dismissed
+  // itself — deleting the blank sticky immediately for everyone who does not drag.
+  it('waits for the trailing click before opening the chooser on mousedown placements', () => {
+    const { eventBus, popupMenu } = harness();
+    fireCreateEnd(eventBus, provisionalShape(), { type: 'mousedown' });
+    vi.advanceTimersByTime(0);
+    expect(popupMenu.open).not.toHaveBeenCalled();
+
+    document.dispatchEvent(new Event('click', { bubbles: true }));
+    vi.runAllTimers();
+    expect(popupMenu.open).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens via the safety fallback when the gesture click never arrives', () => {
+    const { eventBus, popupMenu } = harness();
+    fireCreateEnd(eventBus, provisionalShape(), { type: 'mousedown' });
+    vi.advanceTimersByTime(300);
+    vi.runAllTimers();
+    expect(popupMenu.open).toHaveBeenCalledTimes(1);
+
+    // A later stray click must not open a second popup (listener was removed).
+    document.dispatchEvent(new Event('click', { bubbles: true }));
+    vi.runAllTimers();
+    expect(popupMenu.open).toHaveBeenCalledTimes(1);
+  });
+
+  it('drag placements (mouseup) keep the immediate deferred open', () => {
+    const { eventBus, popupMenu } = harness();
+    fireCreateEnd(eventBus, provisionalShape(), { type: 'mouseup' });
+    vi.runAllTimers();
+    expect(popupMenu.open).toHaveBeenCalledTimes(1);
+  });
+});

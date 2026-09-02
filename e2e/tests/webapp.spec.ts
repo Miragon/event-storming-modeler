@@ -5,6 +5,7 @@ import {
   dragShape,
   dragShapeTo,
   dropAt,
+  slowDropAt,
   elementGfx,
   exportBoard,
   exportDSL,
@@ -188,7 +189,8 @@ test.describe('webapp modelling interactions', () => {
     // The single append entry drags out a BLANK sticky — the kind is chosen after placing.
     await selectShape(page, source);
     await page.locator('.djs-context-pad [data-action="append"]').click();
-    await dropAt(page, 0.65, 0.55);
+    // Human click timing: mousedown commits, the trailing click lands after the popup opened.
+    await slowDropAt(page, 0.65, 0.55);
 
     // Landing the provisional sticky opens the change-type popup instead of the label editor.
     const popup = page.locator('.djs-popup');
@@ -220,7 +222,8 @@ test.describe('webapp modelling interactions', () => {
 
     await selectShape(page, source);
     await page.locator('.djs-context-pad [data-action="append"]').click();
-    await dropAt(page, 0.65, 0.55);
+    // Human click timing: mousedown commits, the trailing click lands after the popup opened.
+    await slowDropAt(page, 0.65, 0.55);
 
     const popup = page.locator('.djs-popup');
     await expect(popup).toBeVisible();
