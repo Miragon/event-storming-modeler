@@ -86,7 +86,7 @@ accepts an optional `(color #hex)` override.
 | Append sticky              | Context pad `+` drags a blank sticky; pick the type in the popup that opens, then label it                                                                                                       |
 | Change sticky type         | Context pad → change-type popup                                                                                                                                                                  |
 | Type captions on/off       | Menu → "Type captions" (small kind caption at the bottom of every sticky; per-client view preference)                                                                                            |
-| Recolor                    | Context pad → color picker                                                                                                                                                                       |
+| Recolor a drawing          | Context pad → color picker (stickies and notes keep their notation colors)                                                                                                                       |
 
 ## The `.storm` DSL
 

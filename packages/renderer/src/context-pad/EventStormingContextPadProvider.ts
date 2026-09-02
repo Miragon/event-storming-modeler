@@ -156,18 +156,22 @@ export default class EventStormingContextPadProvider implements ContextPadProvid
       };
     }
 
-    // Color override is available on EVERY element (model-wide `color`, DSL suffix `(color ...)`).
-    entries['color'] = {
-      group: 'sticky',
-      title: 'Color',
-      html: cpHtml(ICON_PALETTE, 'Color'),
-      action: {
-        click: (event: Event) => {
-          const e = event as MouseEvent;
-          this.colorPicker.open(shape, e.clientX, e.clientY);
+    // Recoloring is offered for DRAWINGS only — stickies and notes carry their notation color
+    // (the model-wide `color` override and the DSL `(color ...)` suffix still round-trip, there
+    // is just no pad action for them).
+    if (kind === 'drawing') {
+      entries['color'] = {
+        group: 'sticky',
+        title: 'Color',
+        html: cpHtml(ICON_PALETTE, 'Color'),
+        action: {
+          click: (event: Event) => {
+            const e = event as MouseEvent;
+            this.colorPicker.open(shape, e.clientX, e.clientY);
+          },
         },
-      },
-    };
+      };
+    }
 
     // Drawings have no label (pure geometry).
     if (kind !== 'drawing') {

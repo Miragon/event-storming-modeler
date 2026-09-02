@@ -85,4 +85,22 @@ describe('EventStormingContextPadProvider: blank append', () => {
       expect(entries['append'], level).toBeDefined();
     }
   });
+
+  // Stickies and notes carry their notation color — only drawings are recolorable.
+  it('offers the color picker for drawings only', () => {
+    const { provider } = providerHarness();
+    const drawing = {
+      ...sticky('draw_a', 'drawing'),
+      drawingPoints: [
+        { x: 0, y: 0 },
+        { x: 10, y: 10 },
+      ],
+    } as unknown as Element;
+    expect(provider.getContextPadEntries(drawing)['color']).toBeDefined();
+    for (const kind of ['event', 'command', 'aggregate', 'hotspot', 'note'] as const) {
+      expect(provider.getContextPadEntries(sticky(`${kind}_a`, kind))['color'], kind).toBe(
+        undefined,
+      );
+    }
+  });
 });
