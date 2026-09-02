@@ -17,7 +17,7 @@
     "@miragon/event-storming-schema-model": "0.1.0"
   },
   "devDependencies": {
-    "portless": "0.15.5",
+    "portless": "0.15.6",
     "typescript": "6.0.3",
     "vite": "8.2.2"
   }
