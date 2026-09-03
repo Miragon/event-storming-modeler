@@ -84,3 +84,15 @@ describe('EventStormingPaletteProvider: palette refresh', () => {
     expect(rebuild).not.toHaveBeenCalled();
   });
 });
+
+describe('EventStormingPaletteProvider: tooltips', () => {
+  // diagram-js renders the hover tooltip from `title` (and mirrors it into aria-label); a native
+  // title attribute on the markup would show the browser tooltip on top of it.
+  it('gives every entry a title but no native title attribute in its markup', () => {
+    const { provider } = providerHarness();
+    for (const entry of Object.values(provider.getPaletteEntries())) {
+      expect(entry.title).toBeTruthy();
+      expect(entry.html).not.toMatch(/\btitle=/);
+    }
+  });
+});
