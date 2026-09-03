@@ -41,7 +41,7 @@ policy When order placed, ship it [800, 300]
 readmodel Order Status [620, 120]
 external Payment Provider [420, 520]
 hotspot Double payment on retry? [620, 520]
-note Big-picture session [80, 80]
+note Design-level session [80, 80]
 line [[100,100],[200,150],[180,240]] (dashed)      // freeform drawing
 
 // arrows: name-referenced, optional label after ;
