@@ -17,7 +17,7 @@ event Order Shipped [1340, 300]
 readmodel Order Status [620, 120]
 external Payment Provider [420, 520]
 hotspot Double payment on retry? [620, 520]
-note Big-picture session: checkout flow [80, 80]
+note Design-level session: checkout flow [80, 80]
 
 Customer -> Place Order
 Place Order -> #agg_order
