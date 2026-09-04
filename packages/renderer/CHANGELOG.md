@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.1](https://github.com/Miragon/event-storming-modeler/compare/renderer-v0.2.0...renderer-v0.2.1) (2026-09-04)
+
+
+### Bug Fixes
+
+* **renderer:** hang palette tooltips below the entry ([#11](https://github.com/Miragon/event-storming-modeler/issues/11)) ([20f3ccb](https://github.com/Miragon/event-storming-modeler/commit/20f3ccbffe7b8ebf0473cdd78afede2448c59fd1))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @miragon/event-storming-dsl bumped from 0.2.0 to 0.2.1
+
 ## [0.2.0](https://github.com/Miragon/event-storming-modeler/compare/renderer-v0.1.0...renderer-v0.2.0) (2026-09-02)
 
 
