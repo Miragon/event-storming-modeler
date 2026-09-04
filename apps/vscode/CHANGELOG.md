@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.1](https://github.com/Miragon/event-storming-modeler/compare/vscode-v0.2.0...vscode-v0.2.1) (2026-09-04)
+
+
+### Bug Fixes
+
+* **example:** label the checkout board as a design-level session ([#9](https://github.com/Miragon/event-storming-modeler/issues/9)) ([deb5762](https://github.com/Miragon/event-storming-modeler/commit/deb5762d418b966e49d461477fc14ae28e8d8117))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @miragon/event-storming-dsl bumped from 0.2.0 to 0.2.1
+    * @miragon/event-storming-renderer bumped from 0.2.0 to 0.2.1
+
 ## [0.2.0](https://github.com/Miragon/event-storming-modeler/compare/vscode-v0.1.0...vscode-v0.2.0) (2026-09-02)
 
 

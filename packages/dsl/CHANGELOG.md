@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/Miragon/event-storming-modeler/compare/dsl-v0.2.0...dsl-v0.2.1) (2026-09-04)
+
+
+### Bug Fixes
+
+* **example:** label the checkout board as a design-level session ([#9](https://github.com/Miragon/event-storming-modeler/issues/9)) ([deb5762](https://github.com/Miragon/event-storming-modeler/commit/deb5762d418b966e49d461477fc14ae28e8d8117))
+
 ## [0.2.0](https://github.com/Miragon/event-storming-modeler/compare/dsl-v0.1.0...dsl-v0.2.0) (2026-09-02)
 
 
