@@ -141,7 +141,7 @@ export default class EventStormingPaletteProvider implements PaletteProvider {
     entries['lasso-tool'] = {
       group: 'tools',
       title: 'Selection tool — L (or Shift+drag)',
-      html: `<div class="entry event-storming-palette-entry" title="Selection tool — L (or Shift+drag)">${PALETTE_ICONS.lasso}</div>`,
+      html: `<div class="entry event-storming-palette-entry">${PALETTE_ICONS.lasso}</div>`,
       action: {
         click: (event: Event) => this.lassoTool.activateSelection(event as MouseEvent),
       },
@@ -151,7 +151,7 @@ export default class EventStormingPaletteProvider implements PaletteProvider {
       group: 'tools',
       title:
         'Draw — click point by point, double-click/Enter finishes, click the start point to close',
-      html: `<div class="entry event-storming-palette-entry" title="Draw — click point by point, double-click/Enter finishes, click the start point to close">${PALETTE_ICONS.draw}</div>`,
+      html: `<div class="entry event-storming-palette-entry">${PALETTE_ICONS.draw}</div>`,
       action: {
         click: () => this.drawTool.toggle(),
       },
@@ -168,7 +168,7 @@ export default class EventStormingPaletteProvider implements PaletteProvider {
       entries[`create.${spec.key}`] = {
         group: spec.group,
         title: spec.title,
-        html: `<div class="entry event-storming-palette-entry" draggable="true" title="${spec.title}">${PALETTE_ICONS[spec.key]}</div>`,
+        html: `<div class="entry event-storming-palette-entry" draggable="true">${PALETTE_ICONS[spec.key]}</div>`,
         action: { dragstart: start, click: start },
       };
     }

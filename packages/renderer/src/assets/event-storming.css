@@ -126,6 +126,29 @@
     var(--event-storming-surface);
   color: var(--event-storming-accent);
 }
+/* Palette tooltip: diagram-js' hover tooltip, hung BELOW the entry by EventStormingPaletteTooltip
+   (the stock right-hand placement would cover the next entry of the horizontal bar). Brand-black
+   chip in the container typeface; unscoped like the palette so it follows a relocated palette. */
+.djs-hover-tooltip {
+  padding: 5px 9px;
+  border-radius: var(--event-storming-radius-sm);
+  background: var(--event-storming-ink);
+  color: #fff;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: 0 4px 12px var(--event-storming-shadow);
+}
+.djs-hover-tooltip--bottom {
+  transform: translateX(-50%);
+}
+.djs-hover-tooltip .djs-palette-tooltip-shortcut {
+  background: rgba(255, 255, 255, 0.18);
+}
+/* Dark boards: the black chip needs an edge to lift off the navy paper. */
+.event-storming-container.event-storming-dark .djs-hover-tooltip {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
 /* Draw mode: crosshair over the whole canvas. */
 .event-storming-container.event-storming-draw-mode,
 .event-storming-container.event-storming-draw-mode * {
