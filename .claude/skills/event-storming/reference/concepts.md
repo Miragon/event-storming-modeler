@@ -45,6 +45,19 @@ external system ↔ events at the boundary
   annotating a flow element. The modeler supports this: drop an actor/hotspot/note onto a host
   sticky to attach it; it then moves together with the host (DSL: the `(on <Host Name>)` suffix).
 
+### One sticky = one point in time
+
+A sticky is a position on the timeline, not a database row for a concept. An aggregate that accepts
+commands at three points in the flow is **three stickies carrying the same label**, placed at those
+three positions — not one sticky with arrows looping back to it. The same applies to actors,
+external systems and read models that take part more than once.
+
+A board where everything about `Order` sits on a single sticky reads as a class diagram, not a
+timeline: arrows run backwards and the left-to-right story disappears. The quick check is that **no
+arrow along the flow points right-to-left**. In the DSL, repeated labels are legal — give each
+occurrence its own `(id …)` and reference it as `#id`, otherwise every arrow silently binds to the
+first declaration.
+
 ## The three levels
 
 1. **Big Picture** — the whole business flow, many people, events only (plus hotspots and
@@ -66,7 +79,8 @@ drawings) are always available on top:
 | Design      | `design`      | the full grammar — adds `aggregate` to the process set                    |
 
 The level filters creation surfaces only; existing elements of any kind stay valid and editable
-on every level.
+on every level. The per-level statement patterns and authoring rules for the DSL live in the
+`storm-dsl` skill (`reference/levels.md`), with a complete worked board for each level.
 
 ## Timeline, pivotal events, swimlanes
 
@@ -99,3 +113,5 @@ on every level.
 - Actor deciding without a read model (what information do they act on?).
 - A suspiciously smooth board with zero hotspots — real domains have friction.
 - Everything in one giant aggregate, or aggregates introduced before the event flow is stable.
+- A recurring sticky (aggregate, actor, external system) drawn **once** with arrows looping back to
+  it, instead of repeated at each point of the timeline — spot it by arrows running right-to-left.

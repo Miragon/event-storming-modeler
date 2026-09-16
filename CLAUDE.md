@@ -73,7 +73,9 @@ libraries to npm (with provenance) and the VS Code extension
   CI-enforced via `miragon/pin-npm-dependencies`. See
   [`.claude/rules/package-json-fixed-versions.md`](.claude/rules/package-json-fixed-versions.md).
 - For Event-Storming domain work, use the skill in
-  [`.claude/skills/event-storming/`](.claude/skills/event-storming/).
+  [`.claude/skills/event-storming/`](.claude/skills/event-storming/); for the `.storm` text format
+  itself (grammar, coordinates, round-trip, diagnostics) use
+  [`.claude/skills/storm-dsl/`](.claude/skills/storm-dsl/).
 - Contributor onboarding in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Design system (mandatory)

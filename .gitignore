@@ -17,6 +17,7 @@ __screenshots__/
 .claude/settings.local.json
 .claude/logs/
 # Locally installed third-party skills (e.g. from plugins) must not get committed —
-# only the project's own event-storming skill is tracked.
+# only the project's own skills are tracked.
 .claude/skills/*
 !.claude/skills/event-storming/
+!.claude/skills/storm-dsl/
