@@ -1,14 +1,15 @@
 ---
 name: event-storming
 description: >-
-  Event Storming expert. Explains Alberto Brandolini's Event Storming method and the `.storm` text
-  DSL this project uses, teaches the sticky-note grammar (actor → command → aggregate → domain
-  event → policy → …) and the three workshop levels (big picture, process modeling, software
-  design), and reviews a user's board — what is good, what is weak, and where the potential is —
-  adding colour-coded feedback notes directly to the .storm file. Use whenever the user asks to
-  review, critique, improve, or sanity-check an Event Storming board; to explain Event-Storming
-  concepts (domain events, commands, aggregates, policies, hotspots, pivotal events, swimlanes,
-  bounded contexts); or to read/write .storm files.
+  Event Storming expert. Explains Alberto Brandolini's Event Storming method, teaches the
+  sticky-note grammar (actor → command → aggregate → domain event → policy → …) and the three
+  workshop levels (big picture, process modeling, software design), and reviews a user's board —
+  what is good, what is weak, and where the potential is — adding colour-coded feedback notes
+  directly to the .storm file. Use whenever the user asks to review, critique, improve, or
+  sanity-check an Event Storming board, or to explain Event-Storming concepts (domain events,
+  commands, aggregates, policies, hotspots, pivotal events, swimlanes, bounded contexts). For the
+  `.storm` text format itself — grammar, suffixes, coordinates, escaping, diagnostics — use the
+  `storm-dsl` skill.
 ---
 
 # Event Storming
@@ -17,8 +18,9 @@ Event Storming (Alberto Brandolini) is a **workshop format for exploring a busin
 together**: participants storm the domain as **domain events** on sticky notes, arrange them on an
 unbounded **timeline** (left → right = earlier → later), then enrich the picture with commands,
 actors, aggregates, policies, read models, external systems and hotspots. This skill lets you
-(1) explain the method, (2) read/write the `.storm` text DSL these files use, and (3) review a real
-board and return actionable, colour-coded feedback.
+(1) explain the method and (2) review a real board and return actionable, colour-coded feedback.
+Reading or writing the `.storm` text itself is the `storm-dsl` skill's job — load it alongside this
+one whenever you touch a file.
 
 ## The board (always check these first)
 
@@ -45,9 +47,11 @@ board and return actionable, colour-coded feedback.
    event have a source (aggregate or external system)? Are there policies between an event and the
    command it triggers, or do commands appear out of nowhere? Are read models present where actors
    make decisions?
-4. **Check the timeline:** left-to-right order consistent? Are **pivotal events** (the few events
-   that mark phase changes, e.g. `Order Placed`, `Order Shipped`) identifiable? Would **swimlanes**
-   per actor/system clarify parallel flows?
+4. **Check the timeline:** left-to-right order consistent? Does any arrow run right-to-left — the
+   tell-tale sign that a recurring sticky (usually an aggregate) was reused once instead of
+   repeated at each point it takes part? Are **pivotal events** (the few events that mark phase
+   changes, e.g. `Order Placed`, `Order Shipped`) identifiable? Would **swimlanes** per
+   actor/system clarify parallel flows?
 5. **Mine the hotspots:** every disagreement, uncertainty or missing piece deserves a hotspot —
    flag places that look contentious but have none.
 6. **Deliver feedback two ways:**
@@ -57,7 +61,7 @@ board and return actionable, colour-coded feedback.
 
 ## Colour convention for feedback notes
 
-Notes accept a per-note colour override (`(color #hex)`, see `reference/dsl.md`). Use dark hues so
+Notes accept a per-note colour override (`(color #hex)`, see the `storm-dsl` skill). Use dark hues so
 review notes are never confused with the pastel domain stickies:
 
 | Colour    | Hex       | Meaning                                          |
@@ -89,8 +93,9 @@ them decide.
   pivotal events, swimlanes, hotspots, bounded-context discovery.
 - `reference/facilitation.md` — running a workshop: preparation, phases, facilitator moves,
   anti-patterns.
-- `reference/dsl.md` — the `.storm` text DSL this project reads/writes, incl. the `(color …)`
-  override and a worked example.
+- The **`storm-dsl` skill** (`.claude/skills/storm-dsl/`) — the authoritative reference for the
+  `.storm` text format itself: grammar, suffixes, coordinates and layout, escaping, diagnostics.
+  Load it whenever you actually read or write a `.storm` file.
 
 ## Authoring new boards
 

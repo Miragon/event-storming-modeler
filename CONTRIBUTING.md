@@ -93,4 +93,5 @@ Also keep the `.storm` DSL round-trip lossless and JSON serialization determinis
 - Keep PRs small and focused.
 - Make sure local gates are green: `npm run lint`, `npm test`, `npm run depcruise`, `npm run build`.
 - Working on board/domain semantics? See the Event-Storming skill in
-  [`.claude/skills/event-storming/`](.claude/skills/event-storming/).
+  [`.claude/skills/event-storming/`](.claude/skills/event-storming/), and the `.storm` format skill
+  in [`.claude/skills/storm-dsl/`](.claude/skills/storm-dsl/).
