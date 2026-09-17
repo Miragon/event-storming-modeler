@@ -93,7 +93,7 @@ them decide.
   pivotal events, swimlanes, hotspots, bounded-context discovery.
 - `reference/facilitation.md` — running a workshop: preparation, phases, facilitator moves,
   anti-patterns.
-- The **`storm-dsl` skill** (`.claude/skills/storm-dsl/`) — the authoritative reference for the
+- The **`storm-dsl` skill** (shipped alongside this one in the same plugin) — the authoritative reference for the
   `.storm` text format itself: grammar, suffixes, coordinates and layout, escaping, diagnostics.
   Load it whenever you actually read or write a `.storm` file.
 

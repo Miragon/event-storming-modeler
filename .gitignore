@@ -16,8 +16,6 @@ __screenshots__/
 # Ignore only local Claude settings; skills + project guardrails (settings.json, rules/) stay tracked
 .claude/settings.local.json
 .claude/logs/
-# Locally installed third-party skills (e.g. from plugins) must not get committed —
-# only the project's own skills are tracked.
-.claude/skills/*
-!.claude/skills/event-storming/
-!.claude/skills/storm-dsl/
+# Locally installed third-party skills (e.g. from plugins) must not get committed.
+# The project's own skills live in plugins/event-storming-modeler/skills/ and are tracked there.
+.claude/skills/

@@ -72,10 +72,13 @@ libraries to npm (with provenance) and the VS Code extension
   workspace deps included (kept in sync by release-please's `node-workspace` plugin).
   CI-enforced via `miragon/pin-npm-dependencies`. See
   [`.claude/rules/package-json-fixed-versions.md`](.claude/rules/package-json-fixed-versions.md).
-- For Event-Storming domain work, use the skill in
-  [`.claude/skills/event-storming/`](.claude/skills/event-storming/); for the `.storm` text format
-  itself (grammar, coordinates, round-trip, diagnostics) use
-  [`.claude/skills/storm-dsl/`](.claude/skills/storm-dsl/).
+- The repo's Claude skills ship as the **`event-storming-modeler` plugin**
+  ([`plugins/event-storming-modeler/`](plugins/event-storming-modeler/)) via the marketplace in
+  [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json): `event-storming` for
+  domain work, `storm-dsl` for the `.storm` text format (grammar, coordinates, round-trip,
+  diagnostics). Install once with `/plugin marketplace add Miragon/event-storming-modeler` and
+  `/plugin install event-storming-modeler@event-storming`; the skill files are readable directly
+  under `plugins/event-storming-modeler/skills/` either way.
 - Contributor onboarding in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Design system (mandatory)

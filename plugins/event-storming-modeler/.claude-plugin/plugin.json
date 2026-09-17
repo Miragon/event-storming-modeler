@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "event-storming-modeler",
+  "displayName": "Event Storming Modeler",
+  "version": "0.1.0",
+  "description": "Event Storming for Claude: the method after Alberto Brandolini (sticky grammar, the three workshop levels, board reviews with colour-coded feedback) and the complete `.storm` text DSL — grammar, coordinates and layout, escaping, parser diagnostics and the round-trip guarantee — so Claude can read, write, review and generate Event Storming boards as plain text.",
+  "author": {
+    "name": "Miragon",
+    "url": "https://miragon.io"
+  },
+  "homepage": "https://github.com/Miragon/event-storming-modeler",
+  "repository": "https://github.com/Miragon/event-storming-modeler",
+  "license": "MIT",
+  "keywords": [
+    "event-storming",
+    "storm",
+    "dsl",
+    "domain-driven-design",
+    "ddd",
+    "modeling",
+    "brandolini",
+    "miragon"
+  ]
+}

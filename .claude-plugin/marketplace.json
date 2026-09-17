@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-marketplace.json",
+  "name": "event-storming",
+  "owner": {
+    "name": "Miragon",
+    "url": "https://miragon.io"
+  },
+  "description": "Event Storming skills for Claude Code — the workshop method after Alberto Brandolini and the `.storm` text DSL used by the Event Storming Modeler.",
+  "version": "0.1.0",
+  "plugins": [
+    {
+      "name": "event-storming-modeler",
+      "source": "./plugins/event-storming-modeler",
+      "description": "Event Storming for Claude: the method (sticky grammar, the three workshop levels, board reviews with colour-coded feedback) plus the complete `.storm` text DSL — grammar, layout, diagnostics, round-trip. Lets Claude read, write, review and generate Event Storming boards as plain text.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Miragon",
+        "url": "https://miragon.io"
+      },
+      "homepage": "https://github.com/Miragon/event-storming-modeler",
+      "license": "MIT",
+      "category": "modeling",
+      "keywords": [
+        "event-storming",
+        "storm",
+        "dsl",
+        "domain-driven-design",
+        "ddd",
+        "modeling",
+        "brandolini",
+        "miragon"
+      ]
+    }
+  ]
+}
