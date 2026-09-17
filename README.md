@@ -165,6 +165,25 @@ Ship Order -> #agg_order_2
 | [`apps/webapp`](apps/webapp)                                    | Web editor (demo, deployed on Netlify)                               |
 | [`apps/vscode`](apps/vscode)                                    | VS Code extension for `.storm`                                       |
 
+## Claude Code plugin
+
+Two Claude skills — the Event Storming method and the `.storm` format — ship from this repository
+as a Claude Code plugin, so you can use them in any project:
+
+```
+/plugin marketplace add Miragon/event-storming-modeler
+/plugin install event-storming-modeler@event-storming
+```
+
+| Skill            | Covers                                                                                                 |
+| ---------------- | ------------------------------------------------------------------------------------------------------ |
+| `event-storming` | Brandolini's method: sticky grammar, the three workshop levels, facilitation, board reviews            |
+| `storm-dsl`      | The `.storm` format: grammar, suffixes, coordinates and layout, per-level authoring rules, diagnostics |
+
+Claude can then read, review, edit and generate `.storm` boards anywhere. Details in
+[`plugins/event-storming-modeler/`](plugins/event-storming-modeler/); the marketplace manifest is
+[`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json).
+
 ## Quickstart (development)
 
 ```bash

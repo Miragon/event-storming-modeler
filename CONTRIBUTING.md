@@ -92,6 +92,9 @@ Also keep the `.storm` DSL round-trip lossless and JSON serialization determinis
 
 - Keep PRs small and focused.
 - Make sure local gates are green: `npm run lint`, `npm test`, `npm run depcruise`, `npm run build`.
-- Working on board/domain semantics? See the Event-Storming skill in
-  [`.claude/skills/event-storming/`](.claude/skills/event-storming/), and the `.storm` format skill
-  in [`.claude/skills/storm-dsl/`](.claude/skills/storm-dsl/).
+- Working on board/domain semantics? Install the repo's own Claude plugin once —
+  `/plugin marketplace add Miragon/event-storming-modeler` then
+  `/plugin install event-storming-modeler@event-storming` — for the `event-storming` (method) and
+  `storm-dsl` (`.storm` format) skills. The sources live in
+  [`plugins/event-storming-modeler/skills/`](plugins/event-storming-modeler/skills/); after editing
+  them run `claude plugin validate plugins/event-storming-modeler --strict`.
