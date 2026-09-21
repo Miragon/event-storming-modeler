@@ -54,7 +54,7 @@ Order -> Order Placed
 Order Placed -> When order placed, ship it
 ```
 
-Open it in the [web editor](https://event-storming-modeler.netlify.app) or the
+Open it in the [web editor](https://event-storming.modeler.miragon.io) or the
 `miragon-gmbh.event-storming-modeler` VS Code extension, or parse it with
 [`@miragon/event-storming-dsl`](https://www.npmjs.com/package/@miragon/event-storming-dsl).
 
