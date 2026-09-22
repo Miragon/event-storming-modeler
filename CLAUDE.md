@@ -7,8 +7,9 @@ a web app and a VS Code extension.
 ## Monorepo (npm workspaces)
 
 Workspaces are declared in the root `package.json` (`workspaces` array, listed in topological
-build order). **All** versions are pinned to exact values inline in each package's `package.json`
-(`.npmrc` sets `save-exact=true`) — including internal `@miragon/event-storming-*` deps, which pin
+build order). Versions are pinned to exact values inline in each package's `package.json`
+(`.npmrc` sets `save-exact=true`) — the one exception being consumer-shared runtime libs declared
+as ranged `peerDependencies` (see Conventions) — including internal `@miragon/event-storming-*` deps, which pin
 to the referenced package's **current version** (npm links them to the local workspace because the
 local version satisfies the pin). Exact pinning is enforced in CI by
 [`miragon/pin-npm-dependencies`](https://github.com/Miragon/pin-npm-dependencies) (the `pin-check`
@@ -68,9 +69,12 @@ libraries to npm (with provenance) and the VS Code extension
 - Keep core packages (`schema-model`, `dsl`, `transforms`) strictly DOM-free (P1, above).
 - The `.storm` DSL round-trip must stay lossless (unknown lines survive via `rawPassthrough`);
   board JSON serialization must be deterministic. Board transforms are pure functions.
-- Pin **all** dependencies to exact versions — no version ranges (`^`/`~`/`>=`/`*`), internal
-  workspace deps included (kept in sync by release-please's `node-workspace` plugin).
-  CI-enforced via `miragon/pin-npm-dependencies`. See
+- Pin **all** `dependencies`/`devDependencies` to exact versions — no version ranges
+  (`^`/`~`/`>=`/`*`), internal workspace deps included (kept in sync by release-please's
+  `node-workspace` plugin). CI-enforced via `miragon/pin-npm-dependencies`. **Exception:**
+  consumer-shared third-party runtime libs (`zod`; `diagram-js`/`didi`/`tiny-svg`) are
+  `peerDependencies` with **caret ranges** so consumers can dedupe against a single copy —
+  mirrored by an exact `devDependency`, with the bundling apps declaring the exact version. See
   [`.claude/rules/package-json-fixed-versions.md`](.claude/rules/package-json-fixed-versions.md).
 - The repo's Claude skills ship as the **`event-storming-modeler` plugin**
   ([`plugins/event-storming-modeler/`](plugins/event-storming-modeler/)) via the marketplace in

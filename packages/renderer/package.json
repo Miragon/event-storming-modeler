@@ -38,13 +38,18 @@
   "dependencies": {
     "@miragon/event-storming-dsl": "0.2.1",
     "@miragon/event-storming-schema-model": "0.2.0",
-    "clsx": "2.1.1",
-    "diagram-js": "15.26.0",
-    "didi": "11.0.0",
-    "tiny-svg": "4.1.4"
+    "clsx": "2.1.1"
+  },
+  "peerDependencies": {
+    "diagram-js": "^15.26.0",
+    "didi": "^11.0.0",
+    "tiny-svg": "^4.1.4"
   },
   "devDependencies": {
+    "diagram-js": "15.26.0",
+    "didi": "11.0.0",
     "jsdom": "30.0.1",
+    "tiny-svg": "4.1.4",
     "typescript": "6.0.3",
     "vite": "8.3.0",
     "vite-plugin-dts": "5.1.0",
