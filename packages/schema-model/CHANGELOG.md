@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/Miragon/event-storming-modeler/compare/schema-model-v0.2.0...schema-model-v0.2.1) (2026-09-22)
+
+
+### Bug Fixes
+
+* **deps:** move shared runtime deps to peerDependencies ([#22](https://github.com/Miragon/event-storming-modeler/issues/22)) ([c950b3b](https://github.com/Miragon/event-storming-modeler/commit/c950b3b285e622a2652dcb053e9f88a21d58f4dd))
+
 ## [0.2.0](https://github.com/Miragon/event-storming-modeler/compare/schema-model-v0.1.0...schema-model-v0.2.0) (2026-09-02)
 
 
