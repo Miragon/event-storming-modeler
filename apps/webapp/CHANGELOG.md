@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.2.2](https://github.com/Miragon/event-storming-modeler/compare/webapp-v0.2.1...webapp-v0.2.2) (2026-09-22)
+
+
+### Bug Fixes
+
+* **deps:** move shared runtime deps to peerDependencies ([#22](https://github.com/Miragon/event-storming-modeler/issues/22)) ([c950b3b](https://github.com/Miragon/event-storming-modeler/commit/c950b3b285e622a2652dcb053e9f88a21d58f4dd))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @miragon/event-storming-dsl bumped from 0.2.1 to 0.2.2
+    * @miragon/event-storming-renderer bumped from 0.2.1 to 0.2.2
+    * @miragon/event-storming-schema-model bumped from 0.2.0 to 0.2.1
+
 ## [0.2.1](https://github.com/Miragon/event-storming-modeler/compare/webapp-v0.2.0...webapp-v0.2.1) (2026-09-04)
 
 
