@@ -128,10 +128,10 @@
     "diagram-js": "15.26.0",
     "didi": "11.0.0",
     "tiny-svg": "4.1.4",
-    "zod": "4.6.4"
+    "zod": "4.6.5"
   },
   "devDependencies": {
-    "@types/node": "26.5.1",
+    "@types/node": "26.6.2",
     "@types/vscode": "1.96.0",
     "@vscode/vsce": "3.9.2",
     "esbuild": "0.28.2",
