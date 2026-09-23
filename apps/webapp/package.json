@@ -18,7 +18,7 @@
     "diagram-js": "15.26.0",
     "didi": "11.0.0",
     "tiny-svg": "4.1.4",
-    "zod": "4.6.4"
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "portless": "0.15.6",
