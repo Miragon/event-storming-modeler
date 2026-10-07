@@ -125,13 +125,13 @@
     "@miragon/event-storming-dsl": "0.2.2",
     "@miragon/event-storming-renderer": "0.2.2",
     "@miragon/event-storming-schema-model": "0.2.1",
-    "diagram-js": "15.27.1",
+    "diagram-js": "15.28.0",
     "didi": "11.0.0",
     "tiny-svg": "4.1.4",
     "zod": "4.6.5"
   },
   "devDependencies": {
-    "@types/node": "26.6.3",
+    "@types/node": "26.6.4",
     "@types/vscode": "1.96.0",
     "@vscode/vsce": "4.0.0",
     "esbuild": "0.28.2",
