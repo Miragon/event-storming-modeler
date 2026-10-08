@@ -46,9 +46,6 @@ earlier events sit to the left of later ones — and arrows connect the stickies
 - **Collapsed menu** (top-right, Excalidraw-style): fit-to-view · export SVG/PNG (as a picture).
 - **Self-hosted font** — no CDN, offline-capable.
 
-> TODO: `icon.png` is a placeholder carried over from the previous project and needs Event
-> Storming artwork.
-
 ## Development
 
 Building from source and the dev loop are documented in
