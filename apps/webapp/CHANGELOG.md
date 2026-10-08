@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/Miragon/event-storming-modeler/compare/webapp-v0.2.2...webapp-v0.3.0) (2026-10-08)
+
+
+### Features
+
+* use the Event Storming modeler icon for the webapp and VS Code extension ([#32](https://github.com/Miragon/event-storming-modeler/issues/32)) ([7378172](https://github.com/Miragon/event-storming-modeler/commit/7378172b684f3d4f743f793fbee37801007a2f95))
+
 ## [0.2.2](https://github.com/Miragon/event-storming-modeler/compare/webapp-v0.2.1...webapp-v0.2.2) (2026-09-22)
 
 

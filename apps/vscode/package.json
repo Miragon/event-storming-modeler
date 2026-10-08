@@ -1,7 +1,7 @@
 {
   "name": "event-storming-modeler",
   "private": true,
-  "version": "0.2.2",
+  "version": "0.3.0",
   "displayName": "Event Storming Modeler",
   "description": "View and edit Event Storming boards directly in VS Code, backed by plain-text .storm files.",
   "publisher": "miragon-gmbh",
