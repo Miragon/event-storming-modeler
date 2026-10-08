@@ -43,7 +43,11 @@
         "extensions": [
           ".storm"
         ],
-        "configuration": "./language-configuration.json"
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./media/icons/event-storming-light.svg",
+          "dark": "./media/icons/event-storming-dark.svg"
+        }
       }
     ],
     "customEditors": [
