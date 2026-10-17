@@ -1,6 +1,8 @@
-/* Chrome of the webview. The canvas itself carries the Miragon look (renderer CSS); the floating
-   toolbar adopts the VS Code theme (--vscode-*) so the editor blends natively into the IDE, with
-   Miragon fallbacks (Geist, interactive blue #2b50d4) when a theme var is absent. */
+/* Chrome of the webview. The canvas and the palette never follow the VS Code theme (the palette
+   stays light even on a `style dark` board), so the floating toolbar takes the same light tokens
+   (--event-storming-*, loaded with the renderer CSS) instead of host colours: under a dark theme,
+   those would put a dark menu next to the light palette. Only the font family comes from the host.
+   'Geist Variable' is the family name that the bundled @fontsource-variable/geist registers. */
 
 html,
 body {
@@ -8,10 +10,13 @@ body {
   padding: 0;
   height: 100%;
   overflow: hidden;
+  background: var(--event-storming-paper);
 }
 
 body {
+  color: var(--event-storming-ink);
   font-family:
+    'Geist Variable',
     'Geist',
     var(--vscode-font-family),
     ui-sans-serif,
@@ -47,14 +52,18 @@ body {
   height: 36px;
   padding: 0;
   border-radius: 8px;
-  border: 1px solid var(--vscode-editorWidget-border, rgba(0, 0, 0, 0.12));
-  background: var(--vscode-editorWidget-background, #fff);
-  color: var(--vscode-editorWidget-foreground, var(--vscode-foreground, #1d1d1d));
+  border: 1px solid var(--event-storming-border);
+  background: var(--event-storming-surface);
+  color: var(--event-storming-ink);
+  font: inherit;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
   cursor: pointer;
 }
 .menu-btn:hover {
-  background: var(--vscode-toolbar-hoverBackground, rgba(0, 0, 0, 0.06));
+  /* Same hover as the palette next to it: accent tint over the solid surface, never see-through. */
+  background:
+    linear-gradient(var(--event-storming-accent-soft), var(--event-storming-accent-soft)),
+    var(--event-storming-surface);
 }
 .menu-btn svg {
   width: 18px;
@@ -63,8 +72,8 @@ body {
 }
 .menu-btn:focus-visible,
 .menu-item:focus-visible {
-  outline: 1px solid var(--vscode-focusBorder, #2b50d4);
-  outline-offset: 1px;
+  outline: 2px solid #2b50d4;
+  outline-offset: 2px;
 }
 
 .menu-dropdown {
@@ -76,9 +85,9 @@ body {
   flex-direction: column;
   padding: 6px;
   border-radius: 10px;
-  background: var(--vscode-editorWidget-background, #fff);
-  color: var(--vscode-editorWidget-foreground, var(--vscode-foreground, #1d1d1d));
-  border: 1px solid var(--vscode-editorWidget-border, rgba(0, 0, 0, 0.14));
+  background: var(--event-storming-surface);
+  color: var(--event-storming-ink);
+  border: 1px solid var(--event-storming-border);
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
 }
 .menu-dropdown[hidden] {
@@ -100,7 +109,9 @@ body {
   cursor: pointer;
 }
 .menu-item:hover {
-  background: var(--vscode-list-hoverBackground, rgba(0, 0, 0, 0.08));
+  background:
+    linear-gradient(var(--event-storming-accent-soft), var(--event-storming-accent-soft)),
+    var(--event-storming-surface);
 }
 .menu-item svg {
   width: 16px;
@@ -110,7 +121,7 @@ body {
 
 /* Active workshop level (menuitemradio): link accent, check via markup. */
 .menu-item[aria-checked='true'] {
-  color: var(--vscode-textLink-foreground, #2b50d4);
+  color: #2b50d4;
   font-weight: 600;
 }
 /* Keeps unchecked labels aligned with the 16px icons of the other menu items. */
@@ -125,11 +136,11 @@ body {
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--vscode-descriptionForeground, rgba(0, 0, 0, 0.55));
+  color: var(--event-storming-ink-soft);
 }
 
 .menu-sep {
   height: 1px;
   margin: 6px 4px;
-  background: var(--vscode-editorWidget-border, rgba(0, 0, 0, 0.14));
+  background: var(--event-storming-border);
 }

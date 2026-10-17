@@ -161,8 +161,8 @@ function deselect(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Menu (collapsed hamburger top right, Excalidraw style; chrome in the VS Code theme, canvas keeps
-// the Miragon look). NO undo/redo — VS Code handles that via Ctrl/Cmd+Z out of the box
+// Menu (collapsed hamburger top right, Excalidraw style; light Miragon chrome like the palette, in
+// every VS Code theme). NO undo/redo — VS Code handles that via Ctrl/Cmd+Z out of the box
 // (the modeler's keyboard service is bound within the webview canvas).
 // ---------------------------------------------------------------------------
 
