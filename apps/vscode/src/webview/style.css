@@ -1,8 +1,8 @@
-/* Chrome of the webview. The canvas and the palette are always light Miragon paper, so the floating
-   toolbar takes the same light tokens (--event-storming-*, loaded with the renderer CSS) instead of
-   the VS Code theme: under a dark theme, host colours would put a dark menu next to the light
-   canvas. Only the font family comes from the host. 'Geist Variable' is the family name that the
-   bundled @fontsource-variable/geist registers. */
+/* Chrome of the webview. The canvas and the palette never follow the VS Code theme (the palette
+   stays light even on a `style dark` board), so the floating toolbar takes the same light tokens
+   (--event-storming-*, loaded with the renderer CSS) instead of host colours: under a dark theme,
+   those would put a dark menu next to the light palette. Only the font family comes from the host.
+   'Geist Variable' is the family name that the bundled @fontsource-variable/geist registers. */
 
 html,
 body {
