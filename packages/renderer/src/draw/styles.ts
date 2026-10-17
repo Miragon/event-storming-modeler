@@ -130,11 +130,14 @@ export const FONT = {
   /**
    * Set as the `font-family` attribute DIRECTLY on all SVG text elements (canvas labels and
    * consequently the SVG export too) – not inherited from a CSS container. In EVERY context it
-   * reaches for the self-hosted 'Geist' (Miragon corporate typeface) if the consumer provides it;
+   * reaches for the self-hosted Geist (Miragon corporate typeface) if the consumer provides it;
    * otherwise (e.g. an export SVG opened standalone) it falls back safely to a system sans. The
    * library does NOT ship the font – consumers must self-host Geist themselves
-   * (e.g. via @fontsource-variable/geist), see README.
+   * (e.g. via @fontsource-variable/geist), see README. 'Geist Variable' comes first because that
+   * is the family name `@fontsource-variable/geist` registers; 'Geist' matches a locally
+   * installed (static) Geist.
    */
-  family: "'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif",
+  family:
+    "'Geist Variable', 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif",
   label: 13,
 } as const;
