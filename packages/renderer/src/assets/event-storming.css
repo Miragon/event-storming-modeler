@@ -42,7 +42,7 @@
   width: 100%;
   height: 100%;
   background-color: var(--event-storming-paper);
-  background-image: radial-gradient(rgba(29, 29, 29, 0.045) 0.6px, transparent 0.6px);
+  background-image: radial-gradient(var(--cd-ui-linie) 1px, transparent 1px);
   background-size: 22px 22px;
   font-family:
     'Geist Variable',
@@ -60,25 +60,23 @@
   -webkit-user-select: none;
 }
 
-/* Hover / selection emphasis: darken+saturate the WHOLE visual group so elements keep their own
-   (possibly user-picked) colour; the branded blue outline (below) signals the actual selection. */
-.event-storming-container .djs-element.hover > .djs-visual,
-.event-storming-container .djs-element.selected > .djs-visual {
-  filter: brightness(0.72) saturate(1.15);
-}
-
 .event-storming-container .djs-outline {
   stroke: var(--event-storming-accent);
   stroke-dasharray: 3 3;
 }
+/* Hover and selection leave the sticky's own (possibly user-picked) colour alone: the outline in
+   the interaction blue is the only cue (guide §10.4, no brightness filter). diagram-js shows no
+   outline on hover by itself. */
+.event-storming-container .djs-shape.hover > .djs-outline {
+  visibility: visible;
+}
 /* diagram-js drives selection/lasso outlines via CSS variables (default: its own blue), scoped on
-   `.djs-parent` — override there with the Miragon interactive blue. Lasso fill, resizer and
-   bendpoint handles come from cd-canvas.css (guide §10.4: lasso without fill, handles plot with an
-   interaktion rim), so they are not repeated here. */
+   `.djs-parent` — override there with the Miragon interactive blue. The multi-selection outline,
+   lasso fill, resizer and bendpoint handles come from cd-canvas.css (guide §10.4: every selected
+   element dashed in interaktion, lasso without fill, handles plot with an interaktion rim), so they
+   are not repeated here. */
 .event-storming-container .djs-parent {
-  --element-hover-outline-fill-color: var(--event-storming-accent-soft);
   --element-selected-outline-stroke-color: var(--event-storming-accent);
-  --element-selected-outline-secondary-stroke-color: var(--event-storming-accent-soft);
   --lasso-stroke-color: var(--event-storming-accent);
 }
 
