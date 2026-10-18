@@ -40,11 +40,31 @@ earlier events sit to the left of later ones — and arrows connect the stickies
   by the plain-text file. Editing the text in a split view re-renders the canvas live (two-way
   sync), and VS Code tracks dirty state as you go. To reopen a board as raw text, use
   **View: Reopen Editor With…**, then pick **Text Editor**.
-- **Full modeler:** the tool palette on the side and the context pad on a selected sticky (append,
+- **Full modeler:** the tool palette at the top and the context pad on a selected sticky (append,
   connect, change type, delete), free movement on an unbounded canvas, inline label editing, and
-  sticky color overrides. Undo/redo via `Ctrl/Cmd+Z` and `Ctrl/Cmd+Shift+Z`.
-- **Collapsed menu** (top-right, Excalidraw-style): fit-to-view · export SVG/PNG (as a picture).
-- **Self-hosted font** — no CDN, offline-capable.
+  sticky color overrides.
+- **Undo and redo belong to the file.** Every change on the canvas is one edit of the document, so
+  `Ctrl/Cmd+Z` and `Ctrl/Cmd+Shift+Z` (or **Edit > Undo**) undo it like a text change, and the
+  canvas keeps its view and selection. Only the lines that changed are rewritten, so a text editor
+  open beside the board keeps its cursor.
+- **Menu** (top left): the workshop **Level** and **Type captions** (the caption on each sticky),
+  **Export as PNG** and **Export as SVG** (as a picture), and **Keyboard shortcuts…**.
+- **Zoom** (bottom right): zoom out, the current zoom (click for 100%), zoom in and fit. With the
+  board focused, `Ctrl/Cmd` + `+`, `-` and `0` zoom the canvas (not the window), `Shift+1` fits.
+- **Problems.** Lines the parser cannot fully use (an arrow to a missing sticky, an unreadable
+  line) are kept in the file and listed in the **Problems** view; the pill at the bottom left
+  counts them and opens that view.
+- **Commands** (Command Palette or the `…` menu of the editor title, while a board is focused):
+  **Event Storming: Fit to View**, **Export as PNG**, **Export as SVG**.
+- **Empty board:** a hint in the middle offers **Insert example**, which adds the order-checkout
+  example as one undoable edit and keeps the title and comments already in the file.
+- **Light canvas in every theme.** The board stays light under dark color themes (high contrast is
+  honoured) until the Miragon modelers ship their dark mode together.
+- **Self-hosted fonts** — no CDN, offline-capable.
+
+The menu, palette skin, zoom panel, problems pill, status box, empty-board hint and the theme
+bridge come from [`@miragon/modeler-shell`](https://github.com/Miragon/modeler-api/tree/main/packages/shell),
+the chrome shared by all Miragon modelers.
 
 ## Development
 

@@ -73,6 +73,21 @@
         "command": "eventStorming.newBoardFromExample",
         "title": "New Board from Example",
         "category": "Event Storming"
+      },
+      {
+        "command": "eventStorming.fitView",
+        "title": "Fit to View",
+        "category": "Event Storming"
+      },
+      {
+        "command": "eventStorming.exportPng",
+        "title": "Export as PNG",
+        "category": "Event Storming"
+      },
+      {
+        "command": "eventStorming.exportSvg",
+        "title": "Export as SVG",
+        "category": "Event Storming"
       }
     ],
     "menus": {
@@ -80,6 +95,37 @@
         {
           "command": "eventStorming.newBoard",
           "group": "eventStorming"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "eventStorming.fitView",
+          "when": "activeCustomEditorId == eventStorming.boardEditor",
+          "group": "eventStorming@1"
+        },
+        {
+          "command": "eventStorming.exportPng",
+          "when": "activeCustomEditorId == eventStorming.boardEditor",
+          "group": "eventStorming@2"
+        },
+        {
+          "command": "eventStorming.exportSvg",
+          "when": "activeCustomEditorId == eventStorming.boardEditor",
+          "group": "eventStorming@3"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "eventStorming.fitView",
+          "when": "activeCustomEditorId == eventStorming.boardEditor"
+        },
+        {
+          "command": "eventStorming.exportPng",
+          "when": "activeCustomEditorId == eventStorming.boardEditor"
+        },
+        {
+          "command": "eventStorming.exportSvg",
+          "when": "activeCustomEditorId == eventStorming.boardEditor"
         }
       ]
     },
@@ -104,7 +150,7 @@
           {
             "id": "learn",
             "title": "Learn the basics",
-            "description": "Add stickies for events, commands and aggregates, connect them with arrows, then export the board as SVG or PNG.",
+            "description": "Add stickies for events, commands and aggregates, connect them with arrows, then export the board as PNG or SVG.",
             "media": {
               "markdown": "media/walkthrough/learn.md"
             },
