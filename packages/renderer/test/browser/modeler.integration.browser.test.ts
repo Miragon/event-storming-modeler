@@ -134,6 +134,32 @@ describe('Modeler integration (real browser DOM)', () => {
     expect(box.height).toBeGreaterThan(0);
   });
 
+  // Hosts re-import on every external change: an import is no edit, and the shell's viewport
+  // treats viewbox changes between import.parse.start/import.render.start and import.done as
+  // the importer's own.
+  it('re-imports silently over undo history, in the order parse, render, done', async () => {
+    await modeler.importDSL(DSL);
+    const registry = modeler.get<ElementRegistry>('elementRegistry');
+    modeler
+      .get<Modeling>('modeling')
+      .moveShape(findByLabel(registry, 'Place Order'), { x: 40, y: 0 });
+    expect(modeler.canUndo()).toBe(true);
+
+    const fired: string[] = [];
+    for (const name of [
+      'commandStack.changed',
+      'import.parse.start',
+      'import.render.start',
+      'import.done',
+    ]) {
+      modeler.on(name, () => fired.push(name));
+    }
+    await modeler.importDSL(DSL);
+
+    expect(fired).toEqual(['import.parse.start', 'import.render.start', 'import.done']);
+    expect(modeler.canUndo()).toBe(false);
+  });
+
   it('roundtrips importDSL -> exportMap with stable labels and center positions', async () => {
     await modeler.importDSL(DSL);
     const board = modeler.exportMap();

@@ -91,8 +91,10 @@ export abstract class EventStormingBaseViewer {
     const warnings = importer.import(board);
     this._applyStyleClass(board.config.style);
     // Discard the PREVIOUS board's undo history: undo on orphaned elements would otherwise
-    // crash or insert zombie elements into the new board.
-    diagram.get<CommandStack>('commandStack').clear();
+    // crash or insert zombie elements into the new board. Silently, because an import is no
+    // content change (hosts would echo it back), and only where a stack exists: the viewers
+    // have none.
+    diagram.get<CommandStack>('commandStack', false)?.clear(false);
     eventBus.fire('import.done', { warnings });
     return { warnings };
   }
@@ -137,7 +139,7 @@ export abstract class EventStormingBaseViewer {
   }
 
   /** Own implementation (not a diagram-js primitive): attach the container to `target`. */
-  attachTo(target: HTMLElement): void {
+  attachTo(target: Element): void {
     target.appendChild(this._container);
     this.get<Canvas>('canvas').resized();
   }

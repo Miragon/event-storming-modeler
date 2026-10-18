@@ -56,7 +56,40 @@ arrow keys and the single-key tools keep working on the canvas.
 The modeler's keyboard listens on `document`, but only acts on keys aimed at the canvas: the
 target lies inside the canvas container, or nothing is focused (`document.body`). Keys another
 listener already handled (`defaultPrevented`) and keys typed into text fields are left alone, and
-the canvas container gets no `tabindex` of its own.
+the canvas container gets no `tabindex` of its own. An import erases the undo history without
+firing `commandStack.changed`, and fires `import.parse.start`, `import.render.start` and
+`import.done` in that order.
+
+### Collaborative hosts
+
+The package implements the collaborative-modeler contract of
+[`@miragon/modeler-api`](https://www.npmjs.com/package/@miragon/modeler-api) (notation
+`event-storming`) and runs its conformance kit in CI:
+
+```ts
+import {
+  createCollaborativeModeler,
+  createCollaborativeViewer,
+} from '@miragon/event-storming-renderer';
+
+const modeler = createCollaborativeModeler(); // meta.editable: true
+modeler.attachTo(host); // in the document, with a size
+await modeler.importText(text); // silent, history erased, view fitted
+const off = modeler.onContentChanged(() => save(modeler.exportText()));
+
+const viewer = createCollaborativeViewer(); // meta.editable: false, never changes content
+```
+
+- `importText` resolves for every `.storm` text: the DSL keeps every line, unknown ones in
+  `rawPassthrough`. Parser findings come back as `warnings`.
+- `onContentChanged` fires for every command-stack change, undo and redo included (also the
+  workshop level), never for imports, view options (type captions) or the viewport.
+- `getViewState()` / `setViewState()` read and set the diagram-js viewbox (`x`, `y`, `width`,
+  `height`); an import fits the board.
+- `elements` lists the stickies, notes, drawings and arrows with their ids and labels, reveals
+  (selects and scrolls to) an element and reports the selection.
+- `diagram` is the wrapped `Modeler` or `NavigatedViewer`, for everything outside the contract.
+  `createCollaborativeModeler` accepts `additionalModules` and `undoRedoKeys`.
 
 ### Fonts
 

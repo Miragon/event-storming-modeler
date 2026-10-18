@@ -5,6 +5,15 @@ export { NavigatedViewer } from './NavigatedViewer.js';
 export { Modeler } from './Modeler.js';
 export { EventStormingBaseViewer } from './EventStormingBaseViewer.js';
 export type { EventStormingViewerOptions, EventCallback } from './EventStormingBaseViewer.js';
+export {
+  EVENT_STORMING_NOTATION,
+  createCollaborativeModeler,
+  createCollaborativeViewer,
+} from './collaborative/index.js';
+export type {
+  CollaborativeEventStormingModeler,
+  CollaborativeEventStormingOptions,
+} from './collaborative/index.js';
 
 export { eventStormingModelModule, EventStormingElementFactory } from './model/index.js';
 export { boardBoundsModule, BoardBounds } from './board-bounds/index.js';
