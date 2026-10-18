@@ -1,4 +1,5 @@
 import type ContextPad from 'diagram-js/lib/features/context-pad/ContextPad';
+import type EventBus from 'diagram-js/lib/core/EventBus';
 import type Modeling from 'diagram-js/lib/features/modeling/Modeling';
 import type Connect from 'diagram-js/lib/features/connect/Connect';
 import type Create from 'diagram-js/lib/features/create/Create';
@@ -19,6 +20,7 @@ import type EventStormingLabelEditing from '../label-editing/EventStormingLabelE
 import type EventStormingElementFactory from '../model/EventStormingElementFactory.js';
 import type EventStormingColorPicker from '../color-picker/EventStormingColorPicker.js';
 import { POPUP_PROVIDER_ID } from '../popup/index.js';
+import { READ_ONLY_CHANGED_EVENT, type EventStormingReadOnly } from '../read-only/index.js';
 import {
   iconMarkup,
   ICON_ADD,
@@ -53,6 +55,8 @@ export default class EventStormingContextPadProvider implements ContextPadProvid
     'eventStormingLabelEditing',
     'eventStormingElementFactory',
     'eventStormingColorPicker',
+    'eventBus',
+    'eventStormingReadOnly',
   ];
 
   constructor(
@@ -65,11 +69,17 @@ export default class EventStormingContextPadProvider implements ContextPadProvid
     private readonly labelEditing: EventStormingLabelEditing,
     private readonly factory: EventStormingElementFactory,
     private readonly colorPicker: EventStormingColorPicker,
+    eventBus?: EventBus,
+    private readonly readOnly?: Pick<EventStormingReadOnly, 'isReadOnly'>,
   ) {
     contextPad.registerProvider(this);
+    eventBus?.on(READ_ONLY_CHANGED_EVENT, (event: { readOnly?: boolean }) => {
+      if (event.readOnly) contextPad.close();
+    });
   }
 
   getContextPadEntries(element: Element): ContextPadEntries {
+    if (this.readOnly?.isReadOnly()) return {};
     // Connections: edit the arrow annotation + delete.
     if (isEventStormingConnection(element)) {
       const conn = element;

@@ -104,3 +104,29 @@ describe('EventStormingContextPadProvider: blank append', () => {
     }
   });
 });
+
+describe('EventStormingContextPadProvider: read-only lock', () => {
+  it('offers no entry while the canvas is locked and closes an open pad when it locks', () => {
+    const close = vi.fn();
+    let listener: ((event: { readOnly?: boolean }) => void) | undefined;
+    let readOnly = false;
+    const provider = new EventStormingContextPadProvider(
+      { registerProvider: vi.fn(), close } as never,
+      { removeElements: vi.fn() } as never,
+      { start: vi.fn() } as never,
+      { start: vi.fn() } as never,
+      { open: vi.fn() } as never,
+      { setStrokeStyle: vi.fn(), getLevel: () => 'design' } as never,
+      { activate: vi.fn(), activateConnection: vi.fn() } as never,
+      { createProvisional: vi.fn() } as never,
+      { open: vi.fn() } as never,
+      { on: (_name: string, callback: typeof listener) => (listener = callback) } as never,
+      { isReadOnly: () => readOnly },
+    );
+    expect(Object.keys(provider.getContextPadEntries(sticky('cmd_a')))).not.toEqual([]);
+    readOnly = true;
+    listener?.({ readOnly: true });
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(provider.getContextPadEntries(sticky('cmd_a'))).toEqual({});
+  });
+});

@@ -193,7 +193,7 @@ describe('EventStormingLabelEditing', () => {
 });
 
 describe('EventStormingLabelEditing: an import while the editor is open', () => {
-  function importHarness() {
+  function importHarness(options: { readOnly?: boolean } = {}) {
     const container = document.createElement('div');
     document.body.appendChild(container);
     const canvas = {
@@ -228,9 +228,13 @@ describe('EventStormingLabelEditing: an import while the editor is open', () => 
         height: 90,
       }) as unknown as EventStormingShape;
     elements.set('event_order_placed', sticky('Order Placed'));
-    const editing = new EventStormingLabelEditing(eventBus, canvas, modeling, {
-      get: (id: string) => elements.get(id),
-    } as never);
+    const editing = new EventStormingLabelEditing(
+      eventBus,
+      canvas,
+      modeling,
+      { get: (id: string) => elements.get(id) } as never,
+      { isReadOnly: () => options.readOnly ?? false },
+    );
     const field = () => container.querySelector('textarea');
     const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
     return { container, editing, elements, sticky, field, fire, settle, updateLabel };
@@ -267,6 +271,23 @@ describe('EventStormingLabelEditing: an import while the editor is open', () => 
     elements.clear();
     editing.resumeAfterImport();
     await settle();
+    expect(field()).toBeNull();
+    expect(updateLabel).toEqual([]);
+    container.remove();
+  });
+
+  it('opens no editor under the read-only lock', () => {
+    const { editing, elements, field, container } = importHarness({ readOnly: true });
+    editing.activate(elements.get('event_order_placed')!);
+    expect(field()).toBeNull();
+    container.remove();
+  });
+
+  it('closes an open editor without committing when the lock engages', () => {
+    const { editing, elements, field, fire, updateLabel, container } = importHarness();
+    editing.activate(elements.get('event_order_placed')!);
+    field()!.value = 'Order Confirmed';
+    fire('eventStorming.readOnly.changed', { readOnly: true });
     expect(field()).toBeNull();
     expect(updateLabel).toEqual([]);
     container.remove();

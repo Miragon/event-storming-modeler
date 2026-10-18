@@ -9,6 +9,7 @@ import type EventBus from 'diagram-js/lib/core/EventBus';
 import { COLORS } from '../draw/styles.js';
 import { isDrawing, type EventStormingShape } from '../model/di-types.js';
 import type EventStormingModeling from '../modeling/EventStormingModeling.js';
+import { READ_ONLY_CHANGED_EVENT, type EventStormingReadOnly } from '../read-only/index.js';
 
 interface Point {
   x: number;
@@ -21,7 +22,7 @@ interface Point {
  * recomputed bbox) as ONE undoable command.
  */
 export default class EventStormingDrawingHandles {
-  static $inject = ['eventBus', 'canvas', 'eventStormingModeling'];
+  static $inject = ['eventBus', 'canvas', 'eventStormingModeling', 'eventStormingReadOnly'];
 
   private shape: EventStormingShape | null = null;
   private group: SVGElement | null = null;
@@ -31,7 +32,9 @@ export default class EventStormingDrawingHandles {
     private readonly eventBus: EventBus,
     private readonly canvas: Canvas,
     private readonly modeling: EventStormingModeling,
+    private readonly readOnly?: Pick<EventStormingReadOnly, 'isReadOnly'>,
   ) {
+    eventBus.on(READ_ONLY_CHANGED_EVENT, () => this.render());
     eventBus.on('selection.changed', (event: { newSelection?: unknown[] }) => {
       const sel = event.newSelection ?? [];
       const only = sel.length === 1 ? sel[0] : null;
@@ -56,7 +59,7 @@ export default class EventStormingDrawingHandles {
 
   private render(): void {
     this.clear();
-    if (!this.shape) return;
+    if (!this.shape || this.readOnly?.isReadOnly()) return;
     const layer = this.canvas.getLayer('event-storming-drawing-handles', 1100);
     const group = svgCreate('g');
     this.absolutePoints().forEach((p, index) => {

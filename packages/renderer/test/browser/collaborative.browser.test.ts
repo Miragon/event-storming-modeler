@@ -2,8 +2,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { attachedHost } from '@miragon/modeler-api/conformance';
 import type Canvas from 'diagram-js/lib/core/Canvas';
 import type CommandStack from 'diagram-js/lib/command/CommandStack';
+import type ContextPad from 'diagram-js/lib/features/context-pad/ContextPad';
 import type ElementRegistry from 'diagram-js/lib/core/ElementRegistry';
 import type Modeling from 'diagram-js/lib/features/modeling/Modeling';
+import type Rules from 'diagram-js/lib/features/rules/Rules';
 import type { Shape } from 'diagram-js/lib/model/Types';
 import { parseDSL } from '@miragon/event-storming-dsl';
 import {
@@ -14,6 +16,7 @@ import {
 import type EventStormingElementFactory from '../../src/model/EventStormingElementFactory.js';
 import type EventStormingLabelEditing from '../../src/label-editing/EventStormingLabelEditing.js';
 import type EventStormingModeling from '../../src/modeling/EventStormingModeling.js';
+import type EventStormingReadOnly from '../../src/read-only/EventStormingReadOnly.js';
 import type { EventStormingShape } from '../../src/model/di-types.js';
 import { STICKY_STYLES } from '../../src/draw/styles.js';
 import orderCheckout from './fixtures/order-checkout.storm?raw';
@@ -229,5 +232,32 @@ describe('the view after an import (guide §5.9)', () => {
     const { x, y, width, height } = modeler.diagram.get<Canvas>('canvas').viewbox();
     expect(x + width / 2).toBeCloseTo(0, 5);
     expect(y + height / 2).toBeCloseTo(0, 5);
+  });
+});
+
+describe('the read-only lock', () => {
+  it('blocks the context pad, moves, resizes, connections and deletes, and lifts again', async () => {
+    const modeler = editor();
+    await modeler.importText(orderCheckout);
+    const diagram = modeler.diagram;
+    const registry = diagram.get<ElementRegistry>('elementRegistry');
+    const rules = diagram.get<Rules>('rules');
+    const contextPad = diagram.get<ContextPad>('contextPad');
+    const readOnly = diagram.get<EventStormingReadOnly>('eventStormingReadOnly');
+    const event = registry.get('event_order_placed') as Shape;
+    const policy = registry.get('policy_when_order_placed_reserve_stock') as Shape;
+
+    readOnly.setReadOnly(true);
+    expect(rules.allowed('elements.move', { shapes: [event] })).toBe(false);
+    expect(rules.allowed('connection.create', { source: event, target: policy })).toBe(false);
+    expect(rules.allowed('elements.delete', { elements: [event] })).toBe(false);
+    contextPad.open(event);
+    expect(document.querySelectorAll('.djs-context-pad .entry')).toHaveLength(0);
+
+    readOnly.setReadOnly(false);
+    expect(rules.allowed('elements.move', { shapes: [event] })).not.toBe(false);
+    contextPad.close();
+    contextPad.open(event);
+    expect(document.querySelectorAll('.djs-context-pad .entry').length).toBeGreaterThan(0);
   });
 });

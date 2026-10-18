@@ -15,6 +15,7 @@ import { Modeler } from '../Modeler.js';
 import { NavigatedViewer } from '../NavigatedViewer.js';
 import type { EventStormingViewerOptions } from '../EventStormingBaseViewer.js';
 import { isSticky, type EventStormingShape } from '../model/di-types.js';
+import type { FreeRectInsets } from '../palette/EventStormingPaletteProvider.js';
 
 /** Stable notation id in `meta.notation` of the collaborative-modeler contract. */
 export const EVENT_STORMING_NOTATION = 'event-storming';
@@ -24,6 +25,8 @@ export interface CollaborativeEventStormingOptions {
   additionalModules?: ModuleDeclaration[] | undefined;
   /** See `EventStormingViewerOptions.undoRedoKeys` (default true). */
   undoRedoKeys?: boolean | undefined;
+  /** See `EventStormingViewerOptions.freeRectInsets`. */
+  freeRectInsets?: (() => FreeRectInsets) | undefined;
 }
 
 /** The contract surface plus the wrapped diagram for host-specific wiring. */
@@ -54,6 +57,7 @@ export function createCollaborativeModeler(
     new Modeler({
       ...diagramOptions(options),
       undoRedoKeys: options.undoRedoKeys ?? true,
+      freeRectInsets: options.freeRectInsets,
     }),
     true,
   );
@@ -61,7 +65,7 @@ export function createCollaborativeModeler(
 
 /** The read-only mount (`meta.editable: false`): imports, exports and reveals, never edits. */
 export function createCollaborativeViewer(
-  options: Omit<CollaborativeEventStormingOptions, 'undoRedoKeys'> = {},
+  options: Omit<CollaborativeEventStormingOptions, 'undoRedoKeys' | 'freeRectInsets'> = {},
 ): CollaborativeEventStormingModeler {
   return collaborative(new NavigatedViewer(diagramOptions(options)), false);
 }

@@ -53,6 +53,12 @@ export { eventStormingAppendModule, EventStormingAppendBehavior } from './append
 export { eventStormingAttachModule, EventStormingAttachBehavior } from './attach/index.js';
 export { eventStormingColorPickerModule, EventStormingColorPicker } from './color-picker/index.js';
 export { eventStormingResizeModule, EventStormingResizeBehavior } from './resize/index.js';
+export {
+  eventStormingReadOnlyModule,
+  EventStormingReadOnly,
+  READ_ONLY_CHANGED_EVENT,
+} from './read-only/index.js';
+export type { FreeRectInsets } from './palette/EventStormingPaletteProvider.js';
 
 export {
   isEventStormingShape,

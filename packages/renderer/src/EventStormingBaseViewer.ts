@@ -12,6 +12,7 @@ import type EventStormingExporter from './io/EventStormingExporter.js';
 import type BoardBounds from './board-bounds/BoardBounds.js';
 import type EventStormingLabelEditing from './label-editing/EventStormingLabelEditing.js';
 import { ROOT_ID, type ImportWarning } from './io/types.js';
+import type { FreeRectInsets } from './palette/EventStormingPaletteProvider.js';
 
 export interface EventStormingViewerOptions {
   /** Host element. If missing, a detached <div> is created (can be attached later via attachTo). */
@@ -25,6 +26,12 @@ export interface EventStormingViewerOptions {
    * Pass false when the host owns the history (the VS Code document), so the keys reach it.
    */
   undoRedoKeys?: boolean | undefined;
+  /**
+   * The margins of the container that chrome covers (palette row, zoom panel). An element created
+   * from the palette with Enter or Space lands in the centre of what is left (guide §5.5); without
+   * it, in the centre of the container.
+   */
+  freeRectInsets?: (() => FreeRectInsets) | undefined;
 }
 
 export type EventCallback<T = unknown> = (event: T) => void;
@@ -79,6 +86,7 @@ export abstract class EventStormingBaseViewer {
         canvas: { container: this._container },
         modules,
         eventStormingKeyboard: { undoRedoKeys: this._options.undoRedoKeys ?? true },
+        eventStormingPalette: { freeRectInsets: this._options.freeRectInsets },
       });
     }
     return this._diagram;

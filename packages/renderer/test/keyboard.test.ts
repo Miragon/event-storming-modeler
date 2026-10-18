@@ -11,7 +11,7 @@ afterEach(() => {
   for (const cleanup of cleanups.splice(0)) cleanup();
 });
 
-function harness(config?: EventStormingKeyboardConfig) {
+function harness(config?: EventStormingKeyboardConfig, options: { readOnly?: boolean } = {}) {
   const container = document.createElement('div');
   const canvasSvg = document.createElement('div');
   container.append(canvasSvg);
@@ -24,12 +24,20 @@ function harness(config?: EventStormingKeyboardConfig) {
   const modeling = { removeElements: vi.fn(), moveElements: vi.fn() };
   const copyPaste = { copy: vi.fn(() => true), paste: vi.fn(() => true), duplicate: vi.fn() };
   const lassoTool = { activateSelection: vi.fn() };
+  const selection = { get: () => selected, select: vi.fn() };
+  const boardElements = [
+    { id: 'event-storming-root', children: [] },
+    { id: 'event_order_placed', eventStormingType: 'event' },
+    { id: 'arrow_1', eventStormingType: 'arrow', waypoints: [] },
+  ];
+  const elementRegistry = { getAll: () => boardElements };
+  const readOnly = { isReadOnly: () => options.readOnly ?? false };
 
   new EventStormingKeyboard(
     config,
     { getContainer: () => container } as never,
     commandStack as never,
-    { get: () => selected } as never,
+    selection as never,
     modeling as never,
     copyPaste as never,
     { createNew: vi.fn() } as never,
@@ -37,6 +45,8 @@ function harness(config?: EventStormingKeyboardConfig) {
     { getLastMoveEvent: () => null } as never,
     lassoTool as never,
     eventBus,
+    elementRegistry as never,
+    readOnly,
   );
 
   cleanups.push(() => {
@@ -45,7 +55,17 @@ function harness(config?: EventStormingKeyboardConfig) {
     outside.remove();
   });
 
-  return { container, canvasSvg, outside, commandStack, modeling, copyPaste, lassoTool };
+  return {
+    container,
+    canvasSvg,
+    outside,
+    commandStack,
+    modeling,
+    copyPaste,
+    lassoTool,
+    selection,
+    boardElements,
+  };
 }
 
 function press(target: EventTarget, key: string, modifiers: KeyboardEventInit = {}): KeyboardEvent {
@@ -140,5 +160,56 @@ describe('EventStormingKeyboard: undo/redo keys', () => {
 
     expect(press(canvasSvg, 'c', { metaKey: true }).defaultPrevented).toBe(true);
     expect(copyPaste.copy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('EventStormingKeyboard: select all', () => {
+  // Without it VS Code runs its own webview Select All (guide §13.5 lists Cmd+A as a canvas key).
+  it('selects every shape and connection on Cmd/Ctrl+A, never the root', () => {
+    const { canvasSvg, selection, boardElements } = harness();
+    expect(press(canvasSvg, 'a', { metaKey: true }).defaultPrevented).toBe(true);
+    expect(press(canvasSvg, 'a', { ctrlKey: true }).defaultPrevented).toBe(true);
+    expect(selection.select).toHaveBeenCalledTimes(2);
+    expect(selection.select).toHaveBeenLastCalledWith(boardElements.slice(1));
+  });
+
+  it('leaves Cmd/Ctrl+Shift+A alone', () => {
+    const { canvasSvg, selection } = harness();
+    expect(press(canvasSvg, 'a', { metaKey: true, shiftKey: true }).defaultPrevented).toBe(false);
+    expect(selection.select).not.toHaveBeenCalled();
+  });
+});
+
+describe('EventStormingKeyboard: read-only lock', () => {
+  // An invalid file in an IDE host: the canvas shows the last valid board and edits nothing.
+  it('ignores every editing key, and lets undo and redo reach the host', () => {
+    const { canvasSvg, modeling, copyPaste, commandStack } = harness(undefined, { readOnly: true });
+    for (const [key, modifiers] of [
+      ['Delete', {}],
+      ['Backspace', {}],
+      ['ArrowDown', {}],
+      ['v', { metaKey: true }],
+      ['d', { metaKey: true }],
+      ['z', { metaKey: true }],
+      ['y', { ctrlKey: true }],
+    ] as const) {
+      expect(press(canvasSvg, key, modifiers).defaultPrevented, key).toBe(false);
+    }
+    expect(modeling.removeElements).not.toHaveBeenCalled();
+    expect(modeling.moveElements).not.toHaveBeenCalled();
+    expect(copyPaste.paste).not.toHaveBeenCalled();
+    expect(copyPaste.duplicate).not.toHaveBeenCalled();
+    expect(commandStack.undo).not.toHaveBeenCalled();
+    expect(commandStack.redo).not.toHaveBeenCalled();
+  });
+
+  it('keeps select all, copy and the lasso', () => {
+    const { canvasSvg, selection, copyPaste, lassoTool } = harness(undefined, { readOnly: true });
+    press(canvasSvg, 'a', { metaKey: true });
+    press(canvasSvg, 'c', { metaKey: true });
+    press(canvasSvg, 'l');
+    expect(selection.select).toHaveBeenCalledTimes(1);
+    expect(copyPaste.copy).toHaveBeenCalledTimes(1);
+    expect(lassoTool.activateSelection).toHaveBeenCalledTimes(1);
   });
 });

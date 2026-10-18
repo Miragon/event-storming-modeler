@@ -156,3 +156,88 @@ describe('EventStormingPaletteProvider: tooltips', () => {
     }
   });
 });
+
+describe('EventStormingPaletteProvider: Enter or Space on a creating entry (guide §5.5)', () => {
+  function keyboardHarness() {
+    const eventBus = new EventBus();
+    const placed: Array<{ id: string; x: number; y: number; width: number; height: number }> = [];
+    let next = 0;
+    const factory = {
+      createNew: vi.fn(() => ({ id: `event_${++next}`, width: 130, height: 90 })),
+    };
+    const create = { start: vi.fn() };
+    const canvas = {
+      viewbox: () => ({ x: 100, y: 50, scale: 2, outer: { width: 1000, height: 800 } }),
+      getRootElement: () => ({ id: ROOT_ID }),
+      focus: vi.fn(),
+    };
+    const modeling = {
+      createShape: vi.fn(
+        (shape: { id: string; width: number; height: number }, at: { x: number; y: number }) => {
+          const created = {
+            ...shape,
+            eventStormingType: 'event',
+            x: at.x - shape.width / 2,
+            y: at.y - shape.height / 2,
+          };
+          placed.push(created);
+          return created;
+        },
+      ),
+    };
+    const selection = { select: vi.fn() };
+    const elementRegistry = { filter: (fn: (element: unknown) => boolean) => placed.filter(fn) };
+    const labelEditing = { activate: vi.fn() };
+    const provider = new EventStormingPaletteProvider(
+      { registerProvider: vi.fn(), _rebuild: vi.fn() } as never,
+      create as never,
+      factory as never,
+      { activateSelection: vi.fn() } as never,
+      { toggle: vi.fn() } as never,
+      { getLevel: () => 'design' } as never,
+      eventBus,
+      canvas as never,
+      modeling as never,
+      selection as never,
+      elementRegistry as never,
+      labelEditing as never,
+      { freeRectInsets: () => ({ top: 88, right: 24, bottom: 64, left: 24 }) },
+    );
+    const click = (detail: number) =>
+      (provider.getPaletteEntries()['create.event']!.action as { click(event: Event): void }).click(
+        { type: 'click', detail } as unknown as Event,
+      );
+    return { click, create, canvas, modeling, selection, labelEditing };
+  }
+
+  it('places the element in the centre of the free rectangle, selected, with its label editor open', () => {
+    const { click, create, canvas, modeling, selection, labelEditing } = keyboardHarness();
+    click(0);
+    expect(create.start).not.toHaveBeenCalled();
+    // Free rectangle 952 x 648 from (24, 88) on screen; at scale 2 its centre is (100 + 500/2,
+    // 50 + 412/2) on the board.
+    expect(modeling.createShape.mock.calls[0]![1]).toEqual({ x: 350, y: 256 });
+    expect(selection.select).toHaveBeenCalledWith(modeling.createShape.mock.results[0]!.value);
+    expect(canvas.focus).toHaveBeenCalledTimes(1);
+    expect(labelEditing.activate).toHaveBeenCalledWith(modeling.createShape.mock.results[0]!.value);
+  });
+
+  it('moves 24px down and right while the centre is taken', () => {
+    const { click, modeling } = keyboardHarness();
+    click(0);
+    click(0);
+    click(0);
+    expect(modeling.createShape.mock.calls.map((call) => call[1])).toEqual([
+      { x: 350, y: 256 },
+      { x: 374, y: 280 },
+      { x: 398, y: 304 },
+    ]);
+  });
+
+  it('keeps the pointer create for a real click', () => {
+    const { click, create, modeling } = keyboardHarness();
+    click(1);
+    expect(create.start).toHaveBeenCalledTimes(1);
+    expect(modeling.createShape).not.toHaveBeenCalled();
+  });
+});

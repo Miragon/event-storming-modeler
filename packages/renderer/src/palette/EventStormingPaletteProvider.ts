@@ -1,6 +1,11 @@
 import type Palette from 'diagram-js/lib/features/palette/Palette';
+import type Canvas from 'diagram-js/lib/core/Canvas';
 import type Create from 'diagram-js/lib/features/create/Create';
+import type ElementRegistry from 'diagram-js/lib/core/ElementRegistry';
 import type EventBus from 'diagram-js/lib/core/EventBus';
+import type Modeling from 'diagram-js/lib/features/modeling/Modeling';
+import type Selection from 'diagram-js/lib/features/selection/Selection';
+import type { Shape } from 'diagram-js/lib/model/Types';
 import type LassoTool from 'diagram-js/lib/features/lasso-tool/LassoTool';
 import type EventStormingDrawTool from '../draw-tool/EventStormingDrawTool.js';
 import type {
@@ -11,9 +16,30 @@ import type {
 import { LEVEL_STICKY_KINDS } from '@miragon/event-storming-schema-model';
 import type EventStormingElementFactory from '../model/EventStormingElementFactory.js';
 import type EventStormingModeling from '../modeling/EventStormingModeling.js';
-import { ROOT_ID, type EventStormingShapeType } from '../model/di-types.js';
+import type EventStormingLabelEditing from '../label-editing/EventStormingLabelEditing.js';
+import {
+  ROOT_ID,
+  isEventStormingShape,
+  type EventStormingShape,
+  type EventStormingShapeType,
+} from '../model/di-types.js';
 import { NOTE_STYLE, STICKY_STYLES } from '../draw/styles.js';
 import { PALETTE_ICONS } from '../draw/palette-icons.js';
+
+/** Container margins in screen px that the host's chrome covers. */
+export interface FreeRectInsets {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
+export interface EventStormingPaletteConfig {
+  freeRectInsets?: (() => FreeRectInsets) | undefined;
+}
+
+/** Guide §5.5: a keyboard-created element lands this far down-right of one already centred there. */
+const KEYBOARD_CREATE_OFFSET = 24;
 
 interface PaletteSpec {
   key: string;
@@ -106,6 +132,12 @@ export default class EventStormingPaletteProvider implements PaletteProvider {
     'eventStormingDrawTool',
     'eventStormingModeling',
     'eventBus',
+    'canvas',
+    'modeling',
+    'selection',
+    'elementRegistry',
+    'eventStormingLabelEditing',
+    'config.eventStormingPalette',
   ];
 
   constructor(
@@ -116,6 +148,12 @@ export default class EventStormingPaletteProvider implements PaletteProvider {
     private readonly drawTool: EventStormingDrawTool,
     private readonly eventStormingModeling: EventStormingModeling,
     eventBus: EventBus,
+    private readonly canvas?: Canvas,
+    private readonly modeling?: Modeling,
+    private readonly selection?: Selection,
+    private readonly elementRegistry?: ElementRegistry,
+    private readonly labelEditing?: EventStormingLabelEditing,
+    private readonly config?: EventStormingPaletteConfig,
   ) {
     palette.registerProvider(this);
 
@@ -166,6 +204,7 @@ export default class EventStormingPaletteProvider implements PaletteProvider {
       if (spec.type !== 'note' && !allowed.includes(spec.type)) continue;
       const start = (event: Event) => {
         const shape = this.factory.createNew(spec.type, spec.label);
+        if (isKeyboardClick(event) && this.placeInFreeRect(shape)) return;
         this.create.start(event, shape);
       };
       entries[`create.${spec.key}`] = {
@@ -178,4 +217,44 @@ export default class EventStormingPaletteProvider implements PaletteProvider {
     }
     return entries;
   }
+
+  /**
+   * Enter or Space on a creating entry (guide §5.5): a create that follows the pointer never ends
+   * without one, so the element goes straight to the centre of the free rectangle, selected and
+   * with its label editor open. False when the services for it are missing.
+   */
+  private placeInFreeRect(shape: EventStormingShape): boolean {
+    const { canvas, modeling, selection, elementRegistry } = this;
+    if (!canvas || !modeling || !selection || !elementRegistry) return false;
+    const viewbox = canvas.viewbox();
+    const insets = this.config?.freeRectInsets?.() ?? { top: 0, right: 0, bottom: 0, left: 0 };
+    const freeWidth = Math.max(0, viewbox.outer.width - insets.left - insets.right);
+    const freeHeight = Math.max(0, viewbox.outer.height - insets.top - insets.bottom);
+    const centre = {
+      x: viewbox.x + (insets.left + freeWidth / 2) / viewbox.scale,
+      y: viewbox.y + (insets.top + freeHeight / 2) / viewbox.scale,
+    };
+    const taken = (point: { x: number; y: number }) =>
+      elementRegistry
+        .filter(isEventStormingShape)
+        .some(
+          (element) =>
+            Math.abs(element.x + element.width / 2 - point.x) < 1 &&
+            Math.abs(element.y + element.height / 2 - point.y) < 1,
+        );
+    while (taken(centre)) {
+      centre.x += KEYBOARD_CREATE_OFFSET;
+      centre.y += KEYBOARD_CREATE_OFFSET;
+    }
+    const created = modeling.createShape(shape, centre, canvas.getRootElement() as Shape);
+    selection.select(created);
+    canvas.focus();
+    this.labelEditing?.activate(created as unknown as EventStormingShape);
+    return true;
+  }
+}
+
+/** A click the shell synthesises for Enter or Space on a palette entry (no pointer, detail 0). */
+function isKeyboardClick(event: Event): boolean {
+  return event.type === 'click' && (event as MouseEvent).detail === 0;
 }

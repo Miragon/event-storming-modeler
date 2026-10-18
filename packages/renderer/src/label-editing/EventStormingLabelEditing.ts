@@ -8,6 +8,7 @@ import {
   type EventStormingShape,
 } from '../model/di-types.js';
 import type EventStormingModeling from '../modeling/EventStormingModeling.js';
+import { READ_ONLY_CHANGED_EVENT, type EventStormingReadOnly } from '../read-only/index.js';
 import { isManualNoteBox, noteMetrics } from '../draw/styles.js';
 import {
   NOTE_BULLET_CLASS,
@@ -75,7 +76,13 @@ export function sanitizeLabel(raw: string): string {
  * semantics, plus live bold/italic/bullet formatting and the floating alignment toolbar.
  */
 export default class EventStormingLabelEditing {
-  static $inject = ['eventBus', 'canvas', 'eventStormingModeling', 'elementRegistry'];
+  static $inject = [
+    'eventBus',
+    'canvas',
+    'eventStormingModeling',
+    'elementRegistry',
+    'eventStormingReadOnly',
+  ];
 
   private active: ActiveEdit | null = null;
   private suspended: SuspendedEdit | null = null;
@@ -86,7 +93,11 @@ export default class EventStormingLabelEditing {
     private readonly canvas: Canvas,
     private readonly modeling: EventStormingModeling,
     private readonly elementRegistry?: ElementRegistry,
+    private readonly readOnly?: Pick<EventStormingReadOnly, 'isReadOnly'>,
   ) {
+    eventBus.on(READ_ONLY_CHANGED_EVENT, (event: { readOnly?: boolean }) => {
+      if (event.readOnly) this.cancel();
+    });
     eventBus.on('diagram.destroy', () => clearTimeout(this.resumeTimer));
     eventBus.on('element.dblclick', (event: { element?: unknown }) => {
       if (isEventStormingShape(event.element)) this.activate(event.element);
@@ -157,6 +168,7 @@ export default class EventStormingLabelEditing {
 
   activate(element: EventStormingShape): void {
     this.active?.commit();
+    if (this.readOnly?.isReadOnly()) return;
     if (element.eventStormingType === 'drawing') return; // pure geometry, no label
     if (element.eventStormingType === 'note') {
       this.activateNote(element);
@@ -400,6 +412,7 @@ export default class EventStormingLabelEditing {
    */
   activateConnection(conn: EventStormingConnection): void {
     this.active?.commit();
+    if (this.readOnly?.isReadOnly()) return;
 
     const container = this.canvas.getContainer();
     const scale = this.canvas.zoom();
