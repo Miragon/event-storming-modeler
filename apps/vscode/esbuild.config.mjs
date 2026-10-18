@@ -40,7 +40,9 @@ const host = {
   outfile: resolve(here, 'dist/extension.cjs'),
   platform: 'node',
   format: 'cjs',
-  target: 'node18',
+  // VS Code 1.96 (engines) runs extensions on Node 20; the shell's createNonce needs its
+  // globalThis.crypto.
+  target: 'node20',
   external: ['vscode'],
   alias,
 };
@@ -54,7 +56,11 @@ const web = {
   format: 'iife',
   target: 'es2022',
   alias,
-  loader: { '.woff2': 'dataurl', '.woff': 'dataurl', '.ttf': 'dataurl' },
+  // Font files next to the bundle, not inlined: Geist Mono alone brings six subsets, and as
+  // separate files the browser fetches only the ones a page's unicode-range needs. The CSP of
+  // renderWebviewHtml allows fonts from cspSource, and dist/ is the webview's resource root.
+  loader: { '.woff2': 'file', '.woff': 'file', '.ttf': 'file' },
+  assetNames: 'fonts/[name]-[hash]',
 };
 
 if (watch) {

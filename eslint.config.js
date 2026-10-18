@@ -72,6 +72,11 @@ export default tseslint.config(
     },
   },
   {
+    // Build scripts run in Node.
+    files: ['apps/*/scripts/**/*.mjs'],
+    languageOptions: { globals: globals.node },
+  },
+  {
     // Intra-module clean-code ratchet: caps set just above today's maxima, so they are green now and
     // can only be tightened. Source only — tests/config have naturally long describe/setup blocks.
     // max-params is intentionally omitted: diagram-js DI injects each service as a constructor

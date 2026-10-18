@@ -217,6 +217,7 @@
     "build": "node esbuild.config.mjs",
     "watch": "node esbuild.config.mjs --watch",
     "typecheck": "tsc -p tsconfig.json",
+    "notices": "node scripts/third-party-notices.mjs",
     "vscode:prepublish": "node esbuild.config.mjs --production",
     "package": "vsce package --no-dependencies -o event-storming-modeler.vsix"
   },
