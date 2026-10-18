@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { expect, test } from '@playwright/test';
+import { describe, expect, it } from 'vitest';
 import { SHELL, SHELL_TOKENS, shellSizesFromTokens } from '@miragon/modeler-shell/core';
 
 /**
@@ -14,12 +14,14 @@ const vendoredTokens = JSON.parse(
   ),
 ) as { shell: Record<string, string> };
 
-test('the shell sizes equal the vendored `shell` tokens', () => {
-  expect(SHELL).toEqual(shellSizesFromTokens(vendoredTokens.shell));
-});
+describe('the vendored tokens and @miragon/modeler-shell', () => {
+  it('the shell sizes equal the vendored `shell` tokens', () => {
+    expect(SHELL).toEqual(shellSizesFromTokens(vendoredTokens.shell));
+  });
 
-test('the vendored tokens define every size the shell stylesheet reads', () => {
-  expect(Object.keys(vendoredTokens.shell)).toEqual(
-    expect.arrayContaining(Object.values(SHELL_TOKENS)),
-  );
+  it('the vendored tokens define every size the shell stylesheet reads', () => {
+    expect(Object.keys(vendoredTokens.shell)).toEqual(
+      expect.arrayContaining(Object.values(SHELL_TOKENS)),
+    );
+  });
 });

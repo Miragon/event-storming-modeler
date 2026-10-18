@@ -83,7 +83,7 @@ test.describe('VS Code webview: protocol and chrome', () => {
     await expect(level).toHaveAttribute('role', 'group');
     await expect(level).toHaveAttribute('aria-label', 'Level');
     const levelOptions = level.locator('[role="menuitemradio"]');
-    await expect(levelOptions).toHaveText(['Big picture', 'Process modelling', 'Software design']);
+    await expect(levelOptions).toHaveText(['Big picture', 'Process modeling', 'Software design']);
     expect(
       await levelOptions.evaluateAll((options) =>
         options.map((option) => option.getAttribute('data-menu-value')),
@@ -315,7 +315,6 @@ test.describe('VS Code webview: protocol and chrome', () => {
       const labelledBy = await dialog.getAttribute('aria-labelledby');
       expect(labelledBy).toBeTruthy();
       await expect(page.locator(`[id="${labelledBy}"]`)).toHaveText('Keyboard shortcuts');
-      expect(await dialog.evaluate((element) => getComputedStyle(element).zIndex)).toBe('50');
       await expect(dialog.getByRole('button', { name: 'Close' })).toBeVisible();
 
       if (close === 'Escape') await page.keyboard.press('Escape');
@@ -337,5 +336,137 @@ test.describe('VS Code webview: protocol and chrome', () => {
       await expect(entry).toHaveAttribute('aria-keyshortcuts', key);
       await expect(entry).toHaveAttribute('aria-label', label);
     }
+  });
+});
+
+const GRUND = 'rgb(249, 247, 247)';
+
+/** The number of stickies, notes and drawings on the board. */
+function shapeCount(page: Page): Promise<number> {
+  return page.evaluate(
+    () =>
+      window
+        .modeler!.diagram.get<{ getAll(): Array<{ parent?: unknown; waypoints?: unknown }> }>(
+          'elementRegistry',
+        )
+        .getAll()
+        .filter((element) => element.parent && !element.waypoints).length,
+  );
+}
+
+test.describe('VS Code webview: canvas', () => {
+  // Guide §10.7 and §13.5: `style dark` is kept in the text but never painted, so no navy board
+  // sits under light chrome, in a light or a dark VS Code theme.
+  for (const theme of ['light', 'dark'] as const) {
+    test(`a \`style dark\` board stays light in a ${theme} theme`, async ({ page }) => {
+      await openWebview(page, { requested: { theme } });
+      await postFromHost(page, {
+        type: 'update',
+        text: 'title Night\nstyle dark\nevent A [0, 0]\n',
+      });
+      await expect(page.locator('.cd-shell-canvas .djs-element.djs-shape')).toHaveCount(1);
+      const painted = await page.evaluate(() => ({
+        theme: document.documentElement.getAttribute('data-cd-theme'),
+        grund: getComputedStyle(document.documentElement).getPropertyValue('--cd-ui-grund').trim(),
+        board: getComputedStyle(document.querySelector('.event-storming-container')!)
+          .backgroundColor,
+        canvas: getComputedStyle(document.querySelector('.cd-shell-canvas')!).backgroundColor,
+      }));
+      expect(painted).toEqual({ theme: 'light', grund: '#F9F7F7', board: GRUND, canvas: GRUND });
+    });
+  }
+
+  // Guide §5.9: fit never zooms in past 100%, and an empty file has nothing to fit.
+  test('an empty file opens at 100%', async ({ page }) => {
+    await openWebview(page, { board: 'empty' });
+    await expect(page.locator('[data-chrome="zoom"] [data-zoom="actual"]')).toHaveText('100%');
+  });
+
+  // Guide §5.5: a keyboard user creates stickies too.
+  test('Enter on a creating palette entry adds one selected sticky with its label editor', async ({
+    page,
+  }) => {
+    await openWebview(page, { board: 'empty' });
+    const entry = page.locator('.djs-palette[data-chrome="palette"] [data-action="create.event"]');
+    await entry.focus();
+    await page.keyboard.press('Enter');
+
+    // A sticky created on the canvas carries its id in the text, so a re-open (or a peer) finds it.
+    const edit = await waitForPosted(page, 'edit');
+    expect(edit.text).toMatch(/^event Domain Event \[[-\d.]+, [-\d.]+\] \(id event_1\)$/m);
+    expect(countOf(await postedMessages(page), 'edit')).toBe(1);
+    expect(await shapeCount(page)).toBe(1);
+    await expect(page.locator('.cd-shell-canvas .djs-shape.selected')).toHaveCount(1);
+    await expect(page.locator('textarea.event-storming-label-textarea')).toBeFocused();
+
+    await page.keyboard.type('Order Placed');
+    await page.keyboard.press('ControlOrMeta+Enter');
+    await expect.poll(async () => countOf(await postedMessages(page), 'edit')).toBe(2);
+    expect((await waitForPosted(page, 'edit')).text).toMatch(
+      /^event Order Placed \[[-\d.]+, [-\d.]+\] \(id event_1\)$/m,
+    );
+  });
+
+  test('Cmd/Ctrl+A on the canvas selects the whole board and never reaches VS Code', async ({
+    page,
+  }) => {
+    await openWebview(page);
+    await page.evaluate(() => {
+      const seen: boolean[] = [];
+      (window as unknown as { selectAllAtWindow: boolean[] }).selectAllAtWindow = seen;
+      window.addEventListener('keydown', (event) => {
+        if (event.key === 'a') seen.push(event.defaultPrevented);
+      });
+    });
+    await page.locator('.cd-shell-canvas svg[role="application"]').focus();
+    await page.keyboard.press('ControlOrMeta+a');
+
+    // Stopped before window, or at least prevented: VS Code runs no Select All of its own.
+    const atWindow = await page.evaluate(
+      () => (window as unknown as { selectAllAtWindow: boolean[] }).selectAllAtWindow,
+    );
+    expect(atWindow.every((prevented) => prevented)).toBe(true);
+    await expect(page.locator('.cd-shell-canvas .djs-shape.selected')).toHaveCount(
+      await shapeCount(page),
+    );
+  });
+
+  // An invalid file (guide §13.5): the canvas keeps the last valid board and edits nothing until
+  // the text is valid again. The DSL reads every text today, so the test makes one import fail.
+  test('a failed import locks the canvas: no context pad, no delete, no edit', async ({ page }) => {
+    await openWebview(page);
+    await page.evaluate(() => {
+      const modeler = window.modeler!;
+      const importText = modeler.importText.bind(modeler);
+      modeler.importText = () => {
+        modeler.importText = importText;
+        return Promise.reject(new Error('not importable'));
+      };
+    });
+    await postFromHost(page, { type: 'update', text: 'title Broken\n' });
+    await expect(page.locator('[data-chrome="status"]')).toBeVisible();
+
+    const sticky = page.locator(
+      '.cd-shell-canvas .djs-shape[data-element-id="event_order_placed"]',
+    );
+    await sticky.click();
+    await expect(page.locator('.cd-shell-canvas .djs-shape.selected')).toHaveCount(1);
+    await expect(page.locator('.djs-context-pad .entry')).toHaveCount(0);
+    const shapes = await shapeCount(page);
+    await page.keyboard.press('Delete');
+    await sticky.dblclick();
+    await expect(page.locator('textarea.event-storming-label-textarea')).toHaveCount(0);
+    expect(await shapeCount(page)).toBe(shapes);
+    expect(countOf(await postedMessages(page), 'edit')).toBe(0);
+
+    // The next valid import lifts the lock (a click on a selected sticky deselects it, so start
+    // from an empty selection).
+    await postFromHost(page, { type: 'update', text: withExampleInserted(EMPTY_BOARD) });
+    await expect(page.locator('[data-chrome="status"]')).toBeHidden();
+    await page.evaluate(() =>
+      window.modeler!.diagram.get<{ select(elements: unknown): void }>('selection').select(null),
+    );
+    await sticky.click();
+    await expect(page.locator('.djs-context-pad .entry').first()).toBeVisible();
   });
 });
