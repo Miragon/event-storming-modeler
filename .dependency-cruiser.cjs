@@ -21,6 +21,22 @@ module.exports = {
       to: { path: '^packages/renderer/src' },
     },
     {
+      name: 'packages-no-shell',
+      comment:
+        'Renderers and the DOM-free packages never import @miragon/modeler-shell; only the apps mount ' +
+        'the shell (dependency direction of Miragon/modeler-api#4).',
+      severity: 'error',
+      from: { path: '^packages/[^/]+/src' },
+      to: { path: 'node_modules/@miragon/modeler-shell' },
+    },
+    {
+      name: 'dom-free-contract-types-only',
+      comment: 'DOM-free packages take only types from @miragon/modeler-api, never runtime code.',
+      severity: 'error',
+      from: { path: '^packages/(schema-model|dsl|transforms)/src' },
+      to: { path: 'node_modules/@miragon/modeler-api', dependencyTypesNot: ['type-only'] },
+    },
+    {
       name: 'renderer-feature-encapsulation',
       comment:
         'Within the renderer, a feature folder may reach into another feature only through the shared ' +
