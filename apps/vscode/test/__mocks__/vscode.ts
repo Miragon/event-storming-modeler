@@ -145,6 +145,11 @@ export class Diagnostic {
   ) {}
 }
 
+export enum ViewColumn {
+  Active = -1,
+  Beside = -2,
+}
+
 export enum ColorThemeKind {
   Light = 1,
   Dark = 2,
@@ -228,10 +233,12 @@ interface RegisteredEditor {
 
 const registeredEditors: RegisteredEditor[] = [];
 const registeredCommands = new Map<string, (...args: unknown[]) => unknown>();
+const executedCommands: unknown[][] = [];
 const diagnosticCollections: MockDiagnosticCollection[] = [];
 
 export const window = {
   activeColorTheme: { kind: ColorThemeKind.Light as number },
+  activeTextEditor: undefined as { document: { uri: Uri } } | undefined,
   onDidChangeActiveColorTheme(listener: (theme: { kind: number }) => void): Disposable {
     return colorThemeEmitter.event(listener);
   },
@@ -257,7 +264,8 @@ export const commands = {
       if (registeredCommands.get(command) === callback) registeredCommands.delete(command);
     });
   },
-  executeCommand(_command: string, ..._rest: unknown[]): Promise<unknown> {
+  executeCommand(command: string, ...rest: unknown[]): Promise<unknown> {
+    executedCommands.push([command, ...rest]);
     return Promise.resolve(undefined);
   },
 };
@@ -303,6 +311,10 @@ export const vscodeMock = {
   registeredCommandIds(): string[] {
     return [...registeredCommands.keys()];
   },
+  /** Every `vscode.commands.executeCommand` call, as `[command, ...args]`. */
+  executedCommands(): readonly unknown[][] {
+    return executedCommands;
+  },
   /** Runs a command the way the Command Palette does (without arguments). */
   runCommand(command: string, ...args: unknown[]): unknown {
     const callback = registeredCommands.get(command);
@@ -316,12 +328,14 @@ export const vscodeMock = {
   reset(): void {
     registeredEditors.length = 0;
     registeredCommands.clear();
+    executedCommands.length = 0;
     diagnosticCollections.length = 0;
     configuration.clear();
     docChangeEmitter.dispose();
     colorThemeEmitter.dispose();
     configurationEmitter.dispose();
     window.activeColorTheme = { kind: ColorThemeKind.Light };
+    window.activeTextEditor = undefined;
     workspace.workspaceFolders = undefined;
   },
 };

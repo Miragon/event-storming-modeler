@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { WEBVIEW_COMMANDS } from '../src/commands.js';
+import { OPEN_BOARD_COMMAND, OPEN_SOURCE_COMMAND, WEBVIEW_COMMANDS } from '../src/commands.js';
 
 interface CommandContribution {
   command: string;
   title: string;
   category?: string;
+  icon?: string;
 }
 interface MenuContribution {
   command: string;
@@ -18,6 +19,7 @@ const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.
     commands: CommandContribution[];
     menus: Record<string, MenuContribution[]>;
     keybindings?: unknown;
+    walkthroughs: Array<{ steps: Array<{ id: string; completionEvents: string[] }> }>;
   };
 };
 const { contributes } = manifest;
@@ -36,7 +38,10 @@ describe('package.json contributions', () => {
   });
 
   it('puts them in the editor title overflow, fit first, only for a board', () => {
-    const entries = contributes.menus['editor/title'] ?? [];
+    const webviewCommands = new Set<string>(Object.values(WEBVIEW_COMMANDS));
+    const entries = (contributes.menus['editor/title'] ?? []).filter((entry) =>
+      webviewCommands.has(entry.command),
+    );
 
     expect(entries.map((entry) => entry.command)).toEqual([
       WEBVIEW_COMMANDS.fitView,
@@ -55,6 +60,44 @@ describe('package.json contributions', () => {
     );
 
     for (const id of Object.values(WEBVIEW_COMMANDS)) expect(palette.get(id)).toBe(ON_BOARD);
+  });
+
+  // Guide §13.5: source and board side by side from the title of either editor, with Codicons.
+  it('offers the source beside a board and the board beside its source', () => {
+    const byId = new Map(contributes.commands.map((command) => [command.command, command]));
+    expect(byId.get(OPEN_SOURCE_COMMAND)).toMatchObject({
+      title: 'Open Source to the Side',
+      category: 'Event Storming',
+      icon: '$(go-to-file)',
+    });
+    expect(byId.get(OPEN_BOARD_COMMAND)).toMatchObject({
+      title: 'Open Board to the Side',
+      category: 'Event Storming',
+      icon: '$(open-preview)',
+    });
+    const title = new Map(
+      (contributes.menus['editor/title'] ?? []).map((entry) => [entry.command, entry]),
+    );
+    expect(title.get(OPEN_SOURCE_COMMAND)).toEqual({
+      command: OPEN_SOURCE_COMMAND,
+      when: ON_BOARD,
+      group: 'navigation',
+    });
+    expect(title.get(OPEN_BOARD_COMMAND)).toEqual({
+      command: OPEN_BOARD_COMMAND,
+      when: 'editorLangId == event-storming-dsl',
+      group: 'navigation',
+    });
+  });
+
+  it('walks through new, example and source to the side, each completed by its command', () => {
+    const steps = contributes.walkthroughs[0]!.steps;
+    expect(steps.map((step) => step.id).slice(0, 3)).toEqual(['new', 'example', 'source']);
+    expect(steps.slice(0, 3).map((step) => step.completionEvents)).toEqual([
+      ['onCommand:eventStorming.newBoard'],
+      ['onCommand:eventStorming.newBoardFromExample'],
+      [`onCommand:${OPEN_SOURCE_COMMAND}`],
+    ]);
   });
 
   it('contributes no keybindings: the canvas keys apply while the webview has focus', () => {
