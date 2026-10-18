@@ -22,13 +22,22 @@ const ARROW_DELTAS: Record<string, { x: number; y: number }> = {
   arrowdown: { x: 0, y: 1 },
 };
 
+export interface EventStormingKeyboardConfig {
+  /**
+   * Bind Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z and Cmd/Ctrl+Y to the canvas command stack (default true).
+   * A host that owns the history (the VS Code document) passes false so the keys reach it.
+   */
+  undoRedoKeys?: boolean | undefined;
+}
+
 /**
- * Minimal keyboard binding on the canvas container: undo/redo, delete, copy/paste/duplicate,
- * arrow-key nudge of the selection, plus the single-key tools E (domain event), C (command) and
- * L (lasso). Deliberately a DOM listener (no diagram-js keyboard-service binding needed).
+ * Minimal keyboard binding: undo/redo, delete, copy/paste/duplicate, arrow-key nudge of the
+ * selection, plus the single-key tools E (domain event), C (command) and L (lasso). Deliberately
+ * a DOM listener (no diagram-js keyboard-service binding needed).
  */
 export default class EventStormingKeyboard {
   static $inject = [
+    'config.eventStormingKeyboard',
     'canvas',
     'commandStack',
     'selection',
@@ -42,6 +51,7 @@ export default class EventStormingKeyboard {
   ];
 
   constructor(
+    config: EventStormingKeyboardConfig | undefined,
     canvas: Canvas,
     commandStack: CommandStack,
     selection: Selection,
@@ -54,11 +64,14 @@ export default class EventStormingKeyboard {
     eventBus: EventBus,
   ) {
     const container = canvas.getContainer();
-    if (!container.hasAttribute('tabindex')) container.setAttribute('tabindex', '0');
+    const undoRedoKeys = config?.undoRedoKeys ?? true;
 
     // Bind on the DOCUMENT (not the canvas container): single-key tools (E/C/L) must work
     // without the canvas having focus first — same trade-off bpmn-js makes for its keyboard.
     const onKeydown = (e: KeyboardEvent) => {
+      // Someone closer to the target (menu, palette, a host's own chrome) already handled it.
+      if (e.defaultPrevented) return;
+      if (!isCanvasTarget(e.target, container)) return;
       // If the user is currently typing in an input field, do NOT intercept: inline label editing
       // (EventStormingLabelEditing) attaches its <textarea> to the canvas container, and the
       // web-app chrome has its own fields. Without the guard, Backspace/Delete would delete the
@@ -67,13 +80,14 @@ export default class EventStormingKeyboard {
 
       const cmd = e.ctrlKey || e.metaKey;
       const key = e.key.toLowerCase();
+      const isUndo = cmd && key === 'z' && !e.shiftKey;
+      const isRedo = (cmd && key === 'z' && e.shiftKey) || (cmd && key === 'y');
 
-      if (cmd && key === 'z' && !e.shiftKey) {
+      if (isUndo || isRedo) {
+        if (!undoRedoKeys) return;
         e.preventDefault();
-        commandStack.undo();
-      } else if ((cmd && key === 'z' && e.shiftKey) || (cmd && key === 'y')) {
-        e.preventDefault();
-        commandStack.redo();
+        if (isUndo) commandStack.undo();
+        else commandStack.redo();
       } else if (cmd && key === 'c') {
         if (copyPaste.copy()) e.preventDefault();
       } else if (cmd && key === 'v') {
@@ -116,6 +130,14 @@ export default class EventStormingKeyboard {
     document.addEventListener('keydown', onKeydown);
     eventBus.on('diagram.destroy', () => document.removeEventListener('keydown', onKeydown));
   }
+}
+
+function isCanvasTarget(target: EventTarget | null, container: HTMLElement): boolean {
+  if (!(target instanceof Node)) return false;
+  // Body/html as target means nothing is focused — the single-key tools must work right away.
+  return (
+    container.contains(target) || target === document.body || target === document.documentElement
+  );
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {

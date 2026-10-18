@@ -34,6 +34,7 @@ export { eventStormingPaletteModule } from './palette/index.js';
 export { eventStormingContextPadModule } from './context-pad/index.js';
 export { labelEditingModule, EventStormingLabelEditing } from './label-editing/index.js';
 export { eventStormingKeyboardModule } from './keyboard/index.js';
+export type { EventStormingKeyboardConfig } from './keyboard/index.js';
 export {
   eventStormingPopupModule,
   EventStormingElementSettingsProvider,

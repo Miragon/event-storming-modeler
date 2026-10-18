@@ -38,6 +38,26 @@ arrows, undo/redo). Stickies are colored per kind (`STICKY_STYLES`): domain even
 actor, aggregate, policy, read model, external system, hotspot — plus free-text notes and
 freeform drawings on an unbounded canvas.
 
+### Options
+
+`Viewer`, `NavigatedViewer` and `Modeler` take the same options:
+
+| Option              | Default            | Purpose                                                      |
+| ------------------- | ------------------ | ------------------------------------------------------------ |
+| `container`         | a detached `<div>` | Host element; without one, mount later with `attachTo(host)` |
+| `width`, `height`   | `100%`, `600px`    | Container size (`100%` high when a `container` is given)     |
+| `additionalModules` | `[]`               | diagram-js modules appended after the renderer's own         |
+| `undoRedoKeys`      | `true`             | `Modeler` only: bind Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z and Ctrl+Y |
+
+Pass `undoRedoKeys: false` when the host owns the history, as the VS Code extension does: the keys
+then reach the host untouched and the host undoes the document, while copy, paste, delete, the
+arrow keys and the single-key tools keep working on the canvas.
+
+The modeler's keyboard listens on `document`, but only acts on keys aimed at the canvas: the
+target lies inside the canvas container, or nothing is focused (`document.body`). Keys another
+listener already handled (`defaultPrevented`) and keys typed into text fields are left alone, and
+the canvas container gets no `tabindex` of its own.
+
 ### Fonts
 
 The package ships no fonts and uses no CDN. The canvas typeface is **Geist** (Miragon corporate

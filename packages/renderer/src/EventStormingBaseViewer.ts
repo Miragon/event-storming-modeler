@@ -18,6 +18,11 @@ export interface EventStormingViewerOptions {
   height?: number | string;
   /** Concatenated to the end of the module list (extension point). */
   additionalModules?: ModuleDeclaration[];
+  /**
+   * Bind Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z and Cmd/Ctrl+Y to the board's undo/redo (default true).
+   * Pass false when the host owns the history (the VS Code document), so the keys reach it.
+   */
+  undoRedoKeys?: boolean | undefined;
 }
 
 export type EventCallback<T = unknown> = (event: T) => void;
@@ -56,7 +61,11 @@ export abstract class EventStormingBaseViewer {
   private _ensureDiagram(): Diagram {
     if (!this._diagram) {
       const modules = [...this._getModules(), ...(this._options.additionalModules ?? [])];
-      this._diagram = new Diagram({ canvas: { container: this._container }, modules });
+      this._diagram = new Diagram({
+        canvas: { container: this._container },
+        modules,
+        eventStormingKeyboard: { undoRedoKeys: this._options.undoRedoKeys ?? true },
+      });
     }
     return this._diagram;
   }
