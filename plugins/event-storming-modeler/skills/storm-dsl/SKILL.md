@@ -224,6 +224,10 @@ Two DSL consequences:
   `<prefix>_<slugified label>`, with prefixes `event`, `cmd`, `actor`, `agg`, `policy`, `read`,
   `ext`, `hot`, `note`, `draw`.
 - **A label that literally starts with `#`** forces an `(id …)` suffix on serialize.
+- **Keep the `(id …)` the modeler wrote.** A sticky created or renamed on the canvas carries its id
+  in the text (`event Order Confirmed [620, 300] (id event_order_placed)`), so todos, deep links and
+  presence in other tools keep pointing at it after a reload. Keep the suffix when you edit the
+  line; a new sticky you write yourself needs none unless its label repeats.
 - **Empty labels** are replaced by the per-kind default (`Domain Event`, `Command`, `Actor`, …).
 - **An unresolved arrow or an unreadable line is not an error** — it lands in `rawPassthrough` and
   is reported as a diagnostic. It also means the arrow silently does not exist on the board, so

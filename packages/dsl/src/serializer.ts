@@ -3,7 +3,8 @@ import type {
   EventStormingBoard,
   NoteElement,
 } from '@miragon/event-storming-schema-model';
-import { ID_CHARSET_RE, slug } from './lexer.js';
+import { IdAllocator, STICKY_ID_PREFIXES } from './ids.js';
+import { ID_CHARSET_RE, decodeName, slug } from './lexer.js';
 
 /**
  * Coordinate formatter: 3-decimal rounding, NEVER exponent notation — `String(1e21)` yields
@@ -104,30 +105,32 @@ export function serializeDSL(board: EventStormingBoard): string {
   const nameOf = (el: BoardElement): string => names.get(el.id) ?? el.label;
 
   // A `#…` token in a reference position always reads as an id — so a sticky whose serialized
-  // name is AMBIGUOUS (shared by >= 2 stickies) or literally starts with `#` is declared with
-  // an `(id …)` suffix and referenced as `#id`. Everything else stays purely name-based, so
-  // unambiguous boards serialize without any ids, byte-identical to before.
+  // name is AMBIGUOUS (shared by >= 2 stickies) or literally starts with `#` is referenced as
+  // `#id`. Everything else stays purely name-based, so unambiguous boards serialize without any
+  // ids, byte-identical to before.
   const nameCount = new Map<string, number>();
   for (const name of names.values()) nameCount.set(name, (nameCount.get(name) ?? 0) + 1);
-  const needsId = (id: string): boolean => {
+  const referencedById = (id: string): boolean => {
     const name = names.get(id);
     return name !== undefined && (nameCount.get(name)! > 1 || name.startsWith('#'));
   };
 
-  // Ids surface in the text only via needsId. An id outside the DSL id charset (possible in
-  // JSON-authored boards) would emit unparsable syntax and lose the arrows on re-import — a
-  // slug-based, collision-checked stand-in is substituted for the suffix AND every reference.
+  // Ids surface in the text only via the `(id …)` suffix. An id outside the DSL id charset
+  // (possible in JSON-authored boards) would emit unparsable syntax and lose the arrows on
+  // re-import — a slug-based, collision-checked stand-in is substituted for the suffix AND every
+  // reference.
   const emitIds = new Map<string, string>();
   const taken = new Set(board.elements.map((e) => e.id));
   for (const el of board.elements) {
-    if (!needsId(el.id) || ID_CHARSET_RE.test(el.id)) continue;
+    if (!referencedById(el.id) || ID_CHARSET_RE.test(el.id)) continue;
     let candidate = slug(el.id);
     for (let i = 2; taken.has(candidate); i++) candidate = `${slug(el.id)}_${i}`;
     taken.add(candidate);
     emitIds.set(el.id, candidate);
   }
   const idOf = (id: string): string => emitIds.get(id) ?? id;
-  const ref = (id: string): string => (needsId(id) ? `#${idOf(id)}` : (names.get(id) ?? id));
+  const declaredIds = idsToDeclare(board, nameOf, referencedById, idOf);
+  const ref = (id: string): string => (referencedById(id) ? `#${idOf(id)}` : (names.get(id) ?? id));
 
   lines.push(`title ${board.config.title}`);
   if (board.config.style) lines.push(`style ${board.config.style}`);
@@ -145,7 +148,7 @@ export function serializeDSL(board: EventStormingBoard): string {
   };
 
   for (const el of board.elements) {
-    const idSuffix = needsId(el.id) ? ` (id ${idOf(el.id)})` : '';
+    const idSuffix = declaredIds.has(el.id) ? ` (id ${idOf(el.id)})` : '';
     lines.push(elementLine(el, nameOf(el), idSuffix, onSuffix(el)));
   }
 
@@ -170,6 +173,48 @@ export function serializeDSL(board: EventStormingBoard): string {
   }
 
   return lines.join('\n') + '\n';
+}
+
+/**
+ * The stickies whose line carries `(id …)`: those referenced as `#id`, plus every sticky whose id
+ * the parser would not allocate again at its line — one created on the canvas (`event_3`),
+ * renamed after its id was derived from the old label, or declared with an explicit id. Hosts
+ * anchor todos, presence and deep links to these ids, so they must survive a save and re-open.
+ * Replays the parser's allocation in emit order; an id equal to the allocated one stays implicit,
+ * which keeps boards authored without ids byte-identical.
+ */
+function idsToDeclare(
+  board: EventStormingBoard,
+  nameOf: (el: BoardElement) => string,
+  referencedById: (id: string) => boolean,
+  emittedId: (id: string) => string,
+): Set<string> {
+  const allocator = new IdAllocator();
+  const declared = new Set<string>();
+  for (const el of board.elements) {
+    const prefix = STICKY_ID_PREFIXES[el.elementType];
+    if (prefix === undefined) {
+      allocator.alloc(el.elementType === 'note' ? 'note' : 'draw', noteOrDrawingName(el));
+      continue;
+    }
+    const parsedName = decodeName(nameOf(el));
+    const declare =
+      referencedById(el.id) ||
+      (ID_CHARSET_RE.test(el.id) && allocator.peek(prefix, parsedName) !== el.id);
+    if (declare) {
+      declared.add(el.id);
+      allocator.claim(emittedId(el.id));
+    } else {
+      allocator.alloc(prefix, parsedName);
+    }
+  }
+  return declared;
+}
+
+/** The label the parser allocates a note's or a drawing's id from. */
+function noteOrDrawingName(el: BoardElement): string {
+  if (el.elementType === 'drawing') return 'line';
+  return decodeName(escapeText(el.label)) || 'note';
 }
 
 function elementLine(el: BoardElement, name: string, idSuffix: string, attach: string): string {
