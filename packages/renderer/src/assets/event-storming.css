@@ -1,4 +1,10 @@
+/* Design-system files vendored unchanged from Miragon/corporate-identity (src/theme/). The tokens
+   sit in a cascade layer, so a host page's own --cd-* tokens (unlayered) win over this copy.
+   cd-canvas.css stays unlayered and comes after diagram-js.css, so its mapping of the --bio-* and
+   .djs-parent variables onto the --cd-ui-* roles beats diagram-js's defaults. */
+@import '../theme/cd-tokens.generated.css' layer(event-storming-tokens);
 @import 'diagram-js/assets/diagram-js.css';
+@import '../theme/cd-canvas.css';
 
 /* Miragon design tokens for the in-canvas chrome. The VALUES here are hand-mirrored from the single
    source of truth in `src/theme/palette.ts` (CHROME_VARS / DARK_BOARD_VARS); a unit test
@@ -13,7 +19,7 @@
   --event-storming-accent: #335de5;
   --event-storming-accent-soft: rgba(51, 93, 229, 0.12);
   --event-storming-brand: #00e676;
-  --event-storming-danger: #c92a2a;
+  --event-storming-danger: #cd1839;
   --event-storming-shadow: rgba(29, 29, 29, 0.1);
   --event-storming-drawing-ink: #1d1d1d;
 
@@ -66,19 +72,16 @@
   stroke-dasharray: 3 3;
 }
 /* diagram-js drives selection/lasso outlines via CSS variables (default: its own blue), scoped on
-   `.djs-parent` — override there with the Miragon interactive blue. */
+   `.djs-parent` — override there with the Miragon interactive blue. Lasso fill, resizer and
+   bendpoint handles come from cd-canvas.css (guide §10.4: lasso without fill, handles plot with an
+   interaktion rim), so they are not repeated here. */
 .event-storming-container .djs-parent {
   --element-hover-outline-fill-color: var(--event-storming-accent-soft);
   --element-selected-outline-stroke-color: var(--event-storming-accent);
   --element-selected-outline-secondary-stroke-color: var(--event-storming-accent-soft);
-  --lasso-fill-color: var(--event-storming-accent-soft);
   --lasso-stroke-color: var(--event-storming-accent);
 }
 
-.event-storming-container .djs-resizer-visual {
-  fill: var(--event-storming-surface);
-  stroke: var(--event-storming-accent);
-}
 .event-storming-container .djs-resizer-hit {
   fill: none;
 }
@@ -86,8 +89,9 @@
 /* Palette: horizontal floating toolbar (Excalidraw style). Styling on the element itself
    (.djs-palette), NOT on .event-storming-container — so it travels along when the consumer mounts
    the palette elsewhere (e.g. the webapp into the header). Default = floating top-center;
-   overridable by the consumer. */
-.djs-palette {
+   overridable by the consumer. A palette the modeler shell skins (`data-chrome="palette"`) takes
+   only the shell's look, so every palette rule here skips it. */
+.djs-palette:not([data-chrome='palette']) {
   left: 50%;
   top: 12px;
   transform: translateX(-50%);
@@ -102,13 +106,13 @@
     0 1px 2px var(--event-storming-shadow),
     0 10px 26px var(--event-storming-shadow);
 }
-.djs-palette .djs-palette-entries,
-.djs-palette .group {
+.djs-palette:not([data-chrome='palette']) .djs-palette-entries,
+.djs-palette:not([data-chrome='palette']) .group {
   display: flex;
   flex-direction: row;
   align-items: center;
 }
-.djs-palette .entry {
+.djs-palette:not([data-chrome='palette']) .entry {
   float: none; /* diagram-js uses float:left -> redundant in the flex row */
   width: 40px;
   height: 40px;
@@ -119,7 +123,7 @@
     background 150ms ease,
     color 150ms ease;
 }
-.djs-palette .entry:hover {
+.djs-palette:not([data-chrome='palette']) .entry:hover {
   /* Accent tint LAYERED over the solid surface — a bare alpha background would let the canvas
      shine through and make the hovered entry look transparent. */
   background:
@@ -162,19 +166,22 @@
   pointer-events: all;
 }
 
-/* Active tool (e.g. the lasso): branded — the interactive blue, so the "armed" tool is obvious. */
-.djs-palette .entry.highlighted-entry {
+/* Active tool (e.g. the lasso): branded — the interactive blue, so the "armed" tool is obvious.
+   diagram-js colours a highlighted entry with !important (in the interactive blue once
+   cd-canvas.css maps it), and the tool icons draw in currentColor: without the !important here the
+   icon would vanish into the blue. */
+.djs-palette:not([data-chrome='palette']) .entry.highlighted-entry {
   background: var(--event-storming-accent);
-  color: #fff;
+  color: #fff !important;
 }
 
 /* Subtle vertical separator between the groups (diagram-js does not separate groups on its own). */
-.djs-palette .group + .group {
+.djs-palette:not([data-chrome='palette']) .group + .group {
   position: relative;
   margin-left: 9px;
   padding-left: 9px;
 }
-.djs-palette .group + .group::before {
+.djs-palette:not([data-chrome='palette']) .group + .group::before {
   content: '';
   position: absolute;
   top: 6px;
@@ -184,7 +191,9 @@
   background: var(--event-storming-border);
 }
 
-/* Palette icons (custom HTML icons) — unscoped, travel along with the relocated palette. */
+/* Palette icons (custom HTML icons) — unscoped, travel along with the relocated palette. No colour
+   of its own: the entry's colour (ink, hover, armed, the shell's read-only state) reaches the
+   currentColor tool icons. */
 .event-storming-palette-entry {
   display: flex;
   align-items: center;
@@ -194,7 +203,6 @@
   min-width: 24px;
   min-height: 24px;
   line-height: 1;
-  color: var(--event-storming-ink);
 }
 .event-storming-palette-svg {
   display: block;

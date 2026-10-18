@@ -1,0 +1,4 @@
+# Vendored unchanged from Miragon/corporate-identity: collapsed in diffs, re-copied instead of edited.
+packages/renderer/src/theme/cd-tokens.generated.css linguist-generated=true
+packages/renderer/src/theme/cd-tokens.generated.json linguist-generated=true
+packages/renderer/src/theme/cd-canvas.css linguist-generated=true
