@@ -34,22 +34,28 @@ function ioHarness() {
       return root;
     },
     setRootElement: (r: Record<string, unknown>) => (root = r),
+    getRootElements: () => (root ? [root] : []),
+    getSize: () => ({ width: 0, height: 0 }),
     addShape: (shape: EventStormingShape) => shapes.push(shape),
     addConnection: () => {},
     viewbox: () => {},
   } as unknown as Canvas;
+  const rootRegistry = {
+    getAll: () => [],
+    get: (id: string) => (id === ROOT_ID ? root : undefined),
+  };
   const importer = new EventStormingImporter(
     canvas,
     rawFactory,
     new EventStormingElementFactory(rawFactory, { getAll: () => [] } as unknown as ElementRegistry),
     { contentBounds: () => ({ x: 0, y: 0, width: 100, height: 100 }) } as unknown as BoardBounds,
     { fire: () => {} } as unknown as EventBus,
-    { getAll: () => [] } as unknown as ElementRegistry,
+    rootRegistry as unknown as ElementRegistry,
   );
-  const exporter = new EventStormingExporter(
-    { getAll: () => shapes } as unknown as ElementRegistry,
-    canvas,
-  );
+  const exporter = new EventStormingExporter({
+    ...rootRegistry,
+    getAll: () => shapes,
+  } as unknown as ElementRegistry);
   const byId = (id: string) => shapes.find((s) => s.id === id);
   return { importer, exporter, byId };
 }

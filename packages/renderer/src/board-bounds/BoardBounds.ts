@@ -46,7 +46,7 @@ export default class BoardBounds {
    * schema-model default framing so fitView/export behave sensibly before the first sticky.
    */
   contentBounds(padding = 120): Bounds {
-    const shapes = (this.elementRegistry.getAll() as ShapeLikeElement[]).filter(isPositionedShape);
+    const shapes = this.positionedShapes();
     if (!shapes.length) return { x: 0, y: 0, ...DEFAULT_BOARD_SIZE };
 
     const minX = Math.min(...shapes.map((s) => s.x));
@@ -59,5 +59,14 @@ export default class BoardBounds {
       width: maxX - minX + 2 * padding,
       height: maxY - minY + 2 * padding,
     };
+  }
+
+  /** No element on the board: `contentBounds` is only the default framing then. */
+  isEmpty(): boolean {
+    return this.positionedShapes().length === 0;
+  }
+
+  private positionedShapes() {
+    return (this.elementRegistry.getAll() as ShapeLikeElement[]).filter(isPositionedShape);
   }
 }

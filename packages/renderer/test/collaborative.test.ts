@@ -165,5 +165,21 @@ describe('createCollaborativeModeler / createCollaborativeViewer', () => {
     expect(() => modeler.destroy()).not.toThrow();
     expect(modeler.getViewState()).toBeUndefined();
     expect(modeler.elements.reveal('anything')).toBe(false);
+    expect(modeler.elements.list()).toEqual([]);
+    expect(modeler.elements.selection()).toEqual([]);
+  });
+
+  // A host that flushes a debounced save on unmount must neither build a new diagram (with its
+  // document key listener) on the detached container nor lose the last state.
+  it('answer exportText from the state at destroy and reject imports afterwards', async () => {
+    const modeler = editor();
+    const before = modeler.exportText();
+    const containers = document.querySelectorAll('.event-storming-container').length;
+    modeler.destroy();
+    expect(modeler.exportText()).toBe(before);
+    await expect(modeler.importText('title Later\n')).rejects.toThrow(/destroyed/);
+    expect(document.querySelectorAll('.event-storming-container').length).toBeLessThanOrEqual(
+      containers,
+    );
   });
 });

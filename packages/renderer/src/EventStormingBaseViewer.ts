@@ -3,13 +3,15 @@ import type { ModuleDeclaration } from 'didi';
 import type Canvas from 'diagram-js/lib/core/Canvas';
 import type CommandStack from 'diagram-js/lib/command/CommandStack';
 import type EventBus from 'diagram-js/lib/core/EventBus';
+import type PopupMenu from 'diagram-js/lib/features/popup-menu/PopupMenu';
 import type { EventStormingBoard } from '@miragon/event-storming-schema-model';
 import { parseDSLWithDiagnostics, serializeDSL } from '@miragon/event-storming-dsl';
 import { saveSVG } from './io/saveSvg.js';
 import type EventStormingImporter from './io/EventStormingImporter.js';
 import type EventStormingExporter from './io/EventStormingExporter.js';
 import type BoardBounds from './board-bounds/BoardBounds.js';
-import type { ImportWarning } from './io/types.js';
+import type EventStormingLabelEditing from './label-editing/EventStormingLabelEditing.js';
+import { ROOT_ID, type ImportWarning } from './io/types.js';
 
 export interface EventStormingViewerOptions {
   /** Host element. If missing, a detached <div> is created (can be attached later via attachTo). */
@@ -26,6 +28,18 @@ export interface EventStormingViewerOptions {
 }
 
 export type EventCallback<T = unknown> = (event: T) => void;
+
+/**
+ * Board ids become diagram-js ids next to the root elements; a collision would throw only after
+ * the previous board was cleared. Checked first, so such a board is rejected without a trace.
+ */
+function assertNoEngineIds(board: EventStormingBoard): void {
+  for (const { id } of [...board.elements, ...board.edges]) {
+    if (id === ROOT_ID || id.startsWith('__implicitroot')) {
+      throw new Error(`Element id "${id}" is reserved for the board itself.`);
+    }
+  }
+}
 
 function sizeToCss(value: number | string): string {
   return typeof value === 'number' ? `${value}px` : value;
@@ -87,6 +101,10 @@ export abstract class EventStormingBaseViewer {
     const diagram = this._ensureDiagram();
     const eventBus = diagram.get<EventBus>('eventBus');
     const importer = diagram.get<EventStormingImporter>('eventStormingImporter');
+    assertNoEngineIds(board);
+    const labelEditing = diagram.get<EventStormingLabelEditing>('eventStormingLabelEditing', false);
+    labelEditing?.suspend();
+    diagram.get<PopupMenu>('popupMenu', false)?.close();
     importer.clear();
     const warnings = importer.import(board);
     this._applyStyleClass(board.config.style);
@@ -96,6 +114,7 @@ export abstract class EventStormingBaseViewer {
     // have none.
     diagram.get<CommandStack>('commandStack', false)?.clear(false);
     eventBus.fire('import.done', { warnings });
+    labelEditing?.resumeAfterImport();
     return { warnings };
   }
 

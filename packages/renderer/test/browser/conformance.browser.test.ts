@@ -70,6 +70,7 @@ const harness: ConformanceHarness = {
   },
   canonicalTexts: [orderCheckout, warehouseBigPicture],
   looseTexts: [orderCheckoutLoose, warehouseBigPictureLoose],
+  // The DSL reads every text (unreadable lines stay in rawPassthrough), backed by its fuzz test.
   invalidTexts: [],
   foreignTexts: [
     { text: orderCheckoutForeign, mustSurvive: ['x-vendor: keep-me', 'owner team-checkout'] },

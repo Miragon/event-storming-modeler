@@ -14,13 +14,7 @@ import type Selection from 'diagram-js/lib/features/selection/Selection';
 import { Modeler } from '../Modeler.js';
 import { NavigatedViewer } from '../NavigatedViewer.js';
 import type { EventStormingViewerOptions } from '../EventStormingBaseViewer.js';
-import { plainNoteText } from '../draw/index.js';
-import {
-  isEventStormingConnection,
-  isEventStormingShape,
-  type EventStormingConnection,
-  type EventStormingShape,
-} from '../model/di-types.js';
+import { isSticky, type EventStormingShape } from '../model/di-types.js';
 
 /** Stable notation id in `meta.notation` of the collaborative-modeler contract. */
 export const EVENT_STORMING_NOTATION = 'event-storming';
@@ -45,14 +39,22 @@ interface ViewState {
   height: number;
 }
 
-type BoardElement = EventStormingShape | EventStormingConnection;
+/**
+ * Only stickies are addressable: their ids survive a save and re-open (the DSL writes them back).
+ * Notes, drawings and arrows have no id in the text — theirs derive from their text or their
+ * position and would move to another element on the next import.
+ */
+type AddressableElement = EventStormingShape;
 
 /** The editing mount (`meta.editable: true`) of the collaborative-modeler contract. */
 export function createCollaborativeModeler(
   options: CollaborativeEventStormingOptions = {},
 ): CollaborativeEventStormingModeler {
   return collaborative(
-    new Modeler({ ...diagramOptions(options), undoRedoKeys: options.undoRedoKeys ?? true }),
+    new Modeler({
+      ...diagramOptions(options),
+      undoRedoKeys: options.undoRedoKeys ?? true,
+    }),
     true,
   );
 }
@@ -64,7 +66,9 @@ export function createCollaborativeViewer(
   return collaborative(new NavigatedViewer(diagramOptions(options)), false);
 }
 
-function diagramOptions(options: CollaborativeEventStormingOptions): EventStormingViewerOptions {
+function diagramOptions(
+  options: Pick<CollaborativeEventStormingOptions, 'additionalModules'>,
+): EventStormingViewerOptions {
   return { width: '100%', height: '100%', additionalModules: options.additionalModules ?? [] };
 }
 
@@ -79,6 +83,7 @@ function collaborative(
   const contentListeners = new Set<() => void>();
   let importsRunning = 0;
   let destroyed = false;
+  let lastExport = '';
 
   const meta: ModelerMeta = {
     notation: EVENT_STORMING_NOTATION,
@@ -95,21 +100,23 @@ function collaborative(
 
   const elements: ElementsSurface = {
     list: () =>
-      (elementRegistry.getAll() as unknown[])
-        .filter(isBoardElement)
-        .map((element) => elementInfo(element)),
+      destroyed
+        ? []
+        : (elementRegistry.getAll() as unknown[])
+            .filter(isAddressable)
+            .map((element) => elementInfo(element)),
     reveal(id) {
       if (destroyed) return false;
       const element = elementRegistry.get(id);
-      if (!isBoardElement(element)) return false;
+      if (!isAddressable(element)) return false;
       selection.select(element);
       canvas.scrollToElement(element);
       return true;
     },
-    selection: () => boardElementIds(selection.get()),
+    selection: () => (destroyed ? [] : addressableIds(selection.get())),
     onSelection(callback) {
       const listener = (event: unknown) =>
-        callback(boardElementIds((event as { newSelection?: unknown[] }).newSelection ?? []));
+        callback(addressableIds((event as { newSelection?: unknown[] }).newSelection ?? []));
       eventBus.on('selection.changed', listener);
       return () => eventBus.off('selection.changed', listener);
     },
@@ -123,6 +130,7 @@ function collaborative(
       diagram.attachTo(host);
     },
     async importText(text): Promise<ImportResult> {
+      if (destroyed) throw new Error('The modeler was destroyed.');
       importsRunning += 1;
       try {
         const { warnings } = await diagram.importDSL(text);
@@ -131,7 +139,11 @@ function collaborative(
         importsRunning -= 1;
       }
     },
-    exportText: () => diagram.exportDSL(),
+    exportText() {
+      // Asking a destroyed diagram would build a new one on the detached container.
+      if (destroyed) return lastExport;
+      return diagram.exportDSL();
+    },
     onContentChanged(callback) {
       if (!editable) return () => undefined;
       contentListeners.add(callback);
@@ -153,6 +165,11 @@ function collaborative(
     },
     destroy() {
       if (destroyed) return;
+      try {
+        lastExport = diagram.exportDSL();
+      } catch {
+        lastExport = '';
+      }
       destroyed = true;
       contentListeners.clear();
       diagram.destroy();
@@ -160,20 +177,16 @@ function collaborative(
   };
 }
 
-function isBoardElement(element: unknown): element is BoardElement {
-  return isEventStormingShape(element) || isEventStormingConnection(element);
+function isAddressable(element: unknown): element is AddressableElement {
+  return isSticky(element);
 }
 
-function boardElementIds(elements: readonly unknown[]): string[] {
-  return elements.filter(isBoardElement).map((element) => element.id);
+function addressableIds(elements: readonly unknown[]): string[] {
+  return elements.filter(isAddressable).map((element) => element.id);
 }
 
-function elementInfo(element: BoardElement): ElementInfo {
-  const name = isEventStormingConnection(element)
-    ? element.linkLabel
-    : element.eventStormingType === 'note'
-      ? plainNoteText(element.eventStormingLabel)
-      : element.eventStormingLabel;
+function elementInfo(element: AddressableElement): ElementInfo {
+  const name = element.eventStormingLabel;
   return name ? { id: element.id, name } : { id: element.id };
 }
 
