@@ -17,6 +17,11 @@ const DOM_RESTRICTED_IMPORTS = {
     { name: 'tiny-svg', message: 'DOM-free packages must not import tiny-svg (P1).' },
     { name: 'min-dom', message: 'DOM-free packages must not import min-dom (P1).' },
     { name: '@miragon/modeler-shell', message: 'Only the apps mount the shell.' },
+    {
+      name: '@miragon/modeler-api',
+      allowTypeImports: true,
+      message: 'DOM-free packages take only types from the contract.',
+    },
   ],
   patterns: [
     {
@@ -24,6 +29,11 @@ const DOM_RESTRICTED_IMPORTS = {
       message: 'DOM-free packages must not import diagram-js (P1).',
     },
     { group: ['@miragon/modeler-shell/*'], message: 'Only the apps mount the shell.' },
+    {
+      group: ['@miragon/modeler-api/*'],
+      allowTypeImports: true,
+      message: 'DOM-free packages take only types from the contract.',
+    },
   ],
 };
 

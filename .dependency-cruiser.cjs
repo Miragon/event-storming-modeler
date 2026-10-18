@@ -27,14 +27,15 @@ module.exports = {
         'the shell (dependency direction of Miragon/modeler-api#4).',
       severity: 'error',
       from: { path: '^packages/[^/]+/src' },
-      to: { path: 'node_modules/@miragon/modeler-shell' },
+      // Also an unresolved specifier (the shell not installed next to the package) must fail.
+      to: { path: '@miragon/modeler-shell' },
     },
     {
       name: 'dom-free-contract-types-only',
       comment: 'DOM-free packages take only types from @miragon/modeler-api, never runtime code.',
       severity: 'error',
       from: { path: '^packages/(schema-model|dsl|transforms)/src' },
-      to: { path: 'node_modules/@miragon/modeler-api', dependencyTypesNot: ['type-only'] },
+      to: { path: '@miragon/modeler-api', dependencyTypesNot: ['type-only'] },
     },
     {
       name: 'renderer-feature-encapsulation',
