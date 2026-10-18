@@ -74,9 +74,10 @@ identical version** (the version pin-check does not enforce that the two stay in
 `packages/renderer/src/theme/cd-tokens.generated.css`, `cd-tokens.generated.json` and
 `cd-canvas.css` are vendored unchanged from the `miragon-brand:modeler-tool-design` skill
 (`assets/`). To update them, copy all three again, put the vendoring header back as the first line
-of the two CSS files (the JSON gets none), and run `npm test` (`theme.sync`) and
-`npm run test:e2e -- --project=vscode-webview` (`tokens.sync`, the shell conformance kit).
-Never edit or reformat them by hand.
+of the two CSS files (the JSON gets none), and run `npm test` (`theme.sync` in the renderer,
+`tokens.sync` in apps/vscode against the shell's sizes) and
+`npm run test:e2e -- --project=vscode-webview` (the shell conformance kit). Never edit or reformat
+them by hand.
 
 ## Pre-commit reality
 

@@ -45,7 +45,7 @@ const { svg } = await viewer.saveSVG();
   labels, undo/redo, free canvas (no grid, no axes — just stickies on a timeline).
 - **Lossless `.storm` DSL round-trip** and a deterministic JSON model.
 - **VS Code extension** — a custom editor for `.storm` files in the shared Miragon modeler chrome
-  ([`@miragon/modeler-shell`](https://github.com/Miragon/modeler-api/tree/main/packages/shell)):
+  ([`@miragon/modeler-shell`](https://www.npmjs.com/package/@miragon/modeler-shell)):
   menu, palette, zoom panel, problems pill; undo and redo through the VS Code document.
 - **Collaborative-modeler contract** — the renderer implements
   [`@miragon/modeler-api`](https://www.npmjs.com/package/@miragon/modeler-api)

@@ -48,6 +48,7 @@ freeform drawings on an unbounded canvas.
 | `width`, `height`   | `100%`, `600px`    | Container size (`100%` high when a `container` is given)     |
 | `additionalModules` | `[]`               | diagram-js modules appended after the renderer's own         |
 | `undoRedoKeys`      | `true`             | `Modeler` only: bind Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z and Ctrl+Y |
+| `freeRectInsets`    | none               | `Modeler` only: `() => ({ top, right, bottom, left })` in px |
 
 Pass `undoRedoKeys: false` when the host owns the history, as the VS Code extension does: the keys
 then reach the host untouched and the host undoes the document, while copy, paste, delete, the
@@ -56,9 +57,25 @@ arrow keys and the single-key tools keep working on the canvas.
 The modeler's keyboard listens on `document`, but only acts on keys aimed at the canvas: the
 target lies inside the canvas container, or nothing is focused (`document.body`). Keys another
 listener already handled (`defaultPrevented`) and keys typed into text fields are left alone, and
-the canvas container gets no `tabindex` of its own. An import erases the undo history without
-firing `commandStack.changed`, and fires `import.parse.start`, `import.render.start` and
-`import.done` in that order.
+the canvas container gets no `tabindex` of its own. Cmd/Ctrl+A selects the whole board. An import
+erases the undo history without firing `commandStack.changed`, and fires `import.parse.start`,
+`import.render.start` and `import.done` in that order. It frames the content centred at the
+largest zoom that shows all of it, never above 100%; an empty board shows at 100%. A label being
+typed when an import arrives is reopened on the same element afterwards, with the typed text.
+
+Enter or Space on a creating palette entry (a click without a pointer, `detail` 0) places the
+element in the centre of the container minus `freeRectInsets` (the margins a host's chrome covers),
+24px down and right while that spot is taken, selects it and opens its label editor.
+
+`eventStormingReadOnly` locks every edit while a host cannot save from the canvas (an invalid file
+in an IDE): `diagram.get('eventStormingReadOnly').setReadOnly(true)` vetoes moves, resizes,
+creates, connections and deletes through the diagram-js rules, and the keyboard, context pad, label
+editor and drawing handles stop editing. Selection, zoom, pan, copy and export stay.
+
+The DSL's `style dark` directive stays in the board config, so the text round-trips, but the
+renderer paints nothing for it: the page's design-system mode decides light or dark, never the
+file. The chrome reads the `--cd-ui-*` roles of the vendored Miragon tokens only, and the canvas
+drawing keeps literal light colours in its SVG attributes, so exports look the same everywhere.
 
 ### Collaborative hosts
 
@@ -80,16 +97,40 @@ const off = modeler.onContentChanged(() => save(modeler.exportText()));
 const viewer = createCollaborativeViewer(); // meta.editable: false, never changes content
 ```
 
-- `importText` resolves for every `.storm` text: the DSL keeps every line, unknown ones in
-  `rawPassthrough`. Parser findings come back as `warnings`.
+- `importText` resolves for every `.storm` text: the DSL keeps every line it cannot read in
+  `rawPassthrough` (with a diagnostic, returned as a `warning`), gives a sticky that claims a
+  reserved id (`event-storming-root`, `__implicitroot…`) a fresh one, and reads a number that
+  overflows to Infinity as an unreadable line. A board passed to `diagram.importMap` that uses a
+  reserved id rejects before the canvas changes.
 - `onContentChanged` fires for every command-stack change, undo and redo included (also the
   workshop level), never for imports, view options (type captions) or the viewport.
 - `getViewState()` / `setViewState()` read and set the diagram-js viewbox (`x`, `y`, `width`,
   `height`); an import fits the board.
-- `elements` lists the stickies, notes, drawings and arrows with their ids and labels, reveals
-  (selects and scrolls to) an element and reports the selection.
+- `elements` lists the stickies with their ids and labels, reveals (selects and scrolls to) one
+  and reports the selection. Sticky ids survive a save and a re-open: the DSL writes `(id …)`
+  back for every sticky whose id the parser would not derive again from its label at that line (one
+  created on the canvas, a renamed one). Notes, drawings and arrows have no id in the text yet (theirs
+  derive from their text or position), so they are not addressable.
 - `diagram` is the wrapped `Modeler` or `NavigatedViewer`, for everything outside the contract.
-  `createCollaborativeModeler` accepts `additionalModules` and `undoRedoKeys`.
+  `createCollaborativeModeler` accepts `additionalModules`, `undoRedoKeys` and `freeRectInsets`.
+- After `destroy()`, `exportText()` returns the last state and `importText()` rejects.
+
+#### Migrating a host
+
+- **DOM.** `attachTo(host)` appends the diagram's own `.event-storming-container` inside `host`.
+  Scope host CSS as a descendant (`.my-host .event-storming-container`), not as a compound selector
+  on the host element.
+- **What can go:** an echo latch around imports (they are silent), a command-stack shim for the
+  viewer (it has none and needs none), special handling of the renderer's own viewbox change on
+  import (the post-import view is the fit), and keeping the viewbox by hand (`getViewState` /
+  `setViewState`).
+- **What stays:** presence and view controls that need diagram-js services (canvas, element
+  registry) go through `diagram`.
+- **Empty text** imports as a blank board titled `Untitled Board`; a host that treats empty text
+  differently keeps its own check.
+- **Ids.** Hosts that derive ids from the text themselves (server-side extraction) read `(id …)`
+  first and derive the rest exactly like the parser: `<prefix>_<slug(label)>`, `_2`, `_3`, … in line
+  order.
 
 ### Fonts
 
@@ -107,8 +148,10 @@ Part of the [Event Storming Modeler](https://github.com/Miragon/event-storming-m
 
 MIT
 
-The palette's Lasso and Draw icons (`square-dashed-mouse-pointer`, `spline`) are copied from
-[Lucide](https://lucide.dev) (`lucide-static` 1.59.0):
+The tool icons of the palette (`square-dashed-mouse-pointer`, `spline`) and the icons of the
+context pad and the note toolbar (`plus`, `arrow-right`, `replace`, `line-style`, `palette`,
+`pencil`, `trash`, `bold`, `italic`, `list`, `text-align-*`, `align-vertical-justify-*`) are copied
+from [Lucide](https://lucide.dev) (`lucide-static` 1.59.0):
 
 > ISC License
 >
@@ -124,3 +167,24 @@ The palette's Lasso and Draw icons (`square-dashed-mouse-pointer`, `spline`) are
 > WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
 > NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 > PERFORMANCE OF THIS SOFTWARE.
+
+`arrow-right`, `italic`, `plus` and `trash` are derived from [Feather](https://feathericons.com):
+
+> The MIT License (MIT)
+>
+> Copyright (c) 2013-present Cole Bemis
+>
+> Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+> associated documentation files (the "Software"), to deal in the Software without restriction,
+> including without limitation the rights to use, copy, modify, merge, publish, distribute,
+> sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
+> furnished to do so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in all copies or
+> substantial portions of the Software.
+>
+> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+> BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+> DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+> OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

@@ -93,7 +93,9 @@ libraries to npm (with provenance) and the VS Code extension
   (`createCollaborativeModeler` / `createCollaborativeViewer`, notation `event-storming`, in
   [`packages/renderer/src/collaborative/`](packages/renderer/src/collaborative/)); its conformance
   kit runs in `npm run test:browser`. The DOM-free packages may take only type-only imports from
-  the contract (dependency-cruiser).
+  the contract (ESLint and dependency-cruiser). The elements surface lists stickies only: their ids
+  survive a save and re-open because the serializer writes `(id …)` back whenever the parser would
+  not derive the same id at that line; notes, drawings and arrows have no id grammar yet.
 - Contributor onboarding in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Design system (mandatory)
@@ -120,9 +122,12 @@ defaults); both apps get the tokens through the renderer CSS and import no token
 Drift tests: [`packages/renderer/test/theme.sync.test.ts`](packages/renderer/test/theme.sync.test.ts)
 (import order and layer, the header, the JSON roles against the CSS so a partial re-copy fails,
 every `MIRAGON` value in [`palette.ts`](packages/renderer/src/theme/palette.ts) against its `--cd-*`
-token, the `--event-storming-*` mirror, palette rules scoped away from the shell) and
-[`e2e/tests/vscode/tokens.sync.spec.ts`](e2e/tests/vscode/tokens.sync.spec.ts) (the shell's `SHELL`
-sizes against the vendored `shell` group).
+token, no colour literal and no fixed palette token in `event-storming.css` (it reads the
+`--cd-ui-*` roles only), no `style dark` rendering, overlays below the palette, palette rules scoped
+away from the shell) and [`apps/vscode/test/tokens.sync.test.ts`](apps/vscode/test/tokens.sync.test.ts)
+(the shell's `SHELL` sizes against the vendored `shell` group). The canvas drawing keeps literal
+light colours in its SVG attributes (`draw/styles.ts`), never a `var()`. The DSL's `style dark`
+stays in the board config for the round-trip, but nothing renders it (guide §10.7).
 
 **VS Code chrome = `@miragon/modeler-shell`.** The webview
 ([`apps/vscode/src/webview/main.ts`](apps/vscode/src/webview/main.ts)) mounts the shared Miragon
@@ -133,7 +138,11 @@ content only, `--cd-ui-*` roles only, never `var(--vscode-*)`), `@miragon/modele
 last. The renderer's own palette rules apply only to `.djs-palette:not([data-chrome='palette'])`,
 so a shell-skinned palette wears the shell's look alone. **Renderers never import the shell** — only
 the apps (and `e2e/`) do; `packages/*` reaching `@miragon/modeler-shell` fails ESLint and
-dependency-cruiser. The web app does not use the shell yet.
+dependency-cruiser. The webview runs on `createCollaborativeModeler` (the tested contract path),
+passes the shell's fit insets as `freeRectInsets` (keyboard creation from the palette) and toggles
+the renderer's `eventStormingReadOnly` lock together with `shell.setReadOnly`. The web app does not
+use the shell yet. The VSIX ships `apps/vscode/THIRD_PARTY_NOTICES.md`, generated from the bundles
+(`npm run notices -w apps/vscode`; a unit test fails when it is stale).
 
 Reference implementation in this repo: tokens
 [`packages/renderer/src/theme/palette.ts`](packages/renderer/src/theme/palette.ts) · canvas
