@@ -7,16 +7,17 @@ import { ROOT_ID } from '../src/model/di-types.js';
 function providerHarness(level: BoardLevel = 'design') {
   const eventBus = new EventBus();
   const rebuild = vi.fn();
+  const factory = { createNew: vi.fn() };
   const provider = new EventStormingPaletteProvider(
     { registerProvider: vi.fn(), _rebuild: rebuild } as never,
     { start: vi.fn() } as never,
-    { createNew: vi.fn() } as never,
+    factory as never,
     { activateSelection: vi.fn() } as never,
     { toggle: vi.fn() } as never,
     { getLevel: () => level } as never,
     eventBus,
   );
-  return { provider, eventBus, rebuild };
+  return { provider, eventBus, rebuild, factory };
 }
 
 describe('EventStormingPaletteProvider: level filtering', () => {
@@ -82,6 +83,65 @@ describe('EventStormingPaletteProvider: palette refresh', () => {
       context: { element: { id: 'event_order_placed' } },
     });
     expect(rebuild).not.toHaveBeenCalled();
+  });
+});
+
+describe('EventStormingPaletteProvider: titles and shortcuts', () => {
+  // The tooltip chip and aria-keyshortcuts are built from `shortcut`; a title like
+  // "Domain Event — E" would show the key twice and hide it from assistive technology.
+  it('carries sentence-case titles and the single-key shortcuts separately', () => {
+    const { provider } = providerHarness('design');
+    const entries = provider.getPaletteEntries();
+    const summary = Object.fromEntries(
+      Object.entries(entries).map(([action, entry]) => [
+        action,
+        { title: entry.title, shortcut: entry.shortcut, group: entry.group },
+      ]),
+    );
+    expect(summary).toEqual({
+      'lasso-tool': { title: 'Lasso', shortcut: 'L', group: 'tools' },
+      'draw-tool': { title: 'Draw', shortcut: undefined, group: 'tools' },
+      'create.event': { title: 'Domain event', shortcut: 'E', group: 'stickies-1' },
+      'create.command': { title: 'Command', shortcut: 'C', group: 'stickies-1' },
+      'create.actor': { title: 'Actor', shortcut: undefined, group: 'stickies-1' },
+      'create.aggregate': { title: 'Aggregate', shortcut: undefined, group: 'stickies-1' },
+      'create.policy': { title: 'Policy', shortcut: undefined, group: 'stickies-2' },
+      'create.readmodel': { title: 'Read model', shortcut: undefined, group: 'stickies-2' },
+      'create.external': { title: 'External system', shortcut: undefined, group: 'stickies-2' },
+      'create.hotspot': { title: 'Hotspot', shortcut: undefined, group: 'stickies-3' },
+      'create.note': { title: 'Note', shortcut: undefined, group: 'stickies-3' },
+    });
+    for (const entry of Object.values(entries)) expect(entry.title).not.toMatch(/—/);
+  });
+
+  // Labels are canvas content and travel through the DSL; the palette titles are chrome only.
+  it('keeps the default sticky labels of the created elements', () => {
+    const { provider, factory } = providerHarness('design');
+    const entries = provider.getPaletteEntries();
+    for (const action of ['create.event', 'create.readmodel', 'create.external', 'create.note']) {
+      const entry = entries[action]!;
+      (entry.action as { click: (event: Event) => void }).click(new Event('click'));
+    }
+    expect(factory.createNew.mock.calls).toEqual([
+      ['event', 'Domain Event'],
+      ['readmodel', 'Read Model'],
+      ['external', 'External System'],
+      ['note', 'Note'],
+    ]);
+  });
+
+  it('draws the tools with the Lucide icons in currentColor', () => {
+    const { provider } = providerHarness();
+    const entries = provider.getPaletteEntries();
+    for (const action of ['lasso-tool', 'draw-tool']) {
+      const html = entries[action]!.html!;
+      expect(html).toContain('stroke="currentColor"');
+      expect(html).toContain('width="20"');
+      expect(html).toContain('stroke-width="2"');
+      expect(html).toContain('aria-hidden="true"');
+    }
+    expect(entries['lasso-tool']!.html).toContain('M12.034 12.681');
+    expect(entries['draw-tool']!.html).toContain('M5 17A12 12 0 0 1 17 5');
   });
 });
 

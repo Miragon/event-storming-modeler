@@ -37,8 +37,9 @@ function paletteEntryElement(action: string, rect: Partial<DOMRect> = {}): HTMLE
 const NO_ACTION = {};
 
 const ENTRIES: PaletteEntries = {
-  'create.event': { title: 'Domain Event — E', action: NO_ACTION },
-  'lasso-tool': { title: 'Selection tool', shortcut: 'L', action: NO_ACTION },
+  'create.event': { title: 'Domain event', shortcut: 'E', action: NO_ACTION },
+  'lasso-tool': { title: 'Lasso', shortcut: 'L', action: NO_ACTION },
+  'draw-tool': { title: 'Draw', action: NO_ACTION },
   untitled: { action: NO_ACTION },
 };
 
@@ -71,7 +72,15 @@ describe('EventStormingPaletteTooltip', () => {
   it('renders title and shortcut of the hovered entry, nothing for entries without a title', () => {
     const { config } = tooltipHarness(ENTRIES);
     const content = config.getContent(paletteEntryElement('lasso-tool'));
-    expect(content?.props).toMatchObject({ title: 'Selection tool', shortcut: 'L' });
+    expect(content?.props).toMatchObject({ title: 'Lasso', shortcut: 'L' });
+    expect(config.getContent(paletteEntryElement('create.event'))?.props).toMatchObject({
+      title: 'Domain event',
+      shortcut: 'E',
+    });
+    expect(config.getContent(paletteEntryElement('draw-tool'))?.props).toMatchObject({
+      title: 'Draw',
+      shortcut: undefined,
+    });
     expect(config.getContent(paletteEntryElement('untitled'))).toBeNull();
     expect(config.getContent(paletteEntryElement('unknown'))).toBeNull();
   });

@@ -20,6 +20,7 @@ interface PaletteSpec {
   type: EventStormingShapeType;
   label: string;
   title: string;
+  shortcut?: string;
   group: string;
 }
 
@@ -33,14 +34,16 @@ const SPECS: readonly PaletteSpec[] = [
     key: 'event',
     type: 'event',
     label: STICKY_STYLES.event.label,
-    title: 'Domain Event — E',
+    title: 'Domain event',
+    shortcut: 'E',
     group: GROUP_STICKIES_1,
   },
   {
     key: 'command',
     type: 'command',
     label: STICKY_STYLES.command.label,
-    title: 'Command — C',
+    title: 'Command',
+    shortcut: 'C',
     group: GROUP_STICKIES_1,
   },
   {
@@ -68,14 +71,14 @@ const SPECS: readonly PaletteSpec[] = [
     key: 'readmodel',
     type: 'readmodel',
     label: STICKY_STYLES.readmodel.label,
-    title: 'Read Model',
+    title: 'Read model',
     group: GROUP_STICKIES_2,
   },
   {
     key: 'external',
     type: 'external',
     label: STICKY_STYLES.external.label,
-    title: 'External System',
+    title: 'External system',
     group: GROUP_STICKIES_2,
   },
   {
@@ -136,11 +139,12 @@ export default class EventStormingPaletteProvider implements PaletteProvider {
   getPaletteEntries(): PaletteEntries {
     const entries: Record<string, PaletteEntry> = {};
 
-    // Selection tool first. Group MUST be called "tools" and the key end in "-tool" — that is
+    // Lasso tool first. Group MUST be called "tools" and the key end in "-tool" — that is
     // what diagram-js' palette uses to highlight the active tool (tool-manager.update).
     entries['lasso-tool'] = {
       group: 'tools',
-      title: 'Selection tool — L (or Shift+drag)',
+      title: 'Lasso',
+      shortcut: 'L',
       html: `<div class="entry event-storming-palette-entry">${PALETTE_ICONS.lasso}</div>`,
       action: {
         click: (event: Event) => this.lassoTool.activateSelection(event as MouseEvent),
@@ -149,8 +153,7 @@ export default class EventStormingPaletteProvider implements PaletteProvider {
 
     entries['draw-tool'] = {
       group: 'tools',
-      title:
-        'Draw — click point by point, double-click/Enter finishes, click the start point to close',
+      title: 'Draw',
       html: `<div class="entry event-storming-palette-entry">${PALETTE_ICONS.draw}</div>`,
       action: {
         click: () => this.drawTool.toggle(),
@@ -168,6 +171,7 @@ export default class EventStormingPaletteProvider implements PaletteProvider {
       entries[`create.${spec.key}`] = {
         group: spec.group,
         title: spec.title,
+        ...(spec.shortcut ? { shortcut: spec.shortcut } : {}),
         html: `<div class="entry event-storming-palette-entry" draggable="true">${PALETTE_ICONS[spec.key]}</div>`,
         action: { dragstart: start, click: start },
       };
