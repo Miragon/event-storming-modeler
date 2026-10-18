@@ -1,6 +1,12 @@
+import './zod-jitless.js';
 import '@fontsource-variable/geist/wght.css';
 import '@fontsource-variable/geist-mono/wght.css';
-import { Modeler, type BoardBounds } from '@miragon/event-storming-renderer';
+import {
+  createCollaborativeModeler,
+  type BoardBounds,
+  type CollaborativeEventStormingModeler,
+  type EventStormingReadOnly,
+} from '@miragon/event-storming-renderer';
 import './style.css';
 import '@miragon/modeler-shell/shell.css';
 import type { ShellHandle } from '@miragon/modeler-shell';
@@ -29,16 +35,6 @@ interface VsCodeApi {
 }
 declare const acquireVsCodeApi: () => VsCodeApi;
 
-declare global {
-  interface Window {
-    /** True once the first `init` import has settled, valid or not (test pages wait for it). */
-    webviewReady?: boolean;
-    shell?: ShellHandle;
-    modeler?: Modeler;
-    connection?: DiagramJsConnection;
-  }
-}
-
 interface DiagramElement {
   id: string;
   parent?: unknown;
@@ -60,19 +56,21 @@ const storedShellState = readShellState(vscode);
 
 // The diagram first: Event Storming's keyboard listens on document and must run before the shell's
 // key listener, and the Modeler builds its diagram lazily on the first get(). Undo and redo keys
-// stay unbound: VS Code's document history owns them (guide §13.5).
-const modeler = new Modeler({
-  width: '100%',
-  height: '100%',
+// stay unbound: VS Code's document history owns them (guide §13.5). The webview runs the same
+// collaborative-modeler contract as every other host, so its imports are silent and fitted.
+const collaborative = createCollaborativeModeler({
   additionalModules: [shellModule],
   undoRedoKeys: false,
+  freeRectInsets: () => shell.fitInsets(),
 });
+const modeler = collaborative.diagram;
 modeler.get('canvas');
 const registry = modeler.get<ElementRegistryLike>('elementRegistry');
 const selection = modeler.get<SelectionLike>('selection');
 const boardBounds = modeler.get<BoardBounds>('boardBounds');
 const typeCaptions = modeler.get<TypeCaptions>('eventStormingViewOptions');
 const levels = modeler.get<BoardLevels>('eventStormingModeling');
+const canvasLock = modeler.get<EventStormingReadOnly>('eventStormingReadOnly');
 if (readTypeCaptionsVisible(vscode) === false) typeCaptions.setTypeCaptionsVisible(false);
 
 const app = document.getElementById('app');
@@ -112,7 +110,6 @@ persistView(vscode, viewport);
 // ---------------------------------------------------------------------------
 
 let lastText = '';
-let importing = false;
 let initialized = false;
 
 function post(message: WebviewToHost): void {
@@ -136,6 +133,7 @@ function reselect(ids: readonly string[]): void {
 }
 
 function showValidBoard(): void {
+  canvasLock.setReadOnly(false);
   shell.setReadOnly(false);
   shell.setStatus(null);
 }
@@ -143,6 +141,7 @@ function showValidBoard(): void {
 function showInvalidBoard(): void {
   // Locked at once; the marks and the status box follow after 800ms without a valid import, so
   // typing in the text editor neither flickers nor re-announces the alert (guide §13.5).
+  canvasLock.setReadOnly(true);
   shell.setReadOnly(true, { delayMs: INVALID_STATUS_DELAY_MS });
   shell.setStatus(
     { severity: 'danger', text: shell.messages.invalidFile(BOARD_NAME) },
@@ -158,16 +157,15 @@ function showInvalidBoard(): void {
  */
 async function importText(text: string): Promise<void> {
   const first = !initialized;
-  if (!first && sameBoardText(text, modeler.exportDSL())) {
+  if (!first && sameBoardText(text, collaborative.exportText())) {
     lastText = text;
     showValidBoard();
     return;
   }
   const keep = first ? undefined : viewport.getViewbox();
   const selected = first ? [] : selectedIds();
-  importing = true;
   try {
-    await modeler.importDSL(text);
+    await collaborative.importText(text);
     lastText = text;
     showValidBoard();
     if (keep) viewport.restore(keep);
@@ -178,7 +176,6 @@ async function importText(text: string): Promise<void> {
   } catch {
     showInvalidBoard();
   } finally {
-    importing = false;
     initialized = true;
   }
 }
@@ -197,17 +194,15 @@ function enqueueImport(text: string): Promise<void> {
 function pushEdit(): void {
   // Before the first import the canvas does not show the document yet; read-only: it shows the
   // last valid board. Either way an edit would overwrite text the canvas never saw.
-  if (!initialized || importing || shell.isReadOnly()) return;
-  const text = modeler.exportDSL();
+  if (!initialized || shell.isReadOnly()) return;
+  const text = collaborative.exportText();
   if (text === lastText) return;
   lastText = text;
   post({ type: 'edit', text });
 }
 
-modeler.on('commandStack.changed', () => {
-  pushEdit();
-  shell.menu.refresh();
-});
+collaborative.onContentChanged(pushEdit);
+modeler.on('commandStack.changed', () => shell.menu.refresh());
 
 // ---------------------------------------------------------------------------
 // Export (the webview rasterizes/serializes; the host shows the save dialog)
@@ -264,14 +259,15 @@ function isHostMessage(data: unknown): data is HostToWebview {
   );
 }
 
+let firstImportSettled: () => void = () => undefined;
+const ready = new Promise<void>((resolve) => (firstImportSettled = resolve));
+
 window.addEventListener('message', (event: MessageEvent<unknown>) => {
   if (!isHostMessage(event.data)) return;
   const message = event.data;
   switch (message.type) {
     case 'init':
-      void enqueueImport(message.text).then(() => {
-        window.webviewReady = true;
-      });
+      void enqueueImport(message.text).then(firstImportSettled);
       break;
     case 'update':
       void enqueueImport(message.text);
@@ -285,8 +281,12 @@ window.addEventListener('message', (event: MessageEvent<unknown>) => {
   }
 });
 
-window.shell = shell;
-window.modeler = modeler;
-window.connection = connection;
-
 post({ type: 'ready' });
+
+/** For test pages: the mounted parts, and `ready` once the first `init` import settled. */
+export const webview: {
+  shell: ShellHandle;
+  modeler: CollaborativeEventStormingModeler;
+  connection: DiagramJsConnection;
+  ready: Promise<void>;
+} = { shell, modeler: collaborative, connection, ready };

@@ -171,7 +171,7 @@ test.describe('VS Code webview: protocol and chrome', () => {
       page.evaluate(
         () =>
           window
-            .modeler!.get<{ getAll(): Array<{ parent?: unknown; waypoints?: unknown }> }>(
+            .modeler!.diagram.get<{ getAll(): Array<{ parent?: unknown; waypoints?: unknown }> }>(
               'elementRegistry',
             )
             .getAll()

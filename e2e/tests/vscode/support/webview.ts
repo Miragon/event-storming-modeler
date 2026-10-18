@@ -1,16 +1,22 @@
 import type { Page } from '@playwright/test';
-import type { Appearance } from '@miragon/modeler-shell';
+import type { CollaborativeEventStormingModeler } from '@miragon/event-storming-renderer';
+import type { Appearance, ShellHandle } from '@miragon/modeler-shell';
+import type { DiagramJsConnection } from '@miragon/modeler-shell/diagram-js';
 import { vsCodeStubSearch } from '@miragon/modeler-shell/testing';
 import type { VsCodeWebviewStub } from '@miragon/modeler-shell/testing/vscode-stub';
 
 /*
  * The webview test page (e2e/webview/webview-test.html) runs apps/vscode/src/webview/main.ts inside
- * the shell's VS Code stub. The webview's own globals (`webviewReady`, `shell`, `modeler`,
- * `connection`) are declared by main.ts; the stub's handle is declared here.
+ * the shell's VS Code stub and publishes the webview's parts on window for the tests.
  */
 declare global {
   interface Window {
     __modelerShellVsCodeStub?: VsCodeWebviewStub;
+    /** True once the first `init` import has settled, valid or not. */
+    webviewReady?: boolean;
+    shell?: ShellHandle;
+    modeler?: CollaborativeEventStormingModeler;
+    connection?: DiagramJsConnection;
   }
 }
 
