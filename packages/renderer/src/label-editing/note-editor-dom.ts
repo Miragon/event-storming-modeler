@@ -1,6 +1,6 @@
 import type { NoteAlignHorizontal, NoteAlignVertical } from '@miragon/event-storming-schema-model';
 import { parseNoteMarkdown, serializeNoteMarkdown } from '../draw/index.js';
-import { iconMarkup } from '../draw/icons.js';
+import { chromeIcon, type LucideIconName } from '../draw/lucide.js';
 
 /**
  * DOM half of the WYSIWYG note editor: the model stores a note label as ONE markdown-subset
@@ -208,20 +208,17 @@ export function ensureLineDivs(root: HTMLElement): void {
   }
 }
 
-/**
- * Alignment icon paths from Google Material Icons (Apache-2.0, © Google) — same source and
- * conventions as draw/icons.ts.
- */
-const ALIGN_ICONS: Record<'horizontal' | 'vertical', Record<string, string>> = {
+/** The Lucide icon of each alignment value. */
+const ALIGN_ICONS: Record<'horizontal' | 'vertical', Record<string, LucideIconName>> = {
   horizontal: {
-    left: 'M15 15H3v2h12v-2zm0-8H3v2h12V7zM3 13h18v-2H3v2zm0 8h18v-2H3v2zM3 3v2h18V3H3z',
-    center: 'M7 15v2h10v-2H7zm-4 6h18v-2H3v2zm0-8h18v-2H3v2zm4-6v2h10V7H7zM3 3v2h18V3H3z',
-    right: 'M3 21h18v-2H3v2zm6-4h12v-2H9v2zm-6-4h18v-2H3v2zm6-4h12V7H9v2zM3 3v2h18V3H3z',
+    left: 'text-align-start',
+    center: 'text-align-center',
+    right: 'text-align-end',
   },
   vertical: {
-    top: 'M8 11h3v10h2V11h3l-4-4-4 4zM4 3v2h16V3H4z',
-    middle: 'M8 19h3v4h2v-4h3l-4-4-4 4zm8-14h-3V1h-2v4H8l4 4 4-4zM4 11v2h16v-2H4z',
-    bottom: 'M16 13h-3V3h-2v10H8l4 4 4-4zM4 19v2h16v-2H4z',
+    top: 'align-vertical-justify-start',
+    middle: 'align-vertical-justify-center',
+    bottom: 'align-vertical-justify-end',
   },
 };
 
@@ -248,9 +245,9 @@ export function createNoteToolbar(
     button.addEventListener('click', () => onAction(action));
     toolbar.appendChild(button);
   };
-  add('note-bold', 'Bold (Cmd/Ctrl+B)', '<b>B</b>');
-  add('note-italic', 'Italic (Cmd/Ctrl+I)', '<i>I</i>');
-  add('note-bullet', 'Bullet list', '•');
+  add('note-bold', 'Bold (Cmd/Ctrl+B)', chromeIcon('bold'));
+  add('note-italic', 'Italic (Cmd/Ctrl+I)', chromeIcon('italic'));
+  add('note-bullet', 'Bullet list', chromeIcon('list'));
   const separator = doc.createElement('span');
   separator.className = 'event-storming-note-toolbar-separator';
   toolbar.appendChild(separator);
@@ -265,7 +262,8 @@ export function updateAlignButton(
   axis: 'horizontal' | 'vertical',
   value: NoteAlignHorizontal | NoteAlignVertical,
 ): void {
-  button.innerHTML = iconMarkup(ALIGN_ICONS[axis][value] ?? '', 16);
+  const icon = ALIGN_ICONS[axis][value];
+  button.innerHTML = icon ? chromeIcon(icon) : '';
   button.title =
     axis === 'horizontal'
       ? `Horizontal alignment: ${value} (click to cycle)`

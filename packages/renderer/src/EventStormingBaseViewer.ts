@@ -115,7 +115,6 @@ export abstract class EventStormingBaseViewer {
     diagram.get<PopupMenu>('popupMenu', false)?.close();
     importer.clear();
     const warnings = importer.import(board);
-    this._applyStyleClass(board.config.style);
     // Discard the PREVIOUS board's undo history: undo on orphaned elements would otherwise
     // crash or insert zombie elements into the new board. Silently, because an import is no
     // content change (hosts would echo it back), and only where a stack exists: the viewers
@@ -124,13 +123,6 @@ export abstract class EventStormingBaseViewer {
     eventBus.fire('import.done', { warnings });
     labelEditing?.resumeAfterImport();
     return { warnings };
-  }
-
-  /** DSL `style` directive as a CSS class on the container (`event-storming-dark` etc.). */
-  private _applyStyleClass(style?: string): void {
-    const cls = this._container.classList;
-    for (const s of ['classic', 'dark']) cls.remove(`event-storming-${s}`);
-    if (style && style !== 'classic') cls.add(`event-storming-${style}`);
   }
 
   /** Load `.storm` DSL text (internally parse -> importMap). Parser findings land in the warnings. */

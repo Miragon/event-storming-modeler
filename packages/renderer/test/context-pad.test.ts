@@ -129,4 +129,26 @@ describe('EventStormingContextPadProvider: read-only lock', () => {
     expect(close).toHaveBeenCalledTimes(1);
     expect(provider.getContextPadEntries(sticky('cmd_a'))).toEqual({});
   });
+
+  it('draws every entry with a 16px Lucide icon at stroke 2.5', () => {
+    const { provider } = providerHarness();
+    const entries = Object.values(provider.getContextPadEntries(sticky('cmd_a')));
+    expect(entries.length).toBeGreaterThan(3);
+    for (const entry of entries) {
+      expect(entry.html).toContain('width="16"');
+      expect(entry.html).toContain('stroke-width="2.5"');
+      expect(entry.html).toContain('stroke="currentColor"');
+      expect(entry.html).toContain('fill="none"');
+    }
+  });
+});
+
+describe('EventStormingContextPadProvider: entry order', () => {
+  it('ends with delete, in a group of its own', () => {
+    const { provider } = providerHarness();
+    const entries = provider.getContextPadEntries(sticky('cmd_a'));
+    expect(Object.keys(entries).at(-1)).toBe('delete');
+    expect(entries['delete']!.group).toBe('delete');
+    expect(Object.values(entries).filter((entry) => entry.group === 'delete')).toHaveLength(1);
+  });
 });

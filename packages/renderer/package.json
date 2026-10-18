@@ -42,7 +42,7 @@
     "clsx": "2.1.1"
   },
   "peerDependencies": {
-    "diagram-js": "^15.26.0",
+    "diagram-js": "^15.28.0",
     "didi": "^11.0.0",
     "tiny-svg": "^4.1.4"
   },

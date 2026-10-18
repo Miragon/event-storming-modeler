@@ -4,13 +4,12 @@
  * Values mirror the Miragon design system — the `miragon-brand:modeler-tool-design` skill in
  * `Miragon/corporate-identity`, whose files are vendored unchanged next to this module
  * (`cd-tokens.generated.css`, `cd-tokens.generated.json`, `cd-canvas.css`; design system 1.12.0).
- * Re-copy them from the skill to update; never fork the hex values by hand. WHY this file exists:
- * colours used to live in three hand-duplicated places (the SVG `COLORS` object, the
- * `--event-storming-*` CSS variables, and the webapp's own `:root`). Here they are declared once.
- * `draw/styles.ts` derives the public `COLORS`/`FONT`/… from `MIRAGON`;
- * `assets/event-storming.css` mirrors the `CHROME_VARS` / `DARK_BOARD_VARS` maps. The unit test
- * `test/theme.sync.test.ts` fails if the CSS drifts from these maps or a `MIRAGON` value drifts
- * from its `--cd-*` counterpart in the vendored token files.
+ * Re-copy them from the skill to update; never fork the hex values by hand. The SVG drawing needs
+ * literal values (exports carry presentation attributes, never `var()`), so `draw/styles.ts`
+ * derives the public `COLORS`/`FONT`/… from `MIRAGON`; the chrome CSS in
+ * `assets/event-storming.css` reads the `--cd-ui-*` roles directly. The unit test
+ * `test/theme.sync.test.ts` fails if a `MIRAGON` value drifts from its `--cd-*` counterpart in the
+ * vendored token files or the CSS declares a colour of its own.
  *
  * Pure data — no DOM, no imports — so it stays inside the P1 DOM-free discipline. The values stay
  * literal (rather than read from the JSON) so the literal-string types survive into the public
@@ -27,7 +26,7 @@ export const MIRAGON = {
   blau: '#335DE5',
   /** Deeper blue for links / accent text on white (WCAG AA, ~5.5:1). */
   blauLink: '#2B50D4',
-  /** Lightened blue for links / accents on dark surfaces (the opt-in "dark board"). */
+  /** Lightened blue for links / accents on dark surfaces. */
   blauHell: '#6B8AFF',
   /** Accent: key visual, highlights, one emphasised word. Bright — a fill, never text on white. */
   gruen: '#00E676',
@@ -46,38 +45,8 @@ export const MIRAGON = {
   warning: '#FFB000',
   danger: '#CD1839',
   info: '#335DE5',
-  /** Dark base — the CI hero / nav-glass colour (rgb 8,10,32). Used only by the opt-in "dark board". */
+  /** Dark base — the CI hero / nav-glass colour (rgb 8,10,32). The canvas never draws it. */
   navy: '#080A20',
   /** Signature brand gradient — hero, large surfaces, brand moments. Use verbatim. */
   gradientBrand: 'linear-gradient(120deg, #335DE5 30%, #00E676)',
 } as const;
-
-/**
- * Chrome CSS variables (`--event-storming-*`) authored in `assets/event-storming.css`. The drift
- * test keeps them in sync. WHY a separate map from `COLORS`: chrome needs surface/brand/danger/
- * shadow that the canvas does not, and only a subset of the canvas colours.
- */
-export const CHROME_VARS: Record<string, string> = {
-  '--event-storming-paper': MIRAGON.grau,
-  '--event-storming-ink': MIRAGON.schwarz,
-  '--event-storming-ink-soft': '#5B5B5B',
-  '--event-storming-surface': MIRAGON.weiss,
-  '--event-storming-border': MIRAGON.linie,
-  '--event-storming-accent': MIRAGON.blau,
-  '--event-storming-accent-soft': 'rgba(51, 93, 229, 0.12)',
-  '--event-storming-brand': MIRAGON.gruen,
-  '--event-storming-danger': MIRAGON.danger,
-  '--event-storming-shadow': 'rgba(29, 29, 29, 0.1)',
-  '--event-storming-drawing-ink': MIRAGON.schwarz,
-};
-
-/**
- * The per-board `style dark` directive (`.event-storming-container.event-storming-dark`)
- * overrides only the surround plus the default drawing ink (near-black strokes would vanish on
- * navy). This is the ONLY dark surface — there is no app-level dark mode. The stickies keep
- * their SVG presentation colours, so exports stay stable.
- */
-export const DARK_BOARD_VARS: Record<string, string> = {
-  '--event-storming-paper': MIRAGON.navy,
-  '--event-storming-drawing-ink': MIRAGON.grau,
-};

@@ -235,6 +235,17 @@ describe('the view after an import (guide §5.9)', () => {
   });
 });
 
+describe('the `style dark` directive (guide §10.7)', () => {
+  it('survives the round trip and paints nothing', async () => {
+    const modeler = editor();
+    await modeler.importText('title Night\nstyle dark\nevent A [0, 0]\n');
+    expect(modeler.exportText()).toBe('title Night\nstyle dark\nevent A [0, 0]\n');
+    const { container } = modeler.diagram;
+    expect([...container.classList].filter((name) => /dark|classic/.test(name))).toEqual([]);
+    expect(getComputedStyle(container).backgroundColor).toBe('rgb(249, 247, 247)');
+  });
+});
+
 describe('the read-only lock', () => {
   it('blocks the context pad, moves, resizes, connections and deletes, and lifts again', async () => {
     const modeler = editor();

@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { CHROME_VARS, DARK_BOARD_VARS, MIRAGON } from '../src/theme/palette.js';
+import { MIRAGON } from '../src/theme/palette.js';
 
 /**
- * Drift guard: `assets/event-storming.css` hand-mirrors the `--event-storming-*` chrome tokens
- * declared once in `theme/palette.ts`, and `MIRAGON` mirrors the design-system tokens vendored in
- * `theme/`. This test fails the moment the CSS, the TS source of truth or a partial re-copy of the
- * vendored files diverge, so the "keep these in sync" contract is enforced instead of hoped for.
- * See the Miragon design system (the `miragon-brand:modeler-tool-design` skill; CLAUDE.md
+ * Drift guard: `assets/event-storming.css` reads the design-system roles only, and `MIRAGON`
+ * mirrors the design-system tokens vendored in `theme/`. This test fails the moment the CSS
+ * declares a colour of its own, the TS source of truth drifts or a partial re-copy of the vendored
+ * files diverges, so the "keep these in sync" contract is enforced instead of hoped for. See the
+ * Miragon design system (the `miragon-brand:modeler-tool-design` skill; CLAUDE.md
  * § "Design system").
  */
 function readSource(relativePath: string): string {
@@ -74,21 +74,6 @@ function expectDeclared(
   }
 }
 
-describe('theme.sync — event-storming.css mirrors theme/palette.ts', () => {
-  it(':root declares every chrome token with the source-of-truth value', () => {
-    expectDeclared(readVars(css, ':root', 'event-storming.css'), CHROME_VARS, ':root');
-  });
-
-  it('the `style dark` board directive declares its tokens with the source-of-truth value', () => {
-    /* The per-board `style dark` directive is the only dark surface (no app-level dark mode). */
-    expectDeclared(
-      readVars(css, '.event-storming-container.event-storming-dark', 'event-storming.css'),
-      DARK_BOARD_VARS,
-      '.event-storming-dark',
-    );
-  });
-});
-
 /** The CSS without comments: what the browser parses. */
 function withoutComments(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//g, '');
@@ -101,6 +86,44 @@ function ruleSelectors(source: string): string[] {
   );
 }
 
+describe('theme.sync — event-storming.css takes every colour from the roles', () => {
+  it('declares no colour literal: no hex, rgb() or hsl() value', () => {
+    expect(withoutComments(css)).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i);
+  });
+
+  it('reads only roles and mode-independent tokens, never a fixed palette colour', () => {
+    const tokens = [...withoutComments(css).matchAll(/var\((--cd-[\w-]+)/g)].map((m) => m[1]!);
+    expect(tokens.length).toBeGreaterThan(20);
+    for (const token of tokens) {
+      expect(token).toMatch(/^--cd-(ui-[\w-]+|radius-\w+|shadow-\d|ease(-out)?|motion-\w+)$/);
+    }
+  });
+
+  it('never renders the DSL `style` directive (guide §10.7: no navy board)', () => {
+    expect(
+      ruleSelectors(css).filter((selector) => /event-storming-(dark|classic)/.test(selector)),
+    ).toEqual([]);
+    expect(withoutComments(css)).not.toMatch(/--event-storming-/);
+  });
+
+  it('keeps its own canvas overlays below the palette (guide §5.13)', () => {
+    const zIndexOf = (selector: string): number => {
+      const rule = new RegExp(`${escapeForRegExp(selector)}\\s*\\{([^}]*)\\}`).exec(
+        withoutComments(css),
+      );
+      return Number(/z-index:\s*(\d+)/.exec(rule?.[1] ?? '')?.[1]);
+    };
+    expect(zIndexOf(".djs-palette:not([data-chrome='palette'])")).toBe(110);
+    for (const overlay of [
+      '.event-storming-container .event-storming-note-toolbar',
+      '.event-storming-container .event-storming-color-picker',
+      '.event-storming-container .event-storming-label-input',
+    ]) {
+      expect(zIndexOf(overlay), overlay).toBeLessThanOrEqual(100);
+    }
+  });
+});
+
 describe('theme.sync — event-storming.css wires the vendored design-system files', () => {
   it('starts with the tokens (layered), diagram-js and cd-canvas (unlayered), in this order', () => {
     const statements = withoutComments(css)
@@ -110,7 +133,7 @@ describe('theme.sync — event-storming.css wires the vendored design-system fil
       "@import '../theme/cd-tokens.generated.css' layer(event-storming-tokens)",
       "@import 'diagram-js/assets/diagram-js.css'",
       "@import '../theme/cd-canvas.css'",
-      ':root',
+      '.event-storming-container',
     ]);
     expect(css.match(/@import/g)).toHaveLength(3);
   });
@@ -144,7 +167,9 @@ describe('theme.sync — event-storming.css wires the vendored design-system fil
     );
     expect(paletteSelectors.length).toBeGreaterThan(5);
     for (const selector of paletteSelectors) {
-      expect(selector).toMatch(/^\.djs-palette:not\(\[data-chrome='palette'\]\)($|[\s.:])/);
+      expect(selector).toMatch(
+        /^(:root\[data-cd-kontrast='hoch'\] )?\.djs-palette:not\(\[data-chrome='palette'\]\)($|[\s.:])/,
+      );
     }
   });
 });

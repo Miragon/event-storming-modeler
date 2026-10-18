@@ -40,7 +40,7 @@ module.exports = {
       name: 'renderer-feature-encapsulation',
       comment:
         'Within the renderer, a feature folder may reach into another feature only through the shared ' +
-        'core (model/di-types, draw styles/icons, theme) or that feature public index.ts. New runtime ' +
+        'core (model/di-types, draw styles/icons/lucide, theme) or that feature public index.ts. New runtime ' +
         'coupling into a sibling feature internals is forbidden (type-only DI wiring is exempt).',
       severity: 'error',
       from: { path: '^packages/renderer/src/([^/]+)/' },
@@ -51,7 +51,7 @@ module.exports = {
           '^packages/renderer/src/$1/',
           '^packages/renderer/src/[^/]+/index\\.ts$',
           '^packages/renderer/src/model/di-types\\.ts$',
-          '^packages/renderer/src/draw/(styles|icons|palette-icons)\\.ts$',
+          '^packages/renderer/src/draw/(styles|icons|palette-icons|lucide)\\.ts$',
           '^packages/renderer/src/theme/',
         ],
       },
