@@ -22,7 +22,7 @@ export interface BoardMenuActions {
 
 const LEVELS: ReadonlyArray<{ value: BoardLevel; label: string }> = [
   { value: 'big-picture', label: 'Big picture' },
-  { value: 'process', label: 'Process modelling' },
+  { value: 'process', label: 'Process modeling' },
   { value: 'design', label: 'Software design' },
 ];
 

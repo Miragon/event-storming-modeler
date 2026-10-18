@@ -3,7 +3,6 @@
    a --cd-ui-* role of the vendored tokens, so the dialog follows the mode with the rest. */
 
 .event-storming-shortcuts {
-  z-index: var(--cd-shell-ebene-dialog);
   box-sizing: border-box;
   width: min(560px, 100cqw - 32px);
   max-width: none;
@@ -69,6 +68,11 @@
   background: var(--cd-ui-hover);
 }
 
+.event-storming-shortcuts-close:focus-visible {
+  outline: 2px solid var(--cd-ui-fokus);
+  outline-offset: 2px;
+}
+
 .event-storming-shortcuts-close svg {
   display: block;
   width: 16px;
@@ -116,4 +120,20 @@
 
 .event-storming-shortcuts-key + .event-storming-shortcuts-key {
   margin-left: 6px;
+}
+
+/* High contrast (guide §5.3, §8): no shadow, a 3px focus ring; forced colours keep the edge. The
+   shell applies these rules only to its own classes, so the modeler's dialog repeats them. */
+:root[data-cd-kontrast='hoch'] .event-storming-shortcuts {
+  box-shadow: none;
+}
+
+:root[data-cd-kontrast='hoch'] .event-storming-shortcuts-close:focus-visible {
+  outline-width: 3px;
+}
+
+@media (forced-colors: active) {
+  .event-storming-shortcuts {
+    border-color: CanvasText;
+  }
 }

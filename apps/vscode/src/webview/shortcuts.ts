@@ -23,22 +23,26 @@ function editKeys(platform: Platform, keyNames: ShellMessages['keyNames']) {
     return {
       undo: ['⌘Z'],
       redo: ['⌘⇧Z'],
+      selectAll: ['⌘A'],
       copy: ['⌘C'],
       paste: ['⌘V'],
       duplicate: ['⌘D'],
       remove: ['⌫'],
       coarseMove: ARROWS.map((arrow) => `⇧${arrow}`),
+      lassoDrag: ['⇧ Drag'],
     };
   }
   const { ctrl, shift } = keyNames;
   return {
     undo: [`${ctrl}+Z`],
     redo: [`${ctrl}+${shift}+Z`, `${ctrl}+Y`],
+    selectAll: [`${ctrl}+A`],
     copy: [`${ctrl}+C`],
     paste: [`${ctrl}+V`],
     duplicate: [`${ctrl}+D`],
     remove: ['Del', 'Backspace'],
     coarseMove: ARROWS.map((arrow) => `${shift}+${arrow}`),
+    lassoDrag: [`${shift}+Drag`],
   };
 }
 
@@ -70,6 +74,7 @@ export function keyboardShortcuts(
       rows: [
         { action: 'Undo', keys: edit.undo },
         { action: 'Redo', keys: edit.redo },
+        { action: 'Select all', keys: edit.selectAll },
         { action: 'Copy', keys: edit.copy },
         { action: 'Paste', keys: edit.paste },
         { action: 'Duplicate', keys: edit.duplicate },
@@ -82,8 +87,10 @@ export function keyboardShortcuts(
       title: 'Tools',
       rows: [
         { action: 'Lasso', keys: ['L'] },
+        { action: 'Lasso by dragging', keys: edit.lassoDrag },
         { action: 'Domain event at the pointer', keys: ['E'] },
         { action: 'Command at the pointer', keys: ['C'] },
+        { action: 'Finish a drawing', keys: ['Enter', 'Esc', 'Double-click'] },
       ],
     },
   ];

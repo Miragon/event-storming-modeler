@@ -43,12 +43,22 @@ describe('keyboardShortcuts', () => {
     expect(edit('other').get('Undo')).toEqual(['Ctrl+Z']);
     expect(edit('other').get('Redo')).toEqual(['Ctrl+Shift+Z', 'Ctrl+Y']);
     expect(edit('other').get('Delete')).toEqual(['Del', 'Backspace']);
+    expect(edit('mac').get('Select all')).toEqual(['⌘A']);
+    expect(edit('other').get('Select all')).toEqual(['Ctrl+A']);
   });
 
-  it('lists the single-key tools of the palette', () => {
+  // The palette tooltips name only the tool; how to drag a lasso or end a drawing lives here.
+  it('lists the tools of the palette with their keys and gestures', () => {
     const tools = keyboardShortcuts('other', defaultMessages, 'en')[2]!;
 
-    expect(tools.rows.map((row) => row.keys)).toEqual([['L'], ['E'], ['C']]);
+    expect(tools.rows).toEqual([
+      { action: 'Lasso', keys: ['L'] },
+      { action: 'Lasso by dragging', keys: ['Shift+Drag'] },
+      { action: 'Domain event at the pointer', keys: ['E'] },
+      { action: 'Command at the pointer', keys: ['C'] },
+      { action: 'Finish a drawing', keys: ['Enter', 'Esc', 'Double-click'] },
+    ]);
+    expect(keyboardShortcuts('mac', defaultMessages, 'en')[2]!.rows[1]!.keys).toEqual(['⇧ Drag']);
   });
 
   it('localizes through the messages table', () => {
