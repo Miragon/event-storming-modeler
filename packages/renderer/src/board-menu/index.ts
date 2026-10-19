@@ -1,4 +1,4 @@
-export { boardMenu, BOARD_LEVELS } from './menu.js';
+export { boardMenu, BOARD_LEVELS, STORM_EXPORT_LABEL } from './menu.js';
 export type {
   BoardExport,
   BoardExports,

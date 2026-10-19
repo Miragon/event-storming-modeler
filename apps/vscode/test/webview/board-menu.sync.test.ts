@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ariaKeyShortcutsFromLabel,
+  commandKeyLabel as shellCommandKeyLabel,
   defaultMessages,
   formatPercent,
   resolveMessages,
@@ -12,6 +13,7 @@ import {
   type ShellMessages,
 } from '@miragon/modeler-shell';
 import {
+  STORM_EXPORT_LABEL,
   boardMenu,
   boardShortcuts,
   commandKeyLabel,
@@ -73,6 +75,26 @@ describe('the board menu and shortcuts against @miragon/modeler-shell', () => {
     expect(ariaKeyShortcutsFromLabel(commandKeyLabel('S', 'other', defaultMessages.keyNames))).toBe(
       'Control+S',
     );
+  });
+
+  it('writes the app key chips as the shell does', () => {
+    for (const platform of ['mac', 'other'] as const) {
+      for (const messages of [defaultMessages, GERMAN]) {
+        expect(commandKeyLabel('O', platform, messages.keyNames)).toBe(
+          shellCommandKeyLabel('O', platform, messages.keyNames),
+        );
+      }
+    }
+  });
+
+  it('names the File row "Open…" as the shell’s File group does', () => {
+    const file = boardShortcuts(
+      { platform: 'mac', lang: 'en', messages: { ...defaultMessages, openFile: 'Öffnen…' } },
+      { fileKeys: true },
+    ).find((group) => group.title === 'File');
+
+    expect(file?.rows[0]).toEqual({ action: 'Öffnen…', keys: ['⌘O'] });
+    expect(file?.rows[1]?.action).toBe(STORM_EXPORT_LABEL);
   });
 
   it('the board menu is a menu the shell takes, and a shell handle is a dialog chrome', () => {

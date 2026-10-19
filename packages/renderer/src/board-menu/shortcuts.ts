@@ -1,3 +1,5 @@
+import { STORM_EXPORT_LABEL } from './menu.js';
+
 /*
  * Every shortcut of the board for the "Keyboard shortcuts…" dialog (guide §5.4): one table per
  * group, the keys as chips like the chrome tooltip's (guide §5.6). The chrome's texts and key
@@ -24,6 +26,8 @@ export interface ShortcutsChrome {
     readonly zoomOut: string;
     zoomToActual(percent: string): string;
     readonly fit: string;
+    /** The File group's "Open…" (the shell's `messages.openFile`); default "Open…". */
+    readonly openFile?: string | undefined;
     readonly keyNames: ShortcutKeyNames;
   };
 }
@@ -105,12 +109,16 @@ function editKeys(platform: ShortcutPlatform, keyNames: ShortcutKeyNames) {
   };
 }
 
-function fileGroup(platform: ShortcutPlatform, keyNames: ShortcutKeyNames): ShortcutGroup {
+function fileGroup(chrome: ShortcutsChrome): ShortcutGroup {
+  const { platform, messages } = chrome;
   return {
     title: 'File',
     rows: [
-      { action: 'Open…', keys: [commandKeyLabel('O', platform, keyNames)] },
-      { action: 'Export as .storm', keys: [commandKeyLabel('S', platform, keyNames)] },
+      {
+        action: messages.openFile ?? 'Open…',
+        keys: [commandKeyLabel('O', platform, messages.keyNames)],
+      },
+      { action: STORM_EXPORT_LABEL, keys: [commandKeyLabel('S', platform, messages.keyNames)] },
     ],
   };
 }
@@ -127,7 +135,7 @@ export function boardShortcuts(
   const view = viewKeys(platform, messages.keyNames);
   const edit = editKeys(platform, messages.keyNames);
   return [
-    ...(options.fileKeys ? [fileGroup(platform, messages.keyNames)] : []),
+    ...(options.fileKeys ? [fileGroup(chrome)] : []),
     {
       title: 'View',
       rows: [

@@ -90,6 +90,9 @@ export interface BoardMenuActions {
   showKeyboardShortcuts(): void;
 }
 
+/** The web app's native-format export, in the Export group and in the shortcuts dialog. */
+export const STORM_EXPORT_LABEL = 'Export as .storm';
+
 export const BOARD_LEVELS: ReadonlyArray<{ readonly value: BoardLevel; readonly label: string }> = [
   { value: 'big-picture', label: 'Big picture' },
   { value: 'process', label: 'Process modeling' },
@@ -131,7 +134,7 @@ function exportEntries(exports: BoardExports): BoardMenuAction[] {
     );
   }
   if (exports.json) entries.push(exportEntry('export-json', 'Export as JSON', exports.json));
-  if (exports.storm) entries.push(exportEntry('export-storm', 'Export as .storm', exports.storm));
+  if (exports.storm) entries.push(exportEntry('export-storm', STORM_EXPORT_LABEL, exports.storm));
   return entries;
 }
 

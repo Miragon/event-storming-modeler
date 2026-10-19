@@ -65,6 +65,7 @@ export type { FreeRectInsets } from './palette/EventStormingPaletteProvider.js';
 export {
   boardMenu,
   BOARD_LEVELS,
+  STORM_EXPORT_LABEL,
   boardShortcuts,
   commandKeyLabel,
   createShortcutsDialog,
