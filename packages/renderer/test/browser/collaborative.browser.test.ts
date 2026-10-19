@@ -214,6 +214,37 @@ describe('a remote import while the user types a label', () => {
   });
 });
 
+describe('destroy while the user types a label', () => {
+  it('takes the editor down without a commit and leaves no focus call on the destroyed canvas', async () => {
+    const modeler = editor();
+    await modeler.importText(orderCheckout);
+    const registry = modeler.diagram.get<ElementRegistry>('elementRegistry');
+    modeler.diagram
+      .get<EventStormingLabelEditing>('eventStormingLabelEditing')
+      .activate(registry.get('event_order_placed') as EventStormingShape);
+    const field = () =>
+      document.querySelector<HTMLTextAreaElement>('textarea.event-storming-label-textarea');
+    field()!.value = 'typed, not committed';
+    let changes = 0;
+    modeler.onContentChanged(() => (changes += 1));
+    const errors: unknown[] = [];
+    const onError = (event: ErrorEvent) => {
+      errors.push(event.error);
+      event.preventDefault();
+    };
+    window.addEventListener('error', onError);
+    try {
+      modeler.destroy();
+      await settle();
+    } finally {
+      window.removeEventListener('error', onError);
+    }
+    expect(errors).toEqual([]);
+    expect(field()).toBeNull();
+    expect(changes).toBe(0);
+  });
+});
+
 describe('the view after an import (guide §5.9)', () => {
   it('never zooms above 100%, and shows an empty board at 100%', async () => {
     const modeler = editor();

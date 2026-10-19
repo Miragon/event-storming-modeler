@@ -98,7 +98,13 @@ export default class EventStormingLabelEditing {
     eventBus.on(READ_ONLY_CHANGED_EVENT, (event: { readOnly?: boolean }) => {
       if (event.readOnly) this.cancel();
     });
-    eventBus.on('diagram.destroy', () => clearTimeout(this.resumeTimer));
+    // Before the canvas tears down (priority 500): a field still open would blur when the
+    // container leaves the document, commit onto the destroyed diagram and queue a canvas focus.
+    eventBus.on('diagram.destroy', () => {
+      clearTimeout(this.resumeTimer);
+      this.suspended = null;
+      this.cancel();
+    });
     eventBus.on('element.dblclick', (event: { element?: unknown }) => {
       if (isEventStormingShape(event.element)) this.activate(event.element);
       else if (isEventStormingConnection(event.element)) this.activateConnection(event.element);
