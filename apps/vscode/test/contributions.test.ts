@@ -32,6 +32,10 @@ describe('package.json contributions', () => {
     expect(byId.get(WEBVIEW_COMMANDS.fitView)).toMatchObject({ title: 'Fit to View' });
     expect(byId.get(WEBVIEW_COMMANDS.exportPng)).toMatchObject({ title: 'Export as PNG' });
     expect(byId.get(WEBVIEW_COMMANDS.exportSvg)).toMatchObject({ title: 'Export as SVG' });
+    expect(byId.get(WEBVIEW_COMMANDS.exportPngTransparent)).toMatchObject({
+      title: 'Export as PNG (4×, Transparent)',
+    });
+    expect(byId.get(WEBVIEW_COMMANDS.exportJson)).toMatchObject({ title: 'Export as JSON' });
     for (const id of Object.values(WEBVIEW_COMMANDS)) {
       expect(byId.get(id)?.category).toBe('Event Storming');
     }
@@ -47,6 +51,8 @@ describe('package.json contributions', () => {
       WEBVIEW_COMMANDS.fitView,
       WEBVIEW_COMMANDS.exportPng,
       WEBVIEW_COMMANDS.exportSvg,
+      WEBVIEW_COMMANDS.exportPngTransparent,
+      WEBVIEW_COMMANDS.exportJson,
     ]);
     for (const entry of entries) {
       expect(entry.when).toBe(ON_BOARD);

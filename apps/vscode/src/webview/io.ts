@@ -5,10 +5,10 @@
 
 import { COLORS } from '@miragon/event-storming-renderer';
 
-/** Rasterizes the SVG to a PNG picture. */
-export async function svgToPng(svg: string, scale = 2): Promise<Blob> {
+/** Rasterizes the SVG to a PNG picture; `transparent` leaves out the paper fill (slides, docs). */
+export async function svgToPng(svg: string, scale = 2, transparent = false): Promise<Blob> {
   const { width, height } = svgSize(svg);
-  const png = await rasterize(svg, width, height, scale);
+  const png = await rasterize(svg, width, height, scale, transparent);
   return new Blob([png as BlobPart], { type: 'image/png' });
 }
 
@@ -23,6 +23,7 @@ async function rasterize(
   width: number,
   height: number,
   scale: number,
+  transparent: boolean,
 ): Promise<Uint8Array> {
   const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
   try {
@@ -39,8 +40,10 @@ async function rasterize(
     canvas.height = Math.round(height * scale);
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Canvas 2D context not available.');
-    ctx.fillStyle = COLORS.paper;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (!transparent) {
+      ctx.fillStyle = COLORS.paper;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
     if (!blob) throw new Error('PNG generation failed.');

@@ -8,6 +8,9 @@ export interface SvgBounds {
   height: number;
 }
 
+/** The live canvas's keyboard and screen reader attributes (diagram-js, a host's chrome). */
+const LIVE_CANVAS_ATTRIBUTES = ['tabindex', 'role', 'aria-label', 'aria-labelledby'] as const;
+
 /**
  * Serializes the current canvas into standalone SVG (snapshot/export).
  * `bounds` is the framing box (typically `BoardBounds.contentBounds()`), so the whole board is
@@ -16,10 +19,14 @@ export interface SvgBounds {
  */
 export function saveSVG(canvas: Canvas, bounds?: SvgBounds): { svg: string } {
   const container = canvas.getContainer();
-  const source = container.querySelector('svg');
+  // The canvas's own <svg> is a child of the container; the icons of a palette that a host's
+  // chrome moved in front of it are <svg>s as well, only deeper down.
+  const source = container.querySelector(':scope > svg');
   if (!source) throw new Error('No SVG found in the canvas container.');
 
   const clone = source.cloneNode(true) as SVGSVGElement;
+  // The live canvas is a focusable application with a name; the exported picture is neither.
+  for (const attribute of LIVE_CANVAS_ATTRIBUTES) clone.removeAttribute(attribute);
 
   const box = bounds ?? { x: 0, y: 0, ...DEFAULT_BOARD_SIZE };
   clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');

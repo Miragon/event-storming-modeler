@@ -159,7 +159,9 @@ describe('Attachments: import -> export round-trip', () => {
     const { importer, byId } = ioHarness();
     const warnings = importer.import(board);
     expect(warnings.map((w) => w.elementId)).toEqual(['hotspot_why', 'actor_customer']);
-    expect(warnings[0]!.message).toContain('attachedTo');
+    expect(warnings[0]!.message).toMatch(
+      /^“hotspot_why” is pinned to “.+”, which isn't on the board/,
+    );
     expect(byId('hotspot_why')!.host).toBeUndefined();
     expect(byId('actor_customer')!.host).toBeUndefined();
   });

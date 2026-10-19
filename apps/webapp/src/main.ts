@@ -1,430 +1,523 @@
-// Geist (Miragon corporate typeface — Vercel, SIL OFL), self-hosted variable font (all weights in one
-// file), no Google Fonts CDN (offline & GDPR). Geist Mono for the export/code textarea.
+// Geist and Geist Mono (Miragon's typefaces, SIL OFL), self-hosted: no font CDN (offline, GDPR).
 import '@fontsource-variable/geist/wght.css';
 import '@fontsource-variable/geist-mono/wght.css';
+// The renderer's stylesheet brings the vendored tokens, diagram-js.css, the canvas mapping and the
+// shortcuts dialog; the chrome's stylesheet comes last.
 import '@miragon/event-storming-renderer/assets/event-storming.css';
-import './style.css';
+import '@miragon/modeler-shell/shell.css';
 import {
   Modeler,
-  iconMarkup,
-  ICON_MENU,
-  ICON_FOLDER_OPEN,
-  ICON_EYE,
-  ICON_NEW,
-  ICON_UNDO,
-  ICON_REDO,
-  ICON_DATA_OBJECT,
-  ICON_CODE,
-  ICON_DOWNLOAD,
-  ICON_IMAGE,
-  ICON_SHARE,
+  boardMenu,
+  createShortcutsDialog,
+  importWarningText,
+  type BoardBounds,
+  type BoardLevels,
+  type ImportWarning,
+  type TypeCaptions,
 } from '@miragon/event-storming-renderer';
-import { createEmptyBoard, type BoardLevel } from '@miragon/event-storming-schema-model';
-import { readHashMap, writeHashMap, shareUrl } from './share.js';
-import { openFile, svgToPng, downloadBlob, downloadText } from './io.js';
-import { showToast } from './toast.js';
+import { createEmptyBoard } from '@miragon/event-storming-schema-model';
+import {
+  TEXT_FIELD_SELECTOR,
+  commandKeyLabel,
+  defaultMessages,
+  detectPlatform,
+  formatNumber,
+  isUndoRedoKey,
+  mountShell,
+  problemSummary,
+  type ToastHandle,
+} from '@miragon/modeler-shell';
+import { connectDiagramJs, shellModule } from '@miragon/modeler-shell/diagram-js';
+import { copyTextWhenReady } from './clipboard.js';
+import { EXAMPLE_BOARD } from './example.js';
+import { boardFileName, type DownloadKind } from './file-names.js';
+import {
+  downloadBlob,
+  downloadText,
+  importBoardFile,
+  openFile,
+  readBoardFile,
+  svgToPng,
+} from './io.js';
+import { readTypeCaptionsVisible, writeTypeCaptionsVisible } from './preferences.js';
+import { importWarningsText, problemItems } from './problems.js';
+import { hashHoldsBoard, readHashMap, shareUrl, writeHashMap } from './share.js';
+import { THEMES } from './themes.js';
 
-const EXAMPLE_BOARD = `title Order Checkout
+interface DiagramElement {
+  id: string;
+  parent?: unknown;
+  waypoints?: unknown;
+}
+interface ElementRegistryLike {
+  getAll(): DiagramElement[];
+  get(id: string): DiagramElement | undefined;
+}
+interface SelectionLike {
+  get(): DiagramElement[];
+  select(elements: DiagramElement | DiagramElement[] | null): void;
+}
+interface CanvasLike {
+  scrollToElement(element: DiagramElement): void;
+}
 
-actor Customer [80, 300]
-command Place Order [240, 300]
-aggregate Order [420, 290] (id agg_order)
-event Order Placed [620, 300]
-policy When order placed, ship it [800, 300]
-command Ship Order [980, 300]
-aggregate Order [1160, 290] (id agg_order_2)
-event Order Shipped [1340, 300]
-readmodel Order Status [620, 120]
-external Payment Provider [420, 520]
-hotspot Double payment on retry? [620, 520]
-note Design-level session: checkout flow [80, 80]
+const APP_NAME = 'Event Storming Modeler';
+const BOARD_NAME = 'Event Storming board';
+const NEW_BOARD_TITLE = 'New board';
+const REPOSITORY_URL = 'https://github.com/Miragon/event-storming-modeler';
+/** Extensions for the file picker and the drop; the MIME types decide during a drag (guide §9). */
+const BOARD_FILE_TYPES = ['.storm', '.json', '.txt', 'application/json', 'text/plain'];
+const CHECK_BOARD_FILE = 'Check that it contains a valid Event Storming board.';
+const BROKEN_LINK_TEXT =
+  "Couldn't read the board in this link. Check that you copied the whole link.";
 
-Customer -> Place Order
-Place Order -> #agg_order
-Place Order -> Payment Provider
-#agg_order -> Order Placed
-Order Placed -> Order Status
-Order Placed -> When order placed, ship it
-When order placed, ship it -> Ship Order
-Ship Order -> #agg_order_2
-#agg_order_2 -> Order Shipped`;
+const app = document.getElementById('app');
+if (!app) throw new Error('index.html has no #app root.');
 
-const container = document.getElementById('canvas');
-if (!container) throw new Error('#canvas is missing');
-
-const viewer = new Modeler({ container });
+// 1. The diagram first: the Event Storming keyboard listens on document and must run before the
+//    chrome's key listener, and the Modeler builds its diagram lazily on the first get(). The web
+//    app keeps the canvas's own undo and redo keys.
+const modeler = new Modeler({
+  width: '100%',
+  height: '100%',
+  additionalModules: [shellModule],
+  // Where Enter or Space on a creating palette entry places the sticky (guide §5.5).
+  freeRectInsets: () => shell.fitInsets(),
+});
+modeler.get('canvas');
+const registry = modeler.get<ElementRegistryLike>('elementRegistry');
+const commandStack = modeler.get<{ canUndo(): boolean }>('commandStack');
+const selection = modeler.get<SelectionLike>('selection');
+const canvas = modeler.get<CanvasLike>('canvas');
+const boardBounds = modeler.get<BoardBounds>('boardBounds');
+const levels = modeler.get<BoardLevels>('eventStormingModeling');
+const typeCaptions = modeler.get<TypeCaptions>('eventStormingViewOptions');
+// A view preference of this browser: applied before the first import, never part of the link.
+if (readTypeCaptionsVisible() === false) typeCaptions.setTypeCaptionsVisible(false);
 Object.assign(globalThis as Record<string, unknown>, {
-  __eventStormingViewer: viewer,
+  __eventStormingViewer: modeler,
   __eventStormingIo: { openFile, svgToPng },
 });
 
-// --- Default viewport after import/reload ---
-// Fit the board content, but leave room at the top for the floating chrome (palette center, menu
-// left, share right) and some margin on the sides/bottom -> nothing overlaps.
-const VIEW_INSET = { top: 92, side: 32, bottom: 32 };
-function fitView(): void {
-  if (!container) return;
-  const canvas = viewer.get('canvas') as {
-    viewbox(box?: { x: number; y: number; width: number; height: number }): void;
-  };
-  const bounds = viewer.get('boardBounds') as {
-    contentBounds(): { x: number; y: number; width: number; height: number };
-  };
-  const rect = container.getBoundingClientRect();
-  const W = rect.width;
-  const H = rect.height;
-  if (!W || !H) return;
-  const p = bounds.contentBounds();
-  const availW = Math.max(W - 2 * VIEW_INSET.side, 50);
-  const availH = Math.max(H - VIEW_INSET.top - VIEW_INSET.bottom, 50);
-  const s = Math.min(availW / p.width, availH / p.height);
-  canvas.viewbox({
-    x: p.x + p.width / 2 - W / 2 / s,
-    y: p.y - VIEW_INSET.top / s, // top edge below the chrome
-    width: W / s,
-    height: H / s,
-  });
-}
-viewer.on('import.done', fitView);
+const platform = detectPlatform(navigator);
+const openKey = commandKeyLabel('O', platform, defaultMessages.keyNames);
+const saveKey = commandKeyLabel('S', platform, defaultMessages.keyNames);
 
-// --- Button / menu icons ---
-function setLabel(id: string, icon: string, label: string): void {
-  const el = document.getElementById(id);
-  if (el) el.innerHTML = `${iconMarkup(icon, 16)}<span>${label}</span>`;
-}
-setLabel('btn-menu', ICON_MENU, 'Menu');
-setLabel('btn-share', ICON_SHARE, 'Share');
-setLabel('m-open', ICON_FOLDER_OPEN, 'Open…');
-setLabel('m-example', ICON_EYE, 'Show example');
-setLabel('m-new', ICON_NEW, 'New / clear');
-setLabel('m-undo', ICON_UNDO, 'Undo');
-setLabel('m-redo', ICON_REDO, 'Redo');
-setLabel('m-json', ICON_DATA_OBJECT, 'Export · JSON');
-setLabel('m-dsl', ICON_CODE, 'Export · DSL (.storm)');
-setLabel('m-svg', ICON_DOWNLOAD, 'Export · SVG');
-setLabel('m-png', ICON_IMAGE, 'Export · PNG (2×)');
-setLabel('m-png-transparent', ICON_IMAGE, 'Export · PNG (4×, transparent)');
-
-// Keep the legal copyright year current without a yearly manual edit.
-const legalYear = document.getElementById('legal-year');
-if (legalYear) legalYear.textContent = String(new Date().getFullYear());
-
-// --- Hamburger menu (Excalidraw style): open/close ---
-const menuBtn = document.getElementById('btn-menu');
-const dropdown = document.getElementById('menu-dropdown');
-function setMenuOpen(open: boolean): void {
-  if (!dropdown || !menuBtn) return;
-  dropdown.hidden = !open;
-  menuBtn.setAttribute('aria-expanded', String(open));
-}
-menuBtn?.addEventListener('click', (e) => {
-  e.stopPropagation();
-  setMenuOpen(dropdown?.hidden === true);
+// 2. The chrome around it: the whole web column of guide §5.2.
+const shell = mountShell(app, {
+  host: 'web',
+  canvas: modeler.container,
+  lang: 'en',
+  platform,
+  themes: THEMES,
+  messages: { canvas: BOARD_NAME },
+  primary: { onSelect: () => share() },
+  legal: { links: [{ label: 'GitHub', href: REPOSITORY_URL }] },
+  file: {
+    newDiagram: { onSelect: () => void newDiagram() },
+    open: { onSelect: () => pickFile(), shortcut: openKey },
+    showExample: { onSelect: () => void showExample() },
+  },
+  menu: boardMenu({
+    levels,
+    typeCaptions,
+    onTypeCaptionsToggled: writeTypeCaptionsVisible,
+    exports: {
+      png: { onSelect: () => void exportPicture('png') },
+      svg: { onSelect: () => void exportPicture('svg') },
+      transparentPng: { onSelect: () => void exportPicture('png-transparent') },
+      json: { onSelect: () => exportBoardText('json') },
+      storm: { onSelect: () => exportBoardText('storm'), shortcut: saveKey },
+    },
+    showKeyboardShortcuts: () => shortcutsDialog.open(),
+  }),
+  problems: { onSelectItem: (item) => selectElement(item.elementId) },
+  emptyState: {
+    title: APP_NAME,
+    text: 'Start a new diagram, or explore the example.',
+    komet: '/miragon-komet-blau.svg',
+    onNewDiagram: () => void newDiagram(),
+    onShowExample: () => void showExample(),
+    // The same types the reject toast names (the accept list's extensions).
+    dropHint: 'Or drop a .storm, .json, or .txt file here',
+  },
+  dropZone: {
+    accept: BOARD_FILE_TYPES,
+    onDrop: ([file]) => {
+      if (file) void openBoardFile(file);
+    },
+  },
 });
-document.addEventListener('click', (e) => {
-  if (!(e.target as Element | null)?.closest('.app-menu')) setMenuOpen(false);
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') setMenuOpen(false);
-});
-function onMenu(id: string, action: () => void): void {
-  document.getElementById(id)?.addEventListener('click', () => {
-    setMenuOpen(false);
-    action();
-  });
-}
+const shortcutsDialog = createShortcutsDialog(shell, { fileKeys: true });
+modeler.on('diagram.destroy', () => shortcutsDialog.destroy());
 
-/*
- * Landing / empty state + URL sync (central: what happens when the model changes).
- * The "landing" is the start screen (empty board, user hasn't started yet): it shows the start
- * card and hides only the zoom control (menu, share and palette stay usable). Picking "New board"
- * or "Show example" — or the presence of any non-empty board — leaves it for good this session.
- */
-const emptyState = document.getElementById('empty-state');
-const appEl = document.getElementById('app');
-let hasStarted = false;
-function updateLanding(): void {
-  if (!isEmptyBoard()) hasStarted = true;
-  const landing = !hasStarted && isEmptyBoard();
-  if (emptyState) emptyState.hidden = !landing;
-  appEl?.classList.toggle('app--landing', landing);
-}
-function isEmptyBoard(): boolean {
-  const board = viewer.exportMap();
+// 3. Viewport, palette skin, keys. Cheap tests only: the chrome asks on every content change.
+const isEmpty = (): boolean =>
+  !registry.getAll().some((element) => element.parent && !element.waypoints);
+const connection = connectDiagramJs(shell, modeler, {
+  isEmpty,
+  // No padding of its own: the chrome's fit insets are the only margin (guide §5.9).
+  contentBounds: () => (isEmpty() ? undefined : boardBounds.contentBounds(0)),
+});
+const { viewport } = connection;
+
+// ---------------------------------------------------------------------------
+// Documents: every new board opens like the first (guide §5.9)
+// ---------------------------------------------------------------------------
+
+type BoardLoad = () => Promise<readonly ImportWarning[]>;
+
+const importText =
+  (text: string): BoardLoad =>
+  async () =>
+    (await modeler.importDSL(text)).warnings;
+
+/** Whether the board has stickies, drawings or arrows (the title and level alone do not count). */
+function boardIsEmpty(): boolean {
+  const board = modeler.exportMap();
   return board.elements.length === 0 && board.edges.length === 0;
 }
+
+/**
+ * Import findings go to the problems pill and its list. A toast points at them after an import the
+ * user started (open, drop, example, link), never after one that restores a board (guide §9).
+ */
+function reportWarnings(warnings: readonly ImportWarning[], announce: boolean): void {
+  const items = problemItems(warnings, (id) => registry.get(id) !== undefined);
+  shell.setProblems(problemSummary(items));
+  for (const warning of warnings)
+    console.warn(`[event-storming-import] ${importWarningText(warning)}`);
+  if (!announce || items.length === 0) return;
+  const pill = shell.messages.problems(items.length, formatNumber(items.length, shell.lang));
+  shell.toast({ status: 'warning', text: importWarningsText(items.length, pill) });
+}
+
+async function openDocument(load: BoardLoad, announce: boolean): Promise<void> {
+  viewport.newDocument();
+  let warnings: readonly ImportWarning[];
+  try {
+    warnings = await load();
+  } finally {
+    viewport.afterImport();
+  }
+  shell.setEmptyState(false);
+  shell.menu.refresh();
+  updateDocumentTitle();
+  reportWarnings(warnings, announce);
+}
+
+/** The board's title in the tab (guide §5.4: the web app's title names the file), else the app. */
+function updateDocumentTitle(): void {
+  const title = shell.isEmptyStateShown() ? undefined : boardTitle()?.trim();
+  document.title = title && title !== NEW_BOARD_TITLE ? `${title} · ${APP_NAME}` : APP_NAME;
+}
+
+interface ReplaceUndo {
+  readonly toast: ToastHandle;
+  run(): void;
+}
+
+let replaceUndo: ReplaceUndo | undefined;
+
+/** An undo offer would bring back the replaced board and silently drop what came after it. */
+function withdrawReplaceUndo(): void {
+  replaceUndo?.toast.dismiss();
+  replaceUndo = undefined;
+}
+
+/**
+ * Replacing a board clears the canvas history, so instead of asking first (guide §9) every
+ * replacement keeps the previous board as text and offers it back: "Board replaced · Undo", and
+ * Cmd/Ctrl+Z while the canvas has nothing else to undo (the toast's button is far down the tab order).
+ */
+async function replaceBoard(load: BoardLoad): Promise<void> {
+  const previous = boardIsEmpty() ? undefined : modeler.exportDSL();
+  await openDocument(load, true);
+  withdrawReplaceUndo();
+  if (previous === undefined || previous === modeler.exportDSL()) return;
+  const undo = (): void => {
+    if (replaceUndo === offer) replaceUndo = undefined;
+    void openDocument(importText(previous), false);
+  };
+  const offer: ReplaceUndo = {
+    toast: shell.toast({
+      status: 'info',
+      text: 'Board replaced',
+      action: { label: 'Undo', onSelect: undo },
+    }),
+    run: () => {
+      offer.toast.dismiss();
+      undo();
+    },
+  };
+  replaceUndo = offer;
+}
+
+function newDiagram(): Promise<void> {
+  return replaceBoard(
+    async () => (await modeler.importMap(createEmptyBoard(NEW_BOARD_TITLE))).warnings,
+  );
+}
+
+function showExample(): Promise<void> {
+  return replaceBoard(importText(EXAMPLE_BOARD));
+}
+
+async function openBoardFile(file: File): Promise<void> {
+  try {
+    const boardFile = await readBoardFile(file);
+    await replaceBoard(() => importBoardFile(boardFile, modeler));
+  } catch (error) {
+    console.error('[event-storming-open]', error);
+    shell.toast({
+      status: 'danger',
+      text: `Couldn't read “${file.name}”. ${CHECK_BOARD_FILE}`,
+    });
+  }
+}
+
+const fileInput = document.createElement('input');
+fileInput.type = 'file';
+fileInput.accept = BOARD_FILE_TYPES.join(',');
+fileInput.hidden = true;
+document.body.append(fileInput);
+fileInput.addEventListener('change', () => {
+  const file = fileInput.files?.[0];
+  fileInput.value = '';
+  if (file) void openBoardFile(file);
+});
+
+function pickFile(): void {
+  fileInput.click();
+}
+
+function selectElement(id: string | undefined): void {
+  const element = id ? registry.get(id) : undefined;
+  if (!element) return;
+  selection.select(element);
+  canvas.scrollToElement(element);
+}
+
+// ---------------------------------------------------------------------------
+// Share and export
+// ---------------------------------------------------------------------------
+
+/** Copies the link inside the click (Safari keeps the gesture only there), shows it in the URL. */
+function share(): void {
+  const dsl = modeler.exportDSL();
+  const copied = copyTextWhenReady(shareUrl(dsl));
+  void (async () => {
+    try {
+      await writeHashMap(dsl);
+      await copied;
+      shell.toast({ status: 'success', text: 'Link copied' });
+    } catch (error) {
+      console.error('[event-storming-share]', error);
+      shell.toast({
+        status: 'danger',
+        text: "Couldn't copy the link. Copy it from the address bar instead.",
+      });
+    }
+  })();
+}
+
+function boardTitle(): string | undefined {
+  return modeler.exportMap().config.title;
+}
+
+function selectedElements(): DiagramElement[] {
+  return selection.get();
+}
+
+/** The picture shows the board, not the selection outlines; the selection comes back afterwards. */
+async function withoutSelection<T>(task: () => Promise<T>): Promise<T> {
+  const selected = selectedElements();
+  selection.select(null);
+  try {
+    return await task();
+  } finally {
+    if (selected.length > 0) selection.select(selected);
+  }
+}
+
+function announceExport(fileName: string): void {
+  shell.toast({ status: 'success', text: `Exported ${fileName}.` });
+}
+
+async function exportPicture(kind: Extract<DownloadKind, 'png' | 'png-transparent' | 'svg'>) {
+  const fileName = boardFileName(boardTitle(), kind);
+  try {
+    const { svg } = await withoutSelection(() => modeler.saveSVG());
+    if (kind === 'svg') downloadText(svg, fileName, 'image/svg+xml');
+    else {
+      const options = kind === 'png' ? {} : { scale: 4, transparent: true };
+      downloadBlob(await svgToPng(svg, options), fileName);
+    }
+    announceExport(fileName);
+  } catch (error) {
+    console.error('[event-storming-export]', error);
+    shell.toast({
+      status: 'danger',
+      text:
+        kind === 'svg'
+          ? "Couldn't export the board as SVG. Try again."
+          : "Couldn't export the board as PNG. Try again, or export it as SVG.",
+    });
+  }
+}
+
+function exportBoardText(kind: Extract<DownloadKind, 'json' | 'storm'>): void {
+  const fileName = boardFileName(boardTitle(), kind);
+  try {
+    // The board's own order, not serializeBoard's canonical one: the importer stacks stickies in
+    // array order, so a sorted export would reopen with overlapping stickies swapped.
+    if (kind === 'json') {
+      downloadText(JSON.stringify(modeler.exportMap(), null, 2), fileName, 'application/json');
+    } else downloadText(modeler.exportDSL(), fileName, 'text/plain;charset=utf-8');
+    announceExport(fileName);
+  } catch (error) {
+    console.error('[event-storming-export]', error);
+    shell.toast({ status: 'danger', text: `Couldn't export ${fileName}. Try again.` });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The web app's own keys: Cmd/Ctrl+O opens a file, Cmd/Ctrl+S exports the .storm file,
+// Cmd/Ctrl+Z takes back a replaced board
+// ---------------------------------------------------------------------------
+
+function isInTextField(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    (target.matches(TEXT_FIELD_SELECTOR) || target.isContentEditable)
+  );
+}
+
+function modalOpen(): boolean {
+  return document.querySelector('dialog:modal') !== null;
+}
+
+/** The canvas has nothing to undo after a replacement (the import cleared it): Cmd/Ctrl+Z takes the board back. */
+function onUndoReplaceKey(event: KeyboardEvent): void {
+  const offer = replaceUndo;
+  if (!offer || event.shiftKey || event.isComposing || !isUndoRedoKey(event)) return;
+  // Cmd/Ctrl+Y is redo; the typed letter decides (QWERTZ swaps the keys), as in isUndoRedoKey.
+  const ascii = event.key.length === 1 && event.key.charCodeAt(0) < 0x80;
+  if ((ascii ? event.key.toLowerCase() : event.code === 'KeyZ' ? 'z' : '') !== 'z') return;
+  if (isInTextField(event.target) || modalOpen() || commandStack.canUndo()) return;
+  event.preventDefault();
+  if (!event.repeat) offer.run();
+}
+
+function onAppKey(event: KeyboardEvent): void {
+  if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+  onUndoReplaceKey(event);
+  if (event.shiftKey) return;
+  const key = event.key.toLowerCase();
+  if ((key !== 'o' && key !== 's') || event.isComposing) return;
+  // Never the browser's "Open file" or "Save page as" instead, also not over a dialog.
+  event.preventDefault();
+  if (event.repeat || modalOpen()) return;
+  if (key === 'o') {
+    pickFile();
+    return;
+  }
+  // The start screen has no board yet to save (guide §8: only the card and the legal line).
+  if (shell.isEmptyStateShown()) return;
+  // A label being typed belongs in the file: leaving the field commits it.
+  const active = document.activeElement;
+  if (active instanceof HTMLElement && isInTextField(active)) active.blur();
+  exportBoardText('storm');
+}
+
+// ---------------------------------------------------------------------------
+// The link: every change is in the URL hash, a pasted link replaces the board
+// ---------------------------------------------------------------------------
+
 let urlTimer: ReturnType<typeof setTimeout> | undefined;
 function syncUrlNow(): void {
   clearTimeout(urlTimer);
   urlTimer = undefined;
-  // Empty board -> drop the hash (clean URL, an empty start stays shareable).
-  if (isEmptyBoard()) history.replaceState(null, '', location.pathname + location.search);
-  else void writeHashMap(viewer.exportDSL());
+  // An empty board drops the hash: a clean URL, and an empty start stays shareable.
+  if (boardIsEmpty()) history.replaceState(null, '', location.pathname + location.search);
+  else void writeHashMap(modeler.exportDSL());
 }
 /**
- * Toggle the empty state + sync the URL. Discrete edit actions (create, connect, move, delete) are
- * persisted IMMEDIATELY — otherwise a change just made (e.g. a freshly drawn arrow) is lost on a
- * very fast reload. The debounce path stays available for high-frequency change sources (one event
- * per keystroke), flushed on beforeunload/pagehide below.
+ * Discrete edits (create, connect, move, delete) are written at once, so a fast reload keeps a
+ * change just made. The debounce path is for high-frequency change sources, flushed on leaving.
  */
 function onModelChanged(debounce = false): void {
-  updateLanding();
   clearTimeout(urlTimer);
   if (debounce) urlTimer = setTimeout(syncUrlNow, 350);
   else syncUrlNow();
 }
-viewer.on('commandStack.changed', () => onModelChanged());
-viewer.on('import.done', () => onModelChanged());
-// Belt-and-suspenders: flush a pending (debounced) sync before leaving the page.
 const flushUrl = (): void => {
   if (urlTimer !== undefined) syncUrlNow();
 };
+
+modeler.on('import.done', () => onModelChanged());
+modeler.on<{ trigger?: string }>('commandStack.changed', (event) => {
+  if (event.trigger !== 'clear') {
+    // The first edit is a start as well; and an edit makes an open undo offer stale.
+    shell.setEmptyState(false);
+    withdrawReplaceUndo();
+  }
+  shell.menu.refresh(); // the level is undoable
+  updateDocumentTitle();
+  onModelChanged();
+});
+
+/** A link pasted into an open tab: writeHashMap uses replaceState and fires no hashchange. */
+function onHashChange(): void {
+  void (async () => {
+    const dsl = await readHashMap();
+    if (dsl === null) {
+      if (hashHoldsBoard()) shell.toast({ status: 'danger', text: BROKEN_LINK_TEXT });
+      return;
+    }
+    if (dsl !== modeler.exportDSL()) await replaceBoard(importText(dsl));
+  })();
+}
+
+window.addEventListener('keydown', onAppKey);
+window.addEventListener('hashchange', onHashChange);
 window.addEventListener('beforeunload', flushUrl);
 window.addEventListener('pagehide', flushUrl);
 
-/**
- * Surface parser/import findings: console detail + a single non-blocking info toast (import
- *  proceeds regardless). Silent-until-now warnings become visible without a modal.
- */
-function logWarnings(warnings: ReadonlyArray<{ message: string }>): void {
-  for (const w of warnings) console.warn(`[event-storming-import] ${w.message}`);
-  if (warnings.length) {
-    showToast(`Imported with ${warnings.length} warning(s) — see console`, 'info');
-  }
+// ---------------------------------------------------------------------------
+// Start: the board from the link, else the start screen on an empty board
+// ---------------------------------------------------------------------------
+
+const linked = await readHashMap();
+if (linked !== null) await openDocument(importText(linked), true);
+else {
+  const brokenLink = hashHoldsBoard();
+  await modeler.importMap(createEmptyBoard(NEW_BOARD_TITLE));
+  viewport.afterImport(); // an empty board at 100 %
+  shell.setEmptyState(true);
+  updateDocumentTitle();
+  if (brokenLink) shell.toast({ status: 'danger', text: BROKEN_LINK_TEXT });
 }
 
-// --- Actions ---
-function showExample(): void {
-  void viewer.importDSL(EXAMPLE_BOARD).then(({ warnings }) => logWarnings(warnings));
-}
-function clearCanvas(): void {
-  void viewer.importMap(createEmptyBoard('New board'));
-}
-function deselect(): void {
-  (viewer.get('selection') as { select: (e: unknown) => void }).select(null);
-}
+let destroyed = false;
 
-const fileInput = document.getElementById('file-input') as HTMLInputElement | null;
-function pickFile(): void {
-  fileInput?.click();
-}
-fileInput?.addEventListener('change', () => {
-  const file = fileInput.files?.[0];
-  if (file) void load(file);
-  fileInput.value = '';
-});
-async function load(file: File): Promise<void> {
-  // Opening a file replaces the current board — ask first (same protection as "New / clear").
-  if (!isEmptyBoard() && !confirm(`Replace the current board with "${file.name}"?`)) return;
-  try {
-    logWarnings(await openFile(file, viewer));
-  } catch (err) {
-    showToast(`Could not open file: ${(err as Error).message}`, 'error');
-  }
-}
-
-// --- JSON/DSL export panel ---
-const overlay = document.getElementById('output');
-const outTitle = document.getElementById('output-title');
-const outText = document.getElementById('output-text') as HTMLTextAreaElement | null;
-function openOutput(title: string, text: string): void {
-  if (!overlay || !outTitle || !outText) return;
-  outTitle.textContent = title;
-  outText.value = text;
-  overlay.hidden = false;
-  outText.focus();
-  outText.select();
-}
-function exportSvg(): void {
-  deselect();
-  void viewer.saveSVG().then(({ svg }) => {
-    downloadText(svg, 'event-storming-board.svg', 'image/svg+xml');
-  });
-}
-function exportPng(options: { scale?: number; transparent?: boolean } = {}): void {
-  deselect();
-  void viewer.saveSVG().then(async ({ svg }) => {
-    downloadBlob(await svgToPng(svg, options), 'event-storming-board.png');
-  });
-}
-
-// --- Wire up menu items ---
-onMenu('m-open', pickFile);
-onMenu('m-example', showExample);
-onMenu('m-new', () => {
-  if (isEmptyBoard() || confirm('Discard the current board and start an empty one?')) clearCanvas();
-});
-onMenu('m-undo', () => viewer.undo());
-onMenu('m-redo', () => viewer.redo());
-onMenu('m-json', () => openOutput('Export · JSON', JSON.stringify(viewer.exportMap(), null, 2)));
-onMenu('m-dsl', () => openOutput('Export · DSL (.storm)', viewer.exportDSL()));
-onMenu('m-svg', exportSvg);
-onMenu('m-png', () => exportPng());
-onMenu('m-png-transparent', () => exportPng({ scale: 4, transparent: true }));
-
-// --- Workshop level (menu radio group) ---
-const LEVELS: ReadonlyArray<{ id: string; level: BoardLevel; label: string }> = [
-  { id: 'm-level-big-picture', level: 'big-picture', label: 'Big Picture' },
-  { id: 'm-level-process', level: 'process', label: 'Process Modelling' },
-  { id: 'm-level-design', level: 'design', label: 'Software Design' },
-];
-// check — Material Icons (same source as the renderer's icon set); marks the active level.
-const ICON_CHECK = 'M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z';
-const levelModeling = viewer.get('eventStormingModeling') as {
-  setLevel(level: BoardLevel): void;
-  getLevel(): BoardLevel;
+/** For the console and the e2e suite: the app's parts and its teardown, once it started. */
+const eventStormingApp = {
+  ready: true,
+  shell,
+  connection,
+  destroy(): void {
+    if (destroyed) return;
+    destroyed = true;
+    window.removeEventListener('keydown', onAppKey);
+    window.removeEventListener('hashchange', onHashChange);
+    window.removeEventListener('beforeunload', flushUrl);
+    window.removeEventListener('pagehide', flushUrl);
+    clearTimeout(urlTimer);
+    fileInput.remove();
+    connection.destroy();
+    modeler.destroy();
+    shell.destroy();
+  },
 };
-function updateLevelMenu(): void {
-  const active = levelModeling.getLevel();
-  for (const { id, level, label } of LEVELS) {
-    const el = document.getElementById(id);
-    if (!el) continue;
-    el.setAttribute('aria-checked', String(level === active));
-    // Checkmark in the icon slot marks the active level; a spacer keeps the labels aligned.
-    if (level === active) setLabel(id, ICON_CHECK, label);
-    else el.innerHTML = `<span class="menu-icon-spacer"></span><span>${label}</span>`;
-  }
-}
-for (const { id, level } of LEVELS) onMenu(id, () => levelModeling.setLevel(level));
-// setLevel is undoable and the level also arrives via import — re-sync the checkmark on both.
-viewer.on('commandStack.changed', updateLevelMenu);
-viewer.on('import.done', updateLevelMenu);
-
-// --- Type captions (menu checkbox; a VIEW preference, persisted per browser) ---
-const TYPE_CAPTIONS_KEY = 'event-storming.typeCaptions';
-const viewOptions = viewer.get('eventStormingViewOptions') as {
-  typeCaptionsVisible(): boolean;
-  setTypeCaptionsVisible(visible: boolean): void;
-};
-function updateTypeCaptionsMenu(): void {
-  const el = document.getElementById('m-type-captions');
-  if (!el) return;
-  const visible = viewOptions.typeCaptionsVisible();
-  el.setAttribute('aria-checked', String(visible));
-  // Same checkmark affordance as the level items: icon slot marks "on", spacer keeps alignment.
-  if (visible) setLabel('m-type-captions', ICON_CHECK, 'Type captions');
-  else el.innerHTML = `<span class="menu-icon-spacer"></span><span>Type captions</span>`;
-}
-onMenu('m-type-captions', () => {
-  const visible = !viewOptions.typeCaptionsVisible();
-  viewOptions.setTypeCaptionsVisible(visible);
-  localStorage.setItem(TYPE_CAPTIONS_KEY, visible ? '1' : '0');
-  updateTypeCaptionsMenu();
-});
-// Not board content -> not in the URL hash; re-apply the stored choice before the first import.
-if (localStorage.getItem(TYPE_CAPTIONS_KEY) === '0') viewOptions.setTypeCaptionsVisible(false);
-updateTypeCaptionsMenu();
-
-// --- Landing (start-screen) buttons ---
-document.getElementById('btn-new')?.addEventListener('click', () => {
-  /* Canvas is already empty here — just leave the landing and reveal the working chrome. */
-  hasStarted = true;
-  updateLanding();
-});
-document.getElementById('btn-example')?.addEventListener('click', () => {
-  hasStarted = true;
-  showExample();
-});
-
-// --- Close/copy the output panel ---
-document.getElementById('output-close')?.addEventListener('click', () => {
-  if (overlay) overlay.hidden = true;
-});
-overlay?.addEventListener('click', (e) => {
-  if (e.target === overlay) overlay.hidden = true;
-});
-document.getElementById('output-copy')?.addEventListener('click', () => {
-  if (!outText) return;
-  void navigator.clipboard?.writeText(outText.value);
-  outText.select();
-  showToast('Copied to clipboard', 'success');
-});
-
-// --- Share ---
-document.getElementById('btn-share')?.addEventListener('click', () => {
-  void (async () => {
-    try {
-      const dsl = viewer.exportDSL();
-      const url = await shareUrl(dsl);
-      await writeHashMap(dsl);
-      await navigator.clipboard?.writeText(url);
-      showToast('Share link copied to clipboard', 'success');
-    } catch {
-      showToast('Could not create the share link', 'error');
-    }
-  })();
-});
-
-// --- Zoom controls (bottom right) + shortcuts ---
-const zoomScroll = viewer.get('zoomScroll') as { stepZoom(delta: number): void };
-const canvasService = viewer.get('canvas') as { zoom(): number };
-const zoomLevelBtn = document.getElementById('z-level');
-function updateZoomLevel(): void {
-  if (zoomLevelBtn) zoomLevelBtn.textContent = `${Math.round(canvasService.zoom() * 100)}%`;
-}
-viewer.on('canvas.viewbox.changed', updateZoomLevel);
-document.getElementById('z-in')?.addEventListener('click', () => zoomScroll.stepZoom(1));
-document.getElementById('z-out')?.addEventListener('click', () => zoomScroll.stepZoom(-1));
-zoomLevelBtn?.addEventListener('click', fitView);
-window.addEventListener('keydown', (e) => {
-  if (!(e.ctrlKey || e.metaKey)) return;
-  if ((e.target as HTMLElement | null)?.closest('input, textarea, [contenteditable]')) return;
-  if (e.key === '+' || e.key === '=') {
-    e.preventDefault();
-    zoomScroll.stepZoom(1);
-  } else if (e.key === '-') {
-    e.preventDefault();
-    zoomScroll.stepZoom(-1);
-  } else if (e.key === '0') {
-    e.preventDefault();
-    fitView();
-  }
-});
-
-// --- Drag & drop (over the whole stage, including over the empty state) ---
-const stage = document.querySelector('.app-stage');
-let dragDepth = 0;
-stage?.addEventListener('dragenter', (e) => {
-  if ((e as DragEvent).dataTransfer?.types.includes('Files')) {
-    e.preventDefault();
-    dragDepth++;
-    stage.classList.add('drag-over');
-  }
-});
-stage?.addEventListener('dragover', (e) => {
-  if ((e as DragEvent).dataTransfer?.types.includes('Files')) e.preventDefault();
-});
-stage?.addEventListener('dragleave', () => {
-  if (--dragDepth <= 0) {
-    dragDepth = 0;
-    stage.classList.remove('drag-over');
-  }
-});
-stage?.addEventListener('drop', (e) => {
-  e.preventDefault();
-  dragDepth = 0;
-  stage.classList.remove('drag-over');
-  const file = (e as DragEvent).dataTransfer?.files?.[0];
-  if (file) void load(file);
-});
-
-// --- Startup: load the board from the URL hash, otherwise an EMPTY canvas (no auto-example) ---
-const initial = await readHashMap();
-if (initial) {
-  const { warnings } = await viewer.importDSL(initial);
-  logWarnings(warnings);
-} else {
-  await viewer.importMap(createEmptyBoard('New board'));
-}
-
-// Pasting a shared link into an already-open tab: adopt the hash change.
-// (writeHashMap uses history.replaceState and fires NO hashchange -> no loop.)
-window.addEventListener('hashchange', () => {
-  void (async () => {
-    const dsl = await readHashMap();
-    if (dsl && dsl !== viewer.exportDSL()) {
-      const { warnings } = await viewer.importDSL(dsl);
-      logWarnings(warnings);
-    }
-  })();
-});
+Object.assign(globalThis as Record<string, unknown>, { __eventStormingApp: eventStormingApp });

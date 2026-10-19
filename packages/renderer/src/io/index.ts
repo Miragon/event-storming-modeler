@@ -12,3 +12,4 @@ export { default as EventStormingExporter } from './EventStormingExporter.js';
 export { saveSVG } from './saveSvg.js';
 export { ROOT_ID } from './types.js';
 export type { ImportWarning, RootBusinessObject } from './types.js';
+export { importWarningText } from './warnings.js';

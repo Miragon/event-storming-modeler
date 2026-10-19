@@ -5,6 +5,8 @@ export const WEBVIEW_COMMANDS: Readonly<Record<WebviewCommand, string>> = {
   fitView: 'eventStorming.fitView',
   exportPng: 'eventStorming.exportPng',
   exportSvg: 'eventStorming.exportSvg',
+  exportPngTransparent: 'eventStorming.exportPngTransparent',
+  exportJson: 'eventStorming.exportJson',
 };
 
 export const NO_BOARD_MESSAGE = 'Open an Event Storming board in the board editor first.';

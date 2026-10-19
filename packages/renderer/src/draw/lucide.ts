@@ -1,7 +1,7 @@
 /**
- * The Lucide icons of the in-canvas chrome (context pad, note toolbar), inlined so the renderer
- * has no icon runtime dependency. Copied unchanged from lucide-static 1.59.0 (`icon-nodes.json`;
- * ISC, © Lucide Icons and Contributors).
+ * The Lucide icons of the in-canvas chrome (context pad, note toolbar) and of the keyboard
+ * shortcuts dialog (Close), inlined so the renderer has no icon runtime dependency. Copied
+ * unchanged from lucide-static 1.59.0 (`icon-nodes.json`; ISC, © Lucide Icons and Contributors).
  */
 export const LUCIDE = {
   plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
@@ -29,6 +29,7 @@ export const LUCIDE = {
     '<rect width="14" height="6" x="5" y="16" rx="2"/><rect width="10" height="6" x="7" y="2" rx="2"/><path d="M2 12h20"/>',
   'align-vertical-justify-end':
     '<rect width="14" height="6" x="5" y="12" rx="2"/><rect width="10" height="6" x="7" y="2" rx="2"/><path d="M2 22h20"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
 } as const;
 
 export type LucideIconName = keyof typeof LUCIDE;

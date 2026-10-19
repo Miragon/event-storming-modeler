@@ -1,4 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
+import type { ShellHandle } from '@miragon/modeler-shell';
+import type { DiagramJsConnection } from '@miragon/modeler-shell/diagram-js';
 
 /**
  * Structural handle to the app's debug surface (exposed in apps/webapp/src/main.ts). We never import
@@ -36,9 +38,18 @@ export interface EventStormingViewer {
   saveSVG(): Promise<{ svg: string }>;
 }
 
+/** The web app's parts (apps/webapp/src/main.ts), published once its first board is in place. */
+export interface EventStormingApp {
+  readonly ready: boolean;
+  readonly shell: ShellHandle;
+  readonly connection: DiagramJsConnection;
+  destroy(): void;
+}
+
 declare global {
   interface Window {
     __eventStormingViewer: EventStormingViewer;
+    __eventStormingApp?: EventStormingApp;
   }
 }
 
@@ -47,16 +58,36 @@ interface Point {
   y: number;
 }
 
+/** Waits until the app has started: its first board (the link's, or an empty one) is in place. */
 export async function waitForViewer(page: Page): Promise<void> {
-  await page.waitForFunction(() => typeof window.__eventStormingViewer !== 'undefined');
+  await page.waitForFunction(() => window.__eventStormingApp?.ready === true);
 }
 
-/** Open the app and leave the landing start-screen with an empty canvas + working chrome (palette). */
+/** The start screen's card (the shell's empty state). */
+export function startScreen(page: Page): Locator {
+  return page.locator('[data-chrome="empty-state"]');
+}
+
+/** Open the app and leave the start screen with an empty canvas and the working chrome. */
 export async function startNewBoard(page: Page): Promise<void> {
   await page.goto('/');
   await waitForViewer(page);
-  await page.locator('#btn-new').click();
+  await startScreen(page).getByRole('button', { name: 'New diagram' }).click();
   await expect(page.locator('.djs-palette')).toBeVisible();
+}
+
+/** Load the Order Checkout example from the start screen of a page that has just opened. */
+export async function openExample(page: Page): Promise<void> {
+  await startScreen(page).getByRole('button', { name: 'Show example' }).click();
+  await expect(page.locator('.cd-shell-canvas .djs-element').first()).toBeVisible();
+}
+
+/** Opens the chrome menu and returns its dropdown. */
+export async function openMenu(page: Page): Promise<Locator> {
+  await page.locator('[data-chrome="menu"]').click();
+  const dropdown = page.locator('.cd-shell-menu[role="menu"]');
+  await expect(dropdown).toBeVisible();
+  return dropdown;
 }
 
 export function exportBoard(page: Page): Promise<EventStormingBoardExport> {
@@ -69,10 +100,10 @@ export function exportSvg(page: Page): Promise<string> {
   return page.evaluate(async () => (await window.__eventStormingViewer.saveSVG()).svg);
 }
 
-/** Absolute page coordinate at the given fraction of the #canvas bounding box. */
+/** Absolute page coordinate at the given fraction of the canvas slot's bounding box. */
 async function canvasPoint(page: Page, fractionX: number, fractionY: number): Promise<Point> {
-  const box = await page.locator('#canvas').boundingBox();
-  if (!box) throw new Error('#canvas has no bounding box');
+  const box = await page.locator('.cd-shell-canvas').boundingBox();
+  if (!box) throw new Error('the canvas slot has no bounding box');
   return { x: box.x + box.width * fractionX, y: box.y + box.height * fractionY };
 }
 
@@ -82,7 +113,7 @@ async function canvasPoint(page: Page, fractionX: number, fractionY: number): Pr
  * pass the id returned by `createStickyAt`/`exportBoard`.
  */
 export function elementGfx(page: Page, id: string): Locator {
-  return page.locator(`#canvas [data-element-id="${id}"]`);
+  return page.locator(`.cd-shell-canvas [data-element-id="${id}"]`);
 }
 /**
  * The element's hit box (`.djs-hit` = element.width×height at the shape origin). For stickies this
@@ -146,8 +177,8 @@ export async function settleForSnapshot(page: Page): Promise<void> {
   await deselectAll(page);
   // Park the pointer on the menu button (HTML chrome outside the canvas SVG) so the canvas root and
   // every element fire `element.out` — no `hover` class survives into the exported markup.
-  await page.locator('#btn-menu').hover();
-  await expect(page.locator('#canvas .hover')).toHaveCount(0);
+  await page.locator('[data-chrome="menu"]').hover();
+  await expect(page.locator('.cd-shell-canvas .hover')).toHaveCount(0);
 }
 
 /**
@@ -238,7 +269,7 @@ export async function dragShapeTo(
  */
 export async function resizeShapeBy(page: Page, id: string, delta: Point): Promise<void> {
   await selectShape(page, id);
-  const handle = page.locator(`#canvas .djs-resizer-${id}.djs-resizer-se`);
+  const handle = page.locator(`.cd-shell-canvas .djs-resizer-${id}.djs-resizer-se`);
   await expect(handle).toBeVisible();
   const from = await centerOf(handle);
   await page.mouse.move(from.x, from.y);

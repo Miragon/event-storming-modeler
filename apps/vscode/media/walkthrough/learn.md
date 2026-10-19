@@ -36,8 +36,8 @@ stickies into a story.
 - **Undo and redo** — `Ctrl/Cmd+Z` and `Ctrl/Cmd+Shift+Z`, like any change to the file.
 - **Zoom and fit** — the zoom panel in the bottom-right corner, or `Ctrl/Cmd` + `+`, `-`, `0` and
   `Shift+1` to fit.
-- **Export** — the menu in the top-left corner exports the board as PNG or SVG; so do the commands
-  **Event Storming: Export as PNG** and **Export as SVG**.
+- **Export** — the menu in the top-left corner exports the board as PNG, SVG, a transparent PNG
+  at four times the size, or JSON; so do the **Event Storming: Export as …** commands.
 - **Keyboard shortcuts** — the menu's **Keyboard shortcuts…** lists them all.
 
 The text file and the canvas stay in sync: **Open Source to the Side** opens the `.storm` text in

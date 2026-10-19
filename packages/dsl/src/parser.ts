@@ -159,7 +159,7 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
   /** Passthrough for a line that looks like a known construct but cannot be parsed. */
   const failed = (l: string) => {
     rawPassthrough.push(l);
-    diag('Line could not be interpreted (kept losslessly in rawPassthrough)');
+    diag("Couldn't read this line. It stays in the file unchanged.");
   };
   /** Board pixels, unbounded — no clamping on the free canvas. */
   const pos = (x: number, y: number): Coordinate => ({ x, y });
@@ -261,15 +261,15 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
         }
         if (node.idInvalid) {
           diag(
-            `Id: could not read "${node.idInvalid.trim()}" — expected (id <id>) with letters, digits, '_' or '-'`,
+            `Couldn't read the id “${node.idInvalid.trim()}”. An id has letters, digits, “_” or “-”, as in (id order_1).`,
           );
         }
         const explicit = node.id !== undefined && ids.claim(node.id) ? node.id : undefined;
         if (node.id !== undefined && explicit === undefined) {
           diag(
             isEngineId(node.id)
-              ? `Id: "${node.id}" is reserved for the board itself — the element got a fresh id`
-              : `Id: "${node.id}" is already taken — the element got a fresh id`,
+              ? `The id “${node.id}” belongs to the board itself, so this sticky got a new id.`
+              : `The id “${node.id}” is already taken, so this sticky got a new id.`,
           );
         }
         const id = explicit ?? ids.alloc(STICKY_ID_PREFIXES[kw as ElementType]!, node.name);
@@ -292,14 +292,14 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
               lineNo,
             });
           } else {
-            diag(`Attachment: a ${kw} cannot be pinned — only actor/hotspot/note support (on …)`);
+            diag(`A ${kw} can't be pinned. Only an actor, a hotspot or a note takes (on …).`);
           }
         }
         if (node.sizeSuffix) {
-          diag(`Size: a ${kw} cannot be resized — only notes support (size …)`);
+          diag(`A ${kw} can't be resized. Only a note takes (size …).`);
         }
         if (node.alignSuffix) {
-          diag(`Align: a ${kw} cannot be aligned — only notes support (align …)`);
+          diag(`A ${kw} can't be aligned. Only a note takes (align …).`);
         }
         break;
       }
@@ -321,16 +321,16 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
         const col = parseColor(idp.rest);
         if (al.invalid) {
           diag(
-            `Align: could not read "${al.invalid.trim()}" — expected (align left|center|right top|middle|bottom)`,
+            `Couldn't read the alignment “${al.invalid.trim()}”. Write (align left|center|right top|middle|bottom).`,
           );
         }
         if (sz.invalid) {
           diag(
-            `Size: could not read "${sz.invalid.trim()}" — expected (size <w>x<h>) with positive numbers`,
+            `Couldn't read the size “${sz.invalid.trim()}”. Write (size <w>x<h>) with positive numbers.`,
           );
         }
         if (idp.id !== undefined || idp.invalid) {
-          diag('Id: a note cannot be referenced — only sticky kinds support (id …)');
+          diag("A note can't have an id. Only a sticky takes (id …).");
         }
         // Literal `\n` back into real line breaks (multi-line notes).
         const textPart = decodeName((split ? split.name : col.rest).trim());
@@ -361,19 +361,19 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
         }
         const onDrawing = parseOn(multi.rest);
         if (onDrawing.host !== undefined) {
-          diag('Attachment: a drawing cannot be pinned — only actor/hotspot/note support (on …)');
+          diag("A drawing can't be pinned. Only an actor, a hotspot or a note takes (on …).");
         }
         const szDrawing = parseSize(onDrawing.rest);
         if (szDrawing.size || szDrawing.invalid) {
-          diag('Size: a drawing cannot be resized — only notes support (size …)');
+          diag("A drawing can't be resized. Only a note takes (size …).");
         }
         const alDrawing = parseAlign(onDrawing.rest);
         if (alDrawing.align || alDrawing.invalid) {
-          diag('Align: a drawing cannot be aligned — only notes support (align …)');
+          diag("A drawing can't be aligned. Only a note takes (align …).");
         }
         const idDrawing = parseId(onDrawing.rest);
         if (idDrawing.id !== undefined || idDrawing.invalid) {
-          diag('Id: a drawing cannot be referenced — only sticky kinds support (id …)');
+          diag("A drawing can't have an id. Only a sticky takes (id …).");
         }
         const flags = onDrawing.rest.toLowerCase();
         const strokeStyle: DrawingStrokeStyle | undefined = flags.includes('(dashed)')
@@ -421,12 +421,12 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
   for (const att of pendingAttachments) {
     const host = resolve(att.host);
     if (!host) {
-      diag(`Attachment: "${att.host}" not found`, att.lineNo, att.raw);
+      diag(`There's no “${att.host}” on the board to pin this to.`, att.lineNo, att.raw);
       continue;
     }
     if (!HOST_KINDS.has(host.elementType)) {
       diag(
-        `Attachment: "${att.host}" is a ${host.elementType} — actors/hotspots/notes may only attach to host stickies`,
+        `“${att.host}” is a ${host.elementType}. An actor, a hotspot or a note is pinned to an event, a command, an aggregate, a policy, a read model or an external system.`,
         att.lineNo,
         att.raw,
       );
@@ -451,7 +451,9 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
     if (!from || !to) {
       rawPassthrough.push(arrow.raw);
       diag(
-        `Arrow: ${!from ? `"${arrow.left}"` : `"${arrow.right}"`} not found`,
+        !from
+          ? `This arrow starts at “${arrow.left}”, which isn't on the board.`
+          : `This arrow points to “${arrow.right}”, which isn't on the board.`,
         arrow.lineNo,
         arrow.raw,
       );
@@ -467,7 +469,7 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
     if (nonSticky) {
       rawPassthrough.push(arrow.raw);
       diag(
-        `Arrow: "${nonSticky[0]}" is a ${nonSticky[1].elementType} — arrows may only connect stickies`,
+        `“${nonSticky[0]}” is a ${nonSticky[1].elementType}, and an arrow only connects stickies.`,
         arrow.lineNo,
         arrow.raw,
       );

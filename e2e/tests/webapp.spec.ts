@@ -10,6 +10,8 @@ import {
   exportBoard,
   exportDSL,
   exportSvg,
+  openExample,
+  openMenu,
   renameShape,
   resizeShapeBy,
   selectShape,
@@ -46,12 +48,9 @@ test.describe('webapp export round-trip', () => {
   });
 
   test('loads the Order Checkout example and exports stable DSL + SVG', async ({ page }) => {
-    // Real UI: the app opens on the landing (empty canvas), which shows a start card —
-    // load the example from its "Show example" button.
-    await page.locator('#btn-example').click();
-
-    // The renderer paints one .djs-element per node/edge once import.done fires.
-    await expect(page.locator('#canvas .djs-element').first()).toBeVisible();
+    // Real UI: the app opens on the start screen (empty canvas) — load the example from its
+    // "Show example" button. The renderer paints one .djs-element per node/edge on import.done.
+    await openExample(page);
 
     const board = await exportBoard(page);
     expect(board.elements.length).toBeGreaterThan(0);
@@ -94,33 +93,32 @@ test.describe('webapp export round-trip', () => {
   });
 
   test('toggles the type captions on the stickies via the menu', async ({ page }) => {
-    await page.locator('#btn-example').click();
-    await expect(page.locator('#canvas .djs-element').first()).toBeVisible();
+    await openExample(page);
 
     // View preference, ON by default: every sticky carries its kind as a small caption.
-    const captions = page.locator('#canvas .event-storming-kind-caption');
+    const captions = page.locator('.cd-shell-canvas .event-storming-kind-caption');
     await expect(captions.first()).toBeVisible();
     expect(await captions.count()).toBeGreaterThan(0);
     await expect(captions.filter({ hasText: 'Domain Event' }).first()).toBeVisible();
-    await expect(page.locator('#m-type-captions')).toHaveAttribute('aria-checked', 'true');
+    const dropdown = await openMenu(page);
+    const typeCaptions = dropdown.locator('[data-menu-id="type-captions"]');
+    await expect(typeCaptions).toHaveAttribute('aria-checked', 'true');
 
-    // Toggle off: the captions leave the live DOM immediately (forced re-render).
-    await page.locator('#btn-menu').click();
-    await page.locator('#m-type-captions').click();
+    // Toggle off: the captions leave the live DOM immediately (forced re-render); a checkbox
+    // keeps the menu open (guide §5.4).
+    await typeCaptions.click();
     await expect(captions).toHaveCount(0);
-    await expect(page.locator('#m-type-captions')).toHaveAttribute('aria-checked', 'false');
+    await expect(typeCaptions).toHaveAttribute('aria-checked', 'false');
 
     // Toggle back on: the captions return.
-    await page.locator('#btn-menu').click();
-    await page.locator('#m-type-captions').click();
+    await typeCaptions.click();
     await expect(captions.first()).toBeVisible();
     expect(await captions.count()).toBeGreaterThan(0);
-    await expect(page.locator('#m-type-captions')).toHaveAttribute('aria-checked', 'true');
+    await expect(typeCaptions).toHaveAttribute('aria-checked', 'true');
   });
 
   test('exports the example board as an SVG matching the snapshot', async ({ page }) => {
-    await page.locator('#btn-example').click();
-    await expect(page.locator('#canvas .djs-element').first()).toBeVisible();
+    await openExample(page);
     await settleForSnapshot(page);
 
     const svg = await exportSvg(page);
@@ -275,8 +273,9 @@ test.describe('webapp modelling interactions', () => {
     await expect(palette.locator('[data-action="create.aggregate"]')).toBeVisible();
     await expect(palette.locator('[data-action="create.command"]')).toBeVisible();
 
-    await page.locator('#btn-menu').click();
-    await page.locator('#m-level-big-picture').click();
+    const dropdown = await openMenu(page);
+    const level = dropdown.locator('[data-menu-id="level"]');
+    await level.locator('[data-menu-value="big-picture"]').click();
 
     // Big picture: aggregate/command leave the palette; events and the annotations/tools stay.
     await expect(palette.locator('[data-action="create.aggregate"]')).toHaveCount(0);
@@ -288,11 +287,13 @@ test.describe('webapp modelling interactions', () => {
 
     // The level is part of the board -> serialized into the DSL, checked in the menu.
     expect(await exportDSL(page)).toContain('level big-picture');
-    await expect(page.locator('#m-level-big-picture')).toHaveAttribute('aria-checked', 'true');
+    await expect(level.locator('[data-menu-value="big-picture"]')).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
 
-    // Back to design: the full palette returns.
-    await page.locator('#btn-menu').click();
-    await page.locator('#m-level-design').click();
+    // Back to design (a radio keeps the menu open): the full palette returns.
+    await level.locator('[data-menu-value="design"]').click();
     await expect(palette.locator('[data-action="create.aggregate"]')).toBeVisible();
     await expect(palette.locator('[data-action="create.command"]')).toBeVisible();
   });
@@ -461,10 +462,12 @@ test.describe('webapp modelling interactions', () => {
       .toBe(command);
     expect(await exportDSL(page)).toContain('(on Command)');
 
-    // Moving the host carries the pinned actor along by the exact same delta.
+    // Moving the host carries the pinned actor along by the exact same delta. An empty board
+    // opens at 100 % (guide §5.9), where the actor's hit stroke reaches the command's centre, so
+    // the command is grabbed in its free upper-left quarter.
     const commandBefore = await positionOf(command);
     const actorBefore = await positionOf(actor);
-    await dragShape(page, command, 0.7, 0.7);
+    await dragShape(page, command, 0.7, 0.7, { x: -40, y: -25 });
     const commandAfter = await positionOf(command);
     const delta = { x: commandAfter.x - commandBefore.x, y: commandAfter.y - commandBefore.y };
     expect(Math.abs(delta.x) + Math.abs(delta.y)).toBeGreaterThan(50);

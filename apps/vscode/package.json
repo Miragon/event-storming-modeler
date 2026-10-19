@@ -100,6 +100,16 @@
         "command": "eventStorming.exportSvg",
         "title": "Export as SVG",
         "category": "Event Storming"
+      },
+      {
+        "command": "eventStorming.exportPngTransparent",
+        "title": "Export as PNG (4×, Transparent)",
+        "category": "Event Storming"
+      },
+      {
+        "command": "eventStorming.exportJson",
+        "title": "Export as JSON",
+        "category": "Event Storming"
       }
     ],
     "menus": {
@@ -134,6 +144,16 @@
           "command": "eventStorming.exportSvg",
           "when": "activeCustomEditorId == eventStorming.boardEditor",
           "group": "eventStorming@3"
+        },
+        {
+          "command": "eventStorming.exportPngTransparent",
+          "when": "activeCustomEditorId == eventStorming.boardEditor",
+          "group": "eventStorming@4"
+        },
+        {
+          "command": "eventStorming.exportJson",
+          "when": "activeCustomEditorId == eventStorming.boardEditor",
+          "group": "eventStorming@5"
         }
       ],
       "commandPalette": [
@@ -155,6 +175,14 @@
         },
         {
           "command": "eventStorming.exportSvg",
+          "when": "activeCustomEditorId == eventStorming.boardEditor"
+        },
+        {
+          "command": "eventStorming.exportPngTransparent",
+          "when": "activeCustomEditorId == eventStorming.boardEditor"
+        },
+        {
+          "command": "eventStorming.exportJson",
           "when": "activeCustomEditorId == eventStorming.boardEditor"
         }
       ]
@@ -201,7 +229,7 @@
           {
             "id": "learn",
             "title": "Learn the basics",
-            "description": "Add stickies for events, commands and aggregates, connect them with arrows, then export the board as PNG or SVG.",
+            "description": "Add stickies for events, commands and aggregates, connect them with arrows, then export the board as PNG, SVG or JSON.",
             "media": {
               "markdown": "media/walkthrough/learn.md"
             },
@@ -227,7 +255,7 @@
     "@miragon/event-storming-dsl": "0.2.2",
     "@miragon/event-storming-renderer": "0.2.2",
     "@miragon/event-storming-schema-model": "0.2.1",
-    "@miragon/modeler-shell": "0.1.0",
+    "@miragon/modeler-shell": "0.2.0",
     "diagram-js": "15.28.1",
     "didi": "12.0.0",
     "tiny-svg": "4.1.4",

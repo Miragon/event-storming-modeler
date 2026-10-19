@@ -2,12 +2,15 @@ import './zod-jitless.js';
 import '@fontsource-variable/geist/wght.css';
 import '@fontsource-variable/geist-mono/wght.css';
 import {
+  boardMenu,
   createCollaborativeModeler,
+  createShortcutsDialog,
   type BoardBounds,
+  type BoardLevels,
   type CollaborativeEventStormingModeler,
   type EventStormingReadOnly,
+  type TypeCaptions,
 } from '@miragon/event-storming-renderer';
-import './style.css';
 import '@miragon/modeler-shell/shell.css';
 import type { ShellHandle } from '@miragon/modeler-shell';
 import { INVALID_STATUS_DELAY_MS } from '@miragon/modeler-shell/core';
@@ -24,8 +27,6 @@ import {
 import type { HostToWebview, WebviewCommand, WebviewToHost } from '../protocol.js';
 import { WEBVIEW_THEMES } from '../themes.js';
 import { blobToBase64, svgToPng } from './io.js';
-import { boardMenu, type BoardLevels, type TypeCaptions } from './menu.js';
-import { createShortcutsDialog } from './shortcutsDialog.js';
 import { readTypeCaptionsVisible, writeTypeCaptionsVisible } from './state.js';
 
 interface VsCodeApi {
@@ -84,8 +85,13 @@ const shell = mountVsCodeShell(app, {
     levels,
     typeCaptions,
     onTypeCaptionsToggled: (visible) => writeTypeCaptionsVisible(vscode, visible),
-    exportPng: () => void exportPng(),
-    exportSvg: () => void exportSvg(),
+    // The web app's Export group without its .storm export: here the file already is the .storm.
+    exports: {
+      png: { onSelect: () => void exportPng() },
+      svg: { onSelect: () => void exportSvg() },
+      transparentPng: { onSelect: () => void exportPngTransparent() },
+      json: { onSelect: () => exportJson() },
+    },
     showKeyboardShortcuts: () => shortcutsDialog.open(),
   }),
   problems: { onActivate: () => post({ type: 'showProblems' }) },
@@ -241,6 +247,26 @@ async function exportPng(): Promise<void> {
   }
 }
 
+/** Four times the size, without the paper (slides, documents), as in the web app. */
+async function exportPngTransparent(): Promise<void> {
+  try {
+    const { svg } = await withoutSelection(() => modeler.saveSVG());
+    const png = await svgToPng(svg, 4, true);
+    post({ type: 'export', format: 'png-transparent', data: await blobToBase64(png) });
+  } catch (error) {
+    post({ type: 'error', message: `Could not export the board as PNG: ${messageOf(error)}` });
+  }
+}
+
+/** The board's JSON in its own element order, as the web app exports it. */
+function exportJson(): void {
+  try {
+    post({ type: 'export', format: 'json', data: JSON.stringify(modeler.exportMap(), null, 2) });
+  } catch (error) {
+    post({ type: 'error', message: `Could not export the board as JSON: ${messageOf(error)}` });
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Messages from the extension host
 // ---------------------------------------------------------------------------
@@ -249,6 +275,8 @@ const COMMANDS: Readonly<Record<WebviewCommand, () => void>> = {
   fitView: () => viewport.fit(),
   exportPng: () => void exportPng(),
   exportSvg: () => void exportSvg(),
+  exportPngTransparent: () => void exportPngTransparent(),
+  exportJson: () => exportJson(),
 };
 
 function isHostMessage(data: unknown): data is HostToWebview {

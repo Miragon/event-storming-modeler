@@ -50,7 +50,9 @@ const { svg } = await viewer.saveSVG();
 - **Collaborative-modeler contract** — the renderer implements
   [`@miragon/modeler-api`](https://www.npmjs.com/package/@miragon/modeler-api)
   (`createCollaborativeModeler`, `createCollaborativeViewer`).
-- **Web app** — an Excalidraw-style editor with URL sharing and PNG/SVG picture export.
+- **Web app** — the same chrome on the web: a start screen, "Share" (the board travels in the
+  link), open or drop `.storm`/`.json` files, PNG, SVG, JSON and `.storm` export, a problems list,
+  and replacing a board with an undo toast instead of a confirmation.
 - **Strict DOM-free core** (model, DSL, transforms) — usable in any JavaScript runtime.
 - **Self-hosted fonts** — no CDN, offline-capable.
 
@@ -82,8 +84,10 @@ accepts an optional `(color #hex)` override.
 | Copy / paste               | `Ctrl/Cmd+C`, `Ctrl/Cmd+V` — paste attaches to the cursor; click places, `Esc` cancels                                                                                                           |
 | Duplicate (in place)       | `Ctrl/Cmd+D`                                                                                                                                                                                     |
 | Nudge selection            | Arrow keys (`Shift` = coarse)                                                                                                                                                                    |
-| Undo / redo                | `Ctrl/Cmd+Z` / `Ctrl/Cmd+Shift+Z` (in VS Code the document's own undo)                                                                                                                           |
-| Zoom                       | `Ctrl/Cmd` + `+` / `-`; `Ctrl/Cmd+0` fits in the web app and sets 100% in VS Code, where `Shift+1` fits; controls bottom-right                                                                   |
+| Undo / redo                | `Ctrl/Cmd+Z` / `Ctrl/Cmd+Shift+Z` (in VS Code the document's own undo); in the web app `Ctrl/Cmd+Z` also takes back a replaced board while the canvas has nothing else to undo                   |
+| Zoom                       | `Ctrl/Cmd` + `+` / `-`, `Ctrl/Cmd+0` sets 100%, `Shift+1` fits; controls bottom-right                                                                                                            |
+| Open / save (web app)      | `Ctrl/Cmd+O` (or "Open a file…" on the start screen) opens a `.storm`, `.json` or `.txt` file, `Ctrl/Cmd+S` downloads the `.storm` file; a file dropped anywhere on the page opens               |
+| All shortcuts              | Menu → "Keyboard shortcuts…"                                                                                                                                                                     |
 | Edit label                 | Double-click a sticky (`Cmd/Ctrl+Enter` saves)                                                                                                                                                   |
 | Format a note              | Bold/italic/bullets via the floating toolbar or `Cmd/Ctrl+B` / `Cmd/Ctrl+I`, text alignment via the toolbar's align buttons; stored as a tiny Markdown subset in the label                       |
 | Append sticky              | Context pad `+` drags a blank sticky; pick the type in the popup that opens, then label it                                                                                                       |

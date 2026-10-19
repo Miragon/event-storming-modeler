@@ -58,7 +58,7 @@ test.describe('VS Code webview: protocol and chrome', () => {
     expect(countOf(messages, 'edit')).toBe(0);
   });
 
-  test('the menu holds Model (level, type captions), Export (PNG before SVG) and Help', async ({
+  test('the menu holds Model (level, type captions), Export (as in the web app) and Help', async ({
     page,
   }) => {
     await openWebview(page);
@@ -75,6 +75,8 @@ test.describe('VS Code webview: protocol and chrome', () => {
       '|',
       'export-png',
       'export-svg',
+      'export-png-transparent',
+      'export-json',
       '|',
       'keyboard-shortcuts',
     ]);
@@ -100,6 +102,10 @@ test.describe('VS Code webview: protocol and chrome', () => {
     const shortcuts = dropdown.locator('[data-menu-id="keyboard-shortcuts"]');
     await expect(exportPng).toHaveText('Export as PNG');
     await expect(exportSvg).toHaveText('Export as SVG');
+    await expect(dropdown.locator('[data-menu-id="export-png-transparent"]')).toHaveText(
+      'Export as PNG (4×, transparent)',
+    );
+    await expect(dropdown.locator('[data-menu-id="export-json"]')).toHaveText('Export as JSON');
     await expect(shortcuts).toHaveText('Keyboard shortcuts…');
     await expect(shortcuts).toHaveAttribute('aria-haspopup', 'dialog');
     expect(await iconNodesOf(exportPng)).toEqual(lucideNodes('file-image'));
@@ -287,7 +293,9 @@ test.describe('VS Code webview: protocol and chrome', () => {
     const svg = await waitForPosted(page, 'export');
     expect(svg.format).toBe('svg');
     expect(typeof svg.data).toBe('string');
-    expect(String(svg.data).length).toBeGreaterThan(0);
+    // The board itself, not a palette icon (the chrome moves the palette in front of the canvas).
+    expect(String(svg.data)).toContain('data-element-id="event_order_placed"');
+    expect(String(svg.data)).not.toContain('event-storming-palette-svg');
 
     const dropdown = await openMenu(page);
     await dropdown.locator('[data-menu-id="export-png"]').click();
@@ -298,6 +306,20 @@ test.describe('VS Code webview: protocol and chrome', () => {
           .map((message) => message.format),
       )
       .toEqual(['svg', 'png']);
+
+    await postFromHost(page, { type: 'command', name: 'exportPngTransparent' });
+    await (await openMenu(page)).locator('[data-menu-id="export-json"]').click();
+    await expect
+      .poll(async () =>
+        (await postedMessages(page))
+          .filter((message) => message.type === 'export')
+          .map((message) => message.format),
+      )
+      .toEqual(['svg', 'png', 'png-transparent', 'json']);
+    const json = (await postedMessages(page)).find(
+      (message) => message.type === 'export' && message.format === 'json',
+    );
+    expect(JSON.parse(String(json?.data)).config.title).toBe('Order Checkout');
   });
 
   test('the keyboard shortcuts dialog opens from Help, closes on Escape and backdrop', async ({

@@ -3,7 +3,7 @@
  *
  * Values mirror the Miragon design system — the `miragon-brand:modeler-tool-design` skill in
  * `Miragon/corporate-identity`, whose files are vendored unchanged next to this module
- * (`cd-tokens.generated.css`, `cd-tokens.generated.json`, `cd-canvas.css`; design system 1.12.0).
+ * (`cd-tokens.generated.css`, `cd-tokens.generated.json`, `cd-canvas.css`; design system 1.13.0).
  * Re-copy them from the skill to update; never fork the hex values by hand. The SVG drawing needs
  * literal values (exports carry presentation attributes, never `var()`), so `draw/styles.ts`
  * derives the public `COLORS`/`FONT`/… from `MIRAGON`; the chrome CSS in

@@ -49,6 +49,13 @@ export async function decodeMapCompressed(b64: string): Promise<string> {
 const HASH_PREFIX_COMPRESSED = '#mz=';
 const HASH_PREFIX_LEGACY = '#m=';
 
+/** Whether the hash carries a board at all, readable or not (a link cut off when it was copied). */
+export function hashHoldsBoard(): boolean {
+  return (
+    location.hash.startsWith(HASH_PREFIX_COMPRESSED) || location.hash.startsWith(HASH_PREFIX_LEGACY)
+  );
+}
+
 /** Reads the DSL encoded in the hash (compressed `#mz=` or legacy `#m=`) — or null. */
 export async function readHashMap(): Promise<string | null> {
   const h = location.hash;

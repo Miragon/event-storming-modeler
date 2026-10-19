@@ -60,6 +60,39 @@ export {
 } from './read-only/index.js';
 export type { FreeRectInsets } from './palette/EventStormingPaletteProvider.js';
 
+/* The board's menu entries and keyboard shortcuts for the chrome around it (guide §5.4), typed
+   structurally so a host hands them to @miragon/modeler-shell without the renderer importing it. */
+export {
+  boardMenu,
+  BOARD_LEVELS,
+  STORM_EXPORT_LABEL,
+  boardShortcuts,
+  commandKeyLabel,
+  createShortcutsDialog,
+} from './board-menu/index.js';
+export type {
+  BoardExport,
+  BoardExports,
+  BoardLevels,
+  BoardMenu,
+  BoardMenuAction,
+  BoardMenuActions,
+  BoardMenuCheckbox,
+  BoardMenuDialog,
+  BoardMenuEntry,
+  BoardMenuIcon,
+  BoardMenuRadioGroup,
+  BoardShortcutOptions,
+  ShortcutGroup,
+  ShortcutKeyNames,
+  ShortcutPlatform,
+  ShortcutRow,
+  ShortcutsChrome,
+  ShortcutsDialog,
+  ShortcutsDialogChrome,
+  TypeCaptions,
+} from './board-menu/index.js';
+
 export {
   isEventStormingShape,
   isEventStormingConnection,
@@ -79,8 +112,9 @@ export type {
   StickyKind,
 } from './model/di-types.js';
 export type { ImportWarning, RootBusinessObject } from './io/index.js';
+export { importWarningText } from './io/index.js';
 
-// Icons (Material Icons, Apache-2.0) – reusable for consumers' buttons/chrome.
+// Icons (Material Icons, Apache-2.0), deprecated: the chrome's icons come from the modeler shell.
 export {
   iconMarkup,
   ICON_UNDO,

@@ -4,6 +4,7 @@ import {
   decodeMap,
   encodeMapCompressed,
   decodeMapCompressed,
+  hashHoldsBoard,
   readHashMap,
   shareUrl,
 } from '../src/share.js';
@@ -87,6 +88,19 @@ describe('readHashMap', () => {
   it('returns null (swallows the error) for a malformed compressed payload', async () => {
     stubLocation({ hash: '#mz=not-valid-deflate-data' });
     expect(await readHashMap()).toBeNull();
+  });
+});
+
+describe('hashHoldsBoard', () => {
+  it('tells a board link, readable or not, from any other hash', () => {
+    stubLocation({ hash: '#mz=cut-off' });
+    expect(hashHoldsBoard()).toBe(true);
+    stubLocation({ hash: '#m=legacy' });
+    expect(hashHoldsBoard()).toBe(true);
+    stubLocation({ hash: '#section-2' });
+    expect(hashHoldsBoard()).toBe(false);
+    stubLocation({ hash: '' });
+    expect(hashHoldsBoard()).toBe(false);
   });
 });
 

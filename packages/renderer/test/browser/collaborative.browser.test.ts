@@ -104,7 +104,7 @@ describe('texts that used to reject after the previous board was cleared', () =>
       const { warnings } = await modeler.importText(
         `title Broken\nevent Foo [0, 0] (id ${reserved})\nevent Bar [200, 0]\n`,
       );
-      expect(warnings.join('\n')).toMatch(/reserved for the board itself/);
+      expect(warnings.join('\n')).toMatch(/belongs to the board itself/);
       expect(ids(modeler)).toEqual(['event_bar', 'event_foo']);
       expect(modeler.diagram.get<CommandStack>('commandStack').canUndo()).toBe(false);
     },
@@ -133,7 +133,9 @@ describe('texts that used to reject after the previous board was cleared', () =>
     const modeler = editor();
     const line = `event Big [${number}, 0]`;
     const { warnings } = await modeler.importText(`title T\n${line}\nevent Ok [0, 0]\n`);
-    expect(warnings).toHaveLength(1);
+    expect(warnings).toEqual([
+      `Line 2: Couldn't read this line. It stays in the file unchanged. (“${line}”)`,
+    ]);
     expect(ids(modeler)).toEqual(['event_ok']);
     expect(modeler.exportText()).toContain(`${line}\n`);
   });

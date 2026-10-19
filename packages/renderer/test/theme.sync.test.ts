@@ -31,7 +31,7 @@ interface VendoredTokens {
 const tokens = JSON.parse(vendoredTokensJson) as VendoredTokens;
 
 const VENDORED_HEADER =
-  '/* Vendored unchanged from Miragon/corporate-identity (design system 1.12.0, plugins/miragon-brand/skills/modeler-tool-design/assets). Do not edit; re-copy to update. */';
+  '/* Vendored unchanged from Miragon/corporate-identity (design system 1.13.0, plugins/miragon-brand/skills/modeler-tool-design/assets). Do not edit; re-copy to update. */';
 
 /**
  * Compare colours by meaning, not bytes: ignore hex case and `rgba(…)` whitespace (Prettier
@@ -174,7 +174,7 @@ describe('theme.sync — event-storming.css wires the vendored design-system fil
   });
 });
 
-describe('theme.sync — the vendored files are complete, unchanged copies (design system 1.12.0)', () => {
+describe('theme.sync — the vendored files are complete, unchanged copies (design system 1.13.0)', () => {
   it('both CSS files start with the vendoring header, followed by the generated banner', () => {
     for (const [name, source] of [
       ['cd-tokens.generated.css', vendoredTokensCss],
@@ -251,7 +251,7 @@ describe('theme.sync — MIRAGON mirrors the vendored design-system tokens', () 
     }
   });
 
-  it('the status colours are the 1.12.0 status layer', () => {
+  it('the status colours are the 1.13.0 status layer', () => {
     expect(MIRAGON.success).toBe(tokens.fest['--cd-success']);
     expect(MIRAGON.warning).toBe(tokens.fest['--cd-warning']);
     expect(MIRAGON.danger).toBe(tokens.fest['--cd-danger']);
