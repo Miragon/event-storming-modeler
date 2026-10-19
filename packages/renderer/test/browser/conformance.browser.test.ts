@@ -1,4 +1,4 @@
-import { afterEach, describe, test } from 'vitest';
+import { afterAll, afterEach, describe, expect, test } from 'vitest';
 import {
   attachedHost,
   registerConformance,
@@ -16,6 +16,9 @@ import {
 } from '../../src/index.js';
 import type EventStormingElementFactory from '../../src/model/EventStormingElementFactory.js';
 import type EventStormingModeling from '../../src/modeling/EventStormingModeling.js';
+import type EventStormingLabelEditing from '../../src/label-editing/EventStormingLabelEditing.js';
+import type ElementRegistry from 'diagram-js/lib/core/ElementRegistry';
+import type { EventStormingShape } from '../../src/model/di-types.js';
 import { STICKY_STYLES } from '../../src/draw/styles.js';
 import orderCheckout from './fixtures/order-checkout.storm?raw';
 import orderCheckoutLoose from './fixtures/order-checkout.loose.storm?raw';
@@ -39,10 +42,15 @@ function diagramOf(modeler: CollaborativeModeler): CollaborativeEventStormingMod
   return (modeler as CollaborativeEventStormingModeler).diagram;
 }
 
+// Shared across instances: every call creates a sticky of its own label, so the kit's collision
+// case compares the ids two peers allocate for different stickies.
+let createdStickies = 0;
+
 function addDomainEvent(modeler: CollaborativeModeler): void {
   const diagram = diagramOf(modeler);
   const factory = diagram.get<EventStormingElementFactory>('eventStormingElementFactory');
-  const sticky = factory.createNew('event', STICKY_STYLES.event.label);
+  createdStickies += 1;
+  const sticky = factory.createNew('event', `${STICKY_STYLES.event.label} ${createdStickies}`);
   diagram
     .get<Modeling>('modeling')
     .createShape(
@@ -81,14 +89,56 @@ const harness: ConformanceHarness = {
   undo: (modeler) => diagramOf(modeler).get<CommandStack>('commandStack').undo(),
   redo: (modeler) => diagramOf(modeler).get<CommandStack>('commandStack').redo(),
   settle: () => new Promise((resolve) => setTimeout(resolve, 30)),
+  // damaged forms the DSL meets while a peer types, on top of the probes the kit derives
+  probeTexts: [orderCheckout.replace(/\[(\d+), (\d+)\]/, '[$1,'), 'event Unclosed [10'],
+  openInteraction(modeler) {
+    const diagram = diagramOf(modeler);
+    const sticky = diagram.get<ElementRegistry>('elementRegistry').get('event_order_placed');
+    diagram
+      .get<EventStormingLabelEditing>('eventStormingLabelEditing')
+      .activate(sticky as EventStormingShape);
+    const field = diagram
+      .get<Canvas>('canvas')
+      .getContainer()
+      .querySelector<HTMLTextAreaElement>('textarea.event-storming-label-textarea');
+    if (!field) throw new Error('no label editor opened');
+    field.value = 'typed, not committed';
+  },
+  interactionState(modeler) {
+    const edit = diagramOf(modeler)
+      .get<EventStormingLabelEditing>('eventStormingLabelEditing')
+      .openEdit();
+    return edit && { elementId: edit.elementId, text: edit.value };
+  },
 };
 
+// No case is inapplicable to Event Storming: the harness fills every optional hook, and the kit
+// takes `invalidTexts: []` as a declaration, not a skip. A skip is therefore a gap in the harness.
 const failOnSkip = {
   onSkip(caseName: string, reason: string): never {
     throw new Error(`conformance case skipped: "${caseName}" — ${reason}`);
   },
 };
 
+const advisories: string[] = [];
+
 describe('Event Storming implements the collaborative-modeler contract', () => {
-  registerConformance(harness, test, failOnSkip);
+  registerConformance(harness, test, {
+    ...failOnSkip,
+    onAdvisory(caseName, advice) {
+      advisories.push(`${caseName}: ${advice}`);
+    },
+  });
+
+  // Known and accepted for now: a new sticky takes the lowest free `event_<n>` of its own
+  // instance, so two peers that each add one both allocate 'event_1'. Collision-free ids are a
+  // RECOMMENDATION of contract 1.1 (a candidate law for 2.0). The exact list fails on any other
+  // advisory, and once this one is fixed, so the note cannot go stale.
+  afterAll(() => {
+    expect(advisories).toEqual([
+      expect.stringMatching(
+        /^elements \(when present, recommended\): ids created on two peers.*'event_1'/,
+      ),
+    ]);
+  });
 });
