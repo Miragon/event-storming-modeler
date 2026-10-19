@@ -276,7 +276,8 @@ window.addEventListener('message', (event: MessageEvent<unknown>) => {
       shell.setProblems({ count: message.count, errors: message.errors });
       break;
     case 'command':
-      COMMANDS[message.name]?.();
+      // Only own entries: a name such as "constructor" must not reach Object.prototype.
+      if (Object.hasOwn(COMMANDS, message.name)) COMMANDS[message.name]();
       break;
   }
 });
