@@ -112,6 +112,11 @@ const viewer = createCollaborativeViewer(); // meta.editable: false, never chang
   back for every sticky whose id the parser would not derive again from its label at that line (one
   created on the canvas, a renamed one). Notes, drawings and arrows have no id in the text yet (theirs
   derive from their text or position), so they are not addressable.
+- New sticky ids are not collision-free across peers: a sticky created on the canvas takes the
+  lowest free `<prefix>_<n>` of its own instance, so two peers that each add one at the same time
+  both write `(id event_1)`. When their texts merge, the parser gives the second sticky a fresh id,
+  and whatever was linked to it points at the first. Contract 1.1 only recommends collision-free
+  ids; the conformance test accepts this as its one advisory.
 - `diagram` is the wrapped `Modeler` or `NavigatedViewer`, for everything outside the contract.
   `createCollaborativeModeler` accepts `additionalModules`, `undoRedoKeys` and `freeRectInsets`.
 - After `destroy()`, `exportText()` returns the last state and `importText()` rejects.

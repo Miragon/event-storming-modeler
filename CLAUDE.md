@@ -95,7 +95,10 @@ libraries to npm (with provenance) and the VS Code extension
   kit runs in `npm run test:browser`. The DOM-free packages may take only type-only imports from
   the contract (ESLint and dependency-cruiser). The elements surface lists stickies only: their ids
   survive a save and re-open because the serializer writes `(id …)` back whenever the parser would
-  not derive the same id at that line; notes, drawings and arrows have no id grammar yet.
+  not derive the same id at that line; notes, drawings and arrows have no id grammar yet. New
+  sticky ids come from a per-instance counter (`allocateId`), so stickies two peers add at the same
+  time can collide (`event_1`); the conformance test accepts the kit's advisory for it (contract 1.1
+  only recommends collision-free ids).
 - Contributor onboarding in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Design system (mandatory)
