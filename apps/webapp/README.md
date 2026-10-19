@@ -2,9 +2,11 @@
 
 [![License: MIT](https://img.shields.io/github/license/Miragon/event-storming-modeler)](https://github.com/Miragon/event-storming-modeler/blob/main/LICENSE)
 
-A browser editor for [Event Storming](https://www.eventstorming.com/) boards: an Excalidraw-style
-canvas with URL sharing, drag-and-drop import of `.storm`/`.json`, and PNG/SVG picture export.
-The demo app for the `@miragon/event-storming-*` packages.
+A browser editor for [Event Storming](https://www.eventstorming.com/) boards in the shared Miragon
+modeler chrome ([`@miragon/modeler-shell`](https://www.npmjs.com/package/@miragon/modeler-shell)),
+the same as in the VS Code extension: URL sharing ("Share"), opening and dropping `.storm`/`.json`
+files, and PNG, SVG, JSON and `.storm` export. The demo app for the `@miragon/event-storming-*`
+packages.
 
 **[Live demo](https://event-storming.modeler.miragon.io)**
 
