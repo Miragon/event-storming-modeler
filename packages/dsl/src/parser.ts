@@ -27,10 +27,11 @@ import {
   parseMultiCoords,
   parseOn,
   parseSize,
-  slug,
   splitAtCoords,
   splitLineComment,
+  decodeName,
 } from './lexer.js';
+import { IdAllocator, STICKY_ID_PREFIXES, isEngineId } from './ids.js';
 
 /** Splits `A -> B` at the FIRST arrow — plain indexOf, immune to regex backtracking. */
 function splitArrow(core: string): { left: string; right: string } | null {
@@ -48,23 +49,6 @@ const ATTACHABLE_KINDS: ReadonlySet<string> = new Set(ATTACHABLE_STICKY_KINDS);
 const HOST_KINDS: ReadonlySet<string> = new Set(HOST_STICKY_KINDS);
 
 const KNOWN_LEVELS: ReadonlySet<string> = new Set(['big-picture', 'process', 'design']);
-
-/** Undoes the serializer's `\n` name escaping (line-based DSL, multi-line labels). */
-function decodeName(name: string): string {
-  return name.replace(/\\n/g, '\n');
-}
-
-/** Sticky keywords double as `elementType` values; the value is the ID prefix. */
-const STICKY_ID_PREFIXES: Readonly<Partial<Record<ElementType, string>>> = {
-  event: 'event',
-  command: 'cmd',
-  actor: 'actor',
-  aggregate: 'agg',
-  policy: 'policy',
-  readmodel: 'read',
-  external: 'ext',
-  hotspot: 'hot',
-};
 
 // The 8 sticky kinds — the only legal arrow endpoints (mirrors validateBoard's contract).
 const STICKY_KINDS: ReadonlySet<string> = new Set(Object.keys(STICKY_ID_PREFIXES));
@@ -119,24 +103,6 @@ export interface ParseDiagnostic {
 export interface ParseResult {
   readonly board: EventStormingBoard;
   readonly diagnostics: readonly ParseDiagnostic[];
-}
-
-class IdAllocator {
-  private readonly used = new Set<string>();
-  /** Explicit `(id …)` — false when the id is already taken (caller reports + allocates). */
-  claim(id: string): boolean {
-    if (this.used.has(id)) return false;
-    this.used.add(id);
-    return true;
-  }
-  alloc(prefix: string, label: string): string {
-    const base = `${prefix}_${slug(label)}`;
-    let id = base;
-    let i = 2;
-    while (this.used.has(id)) id = `${base}_${i++}`;
-    this.used.add(id);
-    return id;
-  }
 }
 
 /**
@@ -201,6 +167,9 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
   const sourceLines = text.split(/\r?\n/);
   for (let i = 0; i < sourceLines.length; i++) {
     const raw = sourceLines[i]!;
+    // The empty piece after a final newline is no line: inside an open block comment it would be
+    // kept as one, and every save would append another blank line.
+    if (raw === '' && i === sourceLines.length - 1) continue;
     lineNo = i + 1;
     currentLine = raw.trim();
     let working = raw;
@@ -297,7 +266,11 @@ export function parseDSLWithDiagnostics(text: string): ParseResult {
         }
         const explicit = node.id !== undefined && ids.claim(node.id) ? node.id : undefined;
         if (node.id !== undefined && explicit === undefined) {
-          diag(`Id: "${node.id}" is already taken — the element got a fresh id`);
+          diag(
+            isEngineId(node.id)
+              ? `Id: "${node.id}" is reserved for the board itself — the element got a fresh id`
+              : `Id: "${node.id}" is already taken — the element got a fresh id`,
+          );
         }
         const id = explicit ?? ids.alloc(STICKY_ID_PREFIXES[kw as ElementType]!, node.name);
         elements.push(

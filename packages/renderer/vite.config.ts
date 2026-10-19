@@ -17,6 +17,8 @@ const EXTERNAL = [
   'clsx',
   '@miragon/event-storming-schema-model',
   '@miragon/event-storming-dsl',
+  '@miragon/modeler-api',
+  /^@miragon\/modeler-api\//,
 ];
 
 export default defineConfig({

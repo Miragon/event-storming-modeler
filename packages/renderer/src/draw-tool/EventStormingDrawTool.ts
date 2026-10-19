@@ -11,6 +11,7 @@ import type Selection from 'diagram-js/lib/features/selection/Selection';
 import type { Element, Shape } from 'diagram-js/lib/model/Types';
 import { COLORS, DRAWING_INK } from '../draw/styles.js';
 import type EventStormingElementFactory from '../model/EventStormingElementFactory.js';
+import { READ_ONLY_CHANGED_EVENT } from '../read-only/index.js';
 
 interface Point {
   x: number;
@@ -42,6 +43,9 @@ export default class EventStormingDrawTool {
     private readonly factory: EventStormingElementFactory,
   ) {
     eventBus.on('diagram.destroy', () => this.cancel());
+    eventBus.on(READ_ONLY_CHANGED_EVENT, (event: { readOnly?: boolean }) => {
+      if (event.readOnly) this.cancel();
+    });
   }
 
   isActive(): boolean {

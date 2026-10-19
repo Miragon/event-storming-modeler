@@ -1,9 +1,10 @@
-import { COLORS, NOTE_STYLE, STICKY_STYLES } from './styles.js';
+import { NOTE_STYLE, STICKY_STYLES } from './styles.js';
 import { STICKY_KINDS } from '../model/di-types.js';
 
 /**
- * Palette icons as a mini preview of the ACTUAL canvas rendering (WYSIWYG) — the same colored
- * rounded squares the EventStormingRenderer draws, so the palette shows what will be created.
+ * Palette icons: the creating entries are a mini preview of the ACTUAL canvas rendering
+ * (WYSIWYG) — the same colored squares the EventStormingRenderer draws, so the palette shows
+ * what will be created. The tools use the common Lucide icons of the Miragon modelers.
  */
 
 const wrap = (inner: string): string =>
@@ -16,17 +17,35 @@ const stickySquare = (fill: string, stroke: string, tilt = 0): string =>
     }/>`,
   );
 
+/**
+ * Lucide outline icon (lucide-static 1.59.0, ISC) at the palette tool size: it draws in
+ * `currentColor`, so the chrome around the entry decides the colour (hover, pressed tool).
+ */
+const toolIcon = (inner: string): string =>
+  `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" class="event-storming-palette-svg">${inner}</svg>`;
+
+const LUCIDE_SQUARE_DASHED_MOUSE_POINTER =
+  '<path d="M12.034 12.681a.498.498 0 0 1 .647-.647l9 3.5a.5.5 0 0 1-.033.943l-3.444 1.068a1 1 0 0 0-.66.66l-1.067 3.443a.5.5 0 0 1-.943.033z"/>' +
+  '<path d="M5 3a2 2 0 0 0-2 2"/>' +
+  '<path d="M19 3a2 2 0 0 1 2 2"/>' +
+  '<path d="M5 21a2 2 0 0 1-2-2"/>' +
+  '<path d="M9 3h1"/>' +
+  '<path d="M9 21h2"/>' +
+  '<path d="M14 3h1"/>' +
+  '<path d="M3 9v1"/>' +
+  '<path d="M21 9v2"/>' +
+  '<path d="M3 14v1"/>';
+
+// Lucide's spline with a straight segment between its end points (the shell's line-segment): the
+// curve read as a telephone receiver at 20px.
+const LINE_SEGMENT =
+  '<circle cx="19" cy="5" r="2"/>' +
+  '<circle cx="5" cy="19" r="2"/>' +
+  '<path d="M6.5 17.5 17.5 6.5"/>';
+
 export const PALETTE_ICONS: Record<string, string> = {
-  // Draw tool: open zigzag polyline with the start point marked.
-  draw: wrap(
-    `<polyline points="3,18 8.5,7 14,14 21,4" fill="none" stroke="${COLORS.ink}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>` +
-      `<circle cx="3" cy="18" r="2.2" fill="${COLORS.surface}" stroke="${COLORS.ink}" stroke-width="1.4"/>`,
-  ),
-  // Selection tool: dashed lasso rectangle with a cursor arrow.
-  lasso: wrap(
-    `<rect x="3" y="3" width="13" height="13" rx="2" fill="none" stroke="${COLORS.ink}" stroke-width="1.5" stroke-dasharray="3 2.5"/>` +
-      `<path d="M13.5 13.5l7 2.7-3 1.3-1.3 3z" fill="${COLORS.ink}"/>`,
-  ),
+  draw: toolIcon(LINE_SEGMENT),
+  lasso: toolIcon(LUCIDE_SQUARE_DASHED_MOUSE_POINTER),
   note: stickySquare(NOTE_STYLE.fill, NOTE_STYLE.stroke),
 };
 

@@ -1,4 +1,5 @@
 import type ContextPad from 'diagram-js/lib/features/context-pad/ContextPad';
+import type EventBus from 'diagram-js/lib/core/EventBus';
 import type Modeling from 'diagram-js/lib/features/modeling/Modeling';
 import type Connect from 'diagram-js/lib/features/connect/Connect';
 import type Create from 'diagram-js/lib/features/create/Create';
@@ -19,26 +20,18 @@ import type EventStormingLabelEditing from '../label-editing/EventStormingLabelE
 import type EventStormingElementFactory from '../model/EventStormingElementFactory.js';
 import type EventStormingColorPicker from '../color-picker/EventStormingColorPicker.js';
 import { POPUP_PROVIDER_ID } from '../popup/index.js';
-import {
-  iconMarkup,
-  ICON_ADD,
-  ICON_ARROW_FORWARD,
-  ICON_AUTORENEW,
-  ICON_DELETE,
-  ICON_EDIT,
-  ICON_PALETTE,
-  ICON_SWAP_HORIZ,
-} from '../draw/icons.js';
+import { READ_ONLY_CHANGED_EVENT, type EventStormingReadOnly } from '../read-only/index.js';
+import { chromeIcon, type LucideIconName } from '../draw/lucide.js';
 
 /** Title of the single append entry — the kind is chosen in the popup, not in the pad. */
 const APPEND_TITLE = 'Append sticky (auto-connect, choose the type after placing)';
 
 /**
- * ContextPad entry as HTML with a Material icon. `draggable=true` is mandatory for entries with a
+ * ContextPad entry as HTML with a Lucide icon. `draggable=true` is mandatory for entries with a
  * `dragstart` action — otherwise diagram-js does not fire the drag.
  */
-function cpHtml(icon: string, title: string, draggable = false): string {
-  return `<div class="entry event-storming-cp-entry"${draggable ? ' draggable="true"' : ''} title="${title}">${iconMarkup(icon)}</div>`;
+function cpHtml(icon: LucideIconName, title: string, draggable = false): string {
+  return `<div class="entry event-storming-cp-entry"${draggable ? ' draggable="true"' : ''} title="${title}">${chromeIcon(icon)}</div>`;
 }
 
 /** Context actions per element. */
@@ -53,6 +46,8 @@ export default class EventStormingContextPadProvider implements ContextPadProvid
     'eventStormingLabelEditing',
     'eventStormingElementFactory',
     'eventStormingColorPicker',
+    'eventBus',
+    'eventStormingReadOnly',
   ];
 
   constructor(
@@ -65,11 +60,17 @@ export default class EventStormingContextPadProvider implements ContextPadProvid
     private readonly labelEditing: EventStormingLabelEditing,
     private readonly factory: EventStormingElementFactory,
     private readonly colorPicker: EventStormingColorPicker,
+    eventBus?: EventBus,
+    private readonly readOnly?: Pick<EventStormingReadOnly, 'isReadOnly'>,
   ) {
     contextPad.registerProvider(this);
+    eventBus?.on(READ_ONLY_CHANGED_EVENT, (event: { readOnly?: boolean }) => {
+      if (event.readOnly) contextPad.close();
+    });
   }
 
   getContextPadEntries(element: Element): ContextPadEntries {
+    if (this.readOnly?.isReadOnly()) return {};
     // Connections: edit the arrow annotation + delete.
     if (isEventStormingConnection(element)) {
       const conn = element;
@@ -77,13 +78,13 @@ export default class EventStormingContextPadProvider implements ContextPadProvid
         'edit-label': {
           group: 'edit',
           title: 'Edit arrow label',
-          html: cpHtml(ICON_EDIT, 'Edit arrow label'),
+          html: cpHtml('pencil', 'Edit arrow label'),
           action: { click: () => this.labelEditing.activateConnection(conn) },
         },
         delete: {
-          group: 'edit',
+          group: 'delete',
           title: 'Delete connection',
-          html: cpHtml(ICON_DELETE, 'Delete connection'),
+          html: cpHtml('trash', 'Delete connection'),
           action: { click: () => this.modeling.removeElements([element]) },
         },
       };
@@ -107,7 +108,7 @@ export default class EventStormingContextPadProvider implements ContextPadProvid
       entries['append'] = {
         group: 'append',
         title: APPEND_TITLE,
-        html: cpHtml(ICON_ADD, APPEND_TITLE, true),
+        html: cpHtml('plus', APPEND_TITLE, true),
         action: { click: startAppend, dragstart: startAppend },
       };
 
@@ -117,14 +118,14 @@ export default class EventStormingContextPadProvider implements ContextPadProvid
       entries['connect'] = {
         group: 'edit',
         title: 'Connect to existing sticky',
-        html: cpHtml(ICON_ARROW_FORWARD, 'Connect to existing sticky', true),
+        html: cpHtml('arrow-right', 'Connect to existing sticky', true),
         action: { click: startConnect, dragstart: startConnect },
       };
 
       entries['change-kind'] = {
-        group: 'sticky',
+        group: 'edit',
         title: 'Change type',
-        html: cpHtml(ICON_AUTORENEW, 'Change type'),
+        html: cpHtml('replace', 'Change type'),
         action: {
           click: (event: Event) => {
             const e = event as MouseEvent;
@@ -147,9 +148,9 @@ export default class EventStormingContextPadProvider implements ContextPadProvid
             : 'dashed';
       const title = `Line style: ${shape.strokeStyle ?? 'solid'} (click to change)`;
       entries['stroke-style'] = {
-        group: 'sticky',
+        group: 'edit',
         title,
-        html: cpHtml(ICON_SWAP_HORIZ, title),
+        html: cpHtml('line-style', title),
         action: {
           click: () => this.eventStormingModeling.setStrokeStyle(shape, next),
         },
@@ -161,9 +162,9 @@ export default class EventStormingContextPadProvider implements ContextPadProvid
     // is just no pad action for them).
     if (kind === 'drawing') {
       entries['color'] = {
-        group: 'sticky',
+        group: 'edit',
         title: 'Color',
-        html: cpHtml(ICON_PALETTE, 'Color'),
+        html: cpHtml('palette', 'Color'),
         action: {
           click: (event: Event) => {
             const e = event as MouseEvent;
@@ -178,15 +179,16 @@ export default class EventStormingContextPadProvider implements ContextPadProvid
       entries['edit-label'] = {
         group: 'edit',
         title: 'Edit label',
-        html: cpHtml(ICON_EDIT, 'Edit label'),
+        html: cpHtml('pencil', 'Edit label'),
         action: { click: () => this.labelEditing.activate(shape) },
       };
     }
 
+    // Its own group, appended last: the destructive entry closes the island (guide §8).
     entries['delete'] = {
-      group: 'edit',
+      group: 'delete',
       title: 'Delete',
-      html: cpHtml(ICON_DELETE, 'Delete'),
+      html: cpHtml('trash', 'Delete'),
       action: { click: () => this.modeling.removeElements([shape as unknown as Element]) },
     };
 

@@ -914,15 +914,15 @@ Place Order -> #agg_order
     expect(serializeDSL(round)).toBe(out);
   });
 
-  it('accepts an explicit-but-unneeded `(id …)` and drops it again on serialize (normalization)', () => {
+  it('keeps an explicit `(id …)` the parser would not allocate, and drops one it would', () => {
     const { board, diagnostics } = parseDSLWithDiagnostics(
-      'title T\nevent Foo [0, 0] (id my_custom_id)',
+      'title T\nevent Foo [0, 0] (id my_custom_id)\nevent Bar [200, 0] (id event_bar)',
     );
     expect(diagnostics).toHaveLength(0);
-    expect(board.elements[0]!.id).toBe('my_custom_id');
+    expect(board.elements.map((e) => e.id)).toEqual(['my_custom_id', 'event_bar']);
     const once = serializeDSL(board);
-    expect(once).toContain('event Foo [0, 0]\n');
-    expect(once).not.toContain('(id');
+    expect(once).toBe('title T\nevent Foo [0, 0] (id my_custom_id)\nevent Bar [200, 0]\n');
+    expect(parseDSL(once).elements.map((e) => e.id)).toEqual(['my_custom_id', 'event_bar']);
     expect(serializeDSL(parseDSL(once))).toBe(once);
   });
 
@@ -1511,6 +1511,211 @@ line [[300, 100], [250, 400]]`;
       'line [[800, 200], [600, 350], [700, 500]] (closed) (dashed) (color #b45309)',
     );
     expect(once).toContain('line [[300, 100], [250, 400]]');
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+});
+
+describe('stable sticky ids across a save and re-open (`(id …)` write-back)', () => {
+  const reopen = (text: string) => parseDSL(serializeDSL(parseDSL(text)));
+
+  it('leaves boards authored without ids byte-identical', () => {
+    const canonical = serializeDSL(parseDSL(ALL_KINDS));
+    expect(canonical).not.toContain('(id');
+    expect(serializeDSL(parseDSL(canonical))).toBe(canonical);
+  });
+
+  it('writes the id of a sticky created on the canvas, so a re-open finds it again', () => {
+    const board = parseDSL('title T\nevent Order Placed [0, 0]');
+    const created = {
+      ...board,
+      elements: [
+        ...board.elements,
+        { id: 'event_1', elementType: 'event', label: 'Domain Event', position: { x: 200, y: 0 } },
+      ],
+    } as typeof board;
+    const text = serializeDSL(created);
+    expect(text).toContain('event Domain Event [200, 0] (id event_1)\n');
+    expect(parseDSL(text).elements.map((e) => e.id)).toEqual(['event_order_placed', 'event_1']);
+    expect(serializeDSL(parseDSL(text))).toBe(text);
+  });
+
+  it('keeps the id of a renamed sticky, and its arrows still resolve by name', () => {
+    const board = parseDSL(
+      'title T\ncommand Place Order [0, 0]\nevent Order Placed [200, 0]\nPlace Order -> Order Placed',
+    );
+    const renamed = {
+      ...board,
+      elements: board.elements.map((e) =>
+        e.id === 'event_order_placed' ? { ...e, label: 'Order Confirmed' } : e,
+      ),
+    } as typeof board;
+    const text = serializeDSL(renamed);
+    expect(text).toContain('event Order Confirmed [200, 0] (id event_order_placed)\n');
+    expect(text).toContain('Place Order -> Order Confirmed\n');
+    const reopened = parseDSL(text);
+    expect(reopened.elements.map((e) => e.id)).toEqual(['cmd_place_order', 'event_order_placed']);
+    expect(reopened.edges[0]).toMatchObject({ from: 'cmd_place_order', to: 'event_order_placed' });
+  });
+
+  it('declares a later sticky whose derived id an earlier one took over', () => {
+    const board = parseDSL('title T\nevent Foo [0, 0]');
+    const withSecond = {
+      ...board,
+      elements: [
+        { id: 'event_2', elementType: 'event', label: 'Foo', position: { x: 0, y: 200 } },
+        ...board.elements,
+      ],
+    } as typeof board;
+    expect(
+      reopen(serializeDSL(withSecond))
+        .elements.map((e) => e.id)
+        .sort(),
+    ).toEqual(['event_2', 'event_foo']);
+  });
+
+  it('replays note and drawing ids, which the text cannot carry, before the stickies after them', () => {
+    const board = parseDSL('title T\nnote Hello [0, 0]\nline [[0, 0], [10, 10]]\nevent A [0, 0]');
+    expect(serializeDSL(board)).not.toContain('(id');
+    expect(reopen(serializeDSL(board)).elements.map((e) => e.id)).toEqual([
+      'note_hello',
+      'draw_line',
+      'event_a',
+    ]);
+  });
+});
+
+describe('ids the renderer reserves for the board itself', () => {
+  it.each(['event-storming-root', '__implicitroot_0', '__implicitroot'])(
+    'gives a sticky declared as (id %s) a fresh id and says why',
+    (reserved) => {
+      const { board, diagnostics } = parseDSLWithDiagnostics(
+        `title T\nevent Foo [0, 0] (id ${reserved})\nevent Bar [200, 0]\nBar -> #${reserved}`,
+      );
+      expect(board.elements.map((e) => e.id)).toEqual(['event_foo', 'event_bar']);
+      expect(diagnostics.map((d) => d.message)).toContain(
+        `Id: "${reserved}" is reserved for the board itself — the element got a fresh id`,
+      );
+    },
+  );
+});
+
+describe('numbers the canvas cannot draw (beyond 1e38, or overflowing to Infinity)', () => {
+  const overflowing = '9'.repeat(400);
+  const beyondTheCanvas = `1${'0'.repeat(38)}1`;
+
+  it.each([
+    [`event Big [${overflowing}, 0]`],
+    [`note Big [0, ${overflowing}]`],
+    [`line [[0, 0], [${overflowing}, 0]]`],
+    [`event Big [${beyondTheCanvas}, 0]`],
+    [`note Big [0, -${beyondTheCanvas}]`],
+    [`line [[0, 0], [${beyondTheCanvas}, 0]]`],
+  ])('keep %s losslessly in rawPassthrough with a diagnostic', (line) => {
+    const { board, diagnostics } = parseDSLWithDiagnostics(`title T\n${line}\nevent Ok [0, 0]`);
+    expect(board.elements.map((e) => e.id)).toEqual(['event_ok']);
+    expect(board.rawPassthrough).toEqual([line]);
+    expect(diagnostics).toHaveLength(1);
+    expect(serializeDSL(board)).toContain(`${line}\n`);
+  });
+
+  it.each([overflowing, beyondTheCanvas])(
+    'report a note size of %s as unreadable and keep the note',
+    (width) => {
+      const { board, diagnostics } = parseDSLWithDiagnostics(
+        `title T\nnote Big [0, 0] (size ${width}x10)`,
+      );
+      expect(board.elements).toHaveLength(1);
+      expect(board.elements[0]).not.toHaveProperty('size');
+      expect(diagnostics[0]!.message).toMatch(/^Size: could not read/);
+    },
+  );
+
+  it('still reads 1e38 itself, to a fixed point', () => {
+    const largest = `1${'0'.repeat(38)}`;
+    const { board, diagnostics } = parseDSLWithDiagnostics(
+      `title T\nevent A [-${largest}, ${largest}]\nnote N [0, 0] (size ${largest}x10)`,
+    );
+    expect(diagnostics).toHaveLength(0);
+    expect(board.elements[0]?.position).toEqual({ x: -1e38, y: 1e38 });
+    const once = serializeDSL(board);
+    expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+});
+
+// The renderer's conformance harness declares `invalidTexts: []`: no `.storm` text is rejected.
+// A seeded fuzz over the grammar's pieces (huge and malformed numbers, reserved and duplicate
+// ids, dangling arrows, stray suffixes) backs that claim: parsing never throws, and the canonical
+// form is a fixpoint. Block comments stay out of the fixpoint run: a `*/ … /*` fragment moved to
+// the end of the file still changes meaning on the next parse (a known gap).
+describe('every text parses (fuzz)', () => {
+  const pieces = [
+    'title T',
+    'style dark',
+    'level process',
+    'event Foo',
+    'command Bar',
+    'aggregate Order',
+    'actor A',
+    'note Hello',
+    'line',
+    'hotspot ?',
+    'readmodel R',
+    '[0, 0]',
+    '[10, -20]',
+    `[${'9'.repeat(400)}, 0]`,
+    '[1.2.3, 4]',
+    '[[0, 0], [5, 5]]',
+    `[[0, 0], [${'9'.repeat(310)}, 5]]`,
+    '(id event-storming-root)',
+    '(id __implicitroot_0)',
+    '(id dup)',
+    '(id bad id)',
+    '(color #ff0000)',
+    `(size ${'9'.repeat(400)}x10)`,
+    '(size 0x0)',
+    '(on Foo)',
+    '(align center middle)',
+    '(closed)',
+    '->',
+    'Foo -> Bar',
+    '#dup -> #event-storming-root',
+    '; async',
+    '// comment',
+    '\\n',
+    "'",
+  ];
+  let seed = 42;
+  const random = () => {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    return seed / 2147483648;
+  };
+  const line = () =>
+    Array.from(
+      { length: 1 + Math.floor(random() * 5) },
+      () => pieces[Math.floor(random() * pieces.length)],
+    ).join(' ');
+
+  it('parses 3000 random lines without throwing, to a stable canonical form', () => {
+    for (let board = 0; board < 300; board++) {
+      const text = Array.from({ length: 10 }, line).join('\n');
+      const once = serializeDSL(parseDSLWithDiagnostics(text).board);
+      expect(serializeDSL(parseDSL(once)), text).toBe(once);
+    }
+  });
+
+  it('parses block comments in any arrangement without throwing', () => {
+    for (let board = 0; board < 300; board++) {
+      const text = Array.from(
+        { length: 10 },
+        () => `${line()} ${random() < 0.5 ? '/*' : '*/'}`,
+      ).join('\n');
+      expect(() => serializeDSL(parseDSL(serializeDSL(parseDSL(text)))), text).not.toThrow();
+    }
+  });
+
+  it('keeps an unclosed block comment stable instead of growing a blank line per save', () => {
+    const once = serializeDSL(parseDSL('title T\n/* open\nevent Foo [0, 0]\n'));
+    expect(once).toBe('title T\n/* open\nevent Foo [0, 0]\n');
     expect(serializeDSL(parseDSL(once))).toBe(once);
   });
 });

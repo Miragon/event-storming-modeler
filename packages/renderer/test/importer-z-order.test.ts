@@ -20,6 +20,8 @@ function importerHarness() {
       throw new Error('no root yet');
     },
     setRootElement: () => {},
+    getRootElements: () => [],
+    getSize: () => ({ width: 0, height: 0 }),
     addShape: (shape: { id: string }) => addedShapeIds.push(shape.id),
     addConnection: () => {},
     viewbox: () => {},
@@ -30,7 +32,7 @@ function importerHarness() {
     new EventStormingElementFactory(rawFactory, { getAll: () => [] } as unknown as ElementRegistry),
     { contentBounds: () => ({ x: 0, y: 0, width: 100, height: 100 }) } as unknown as BoardBounds,
     { fire: () => {} } as unknown as EventBus,
-    { getAll: () => [] } as unknown as ElementRegistry,
+    { getAll: () => [], get: () => undefined } as unknown as ElementRegistry,
   );
   return { importer, addedShapeIds };
 }

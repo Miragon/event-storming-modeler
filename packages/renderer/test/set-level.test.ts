@@ -24,10 +24,10 @@ function harness(config: BoardConfig | null = { title: 'Fixture' }) {
     canvas,
     registry as unknown as ElementRegistry,
   );
-  const exporter = new EventStormingExporter(
-    { getAll: () => [] } as unknown as ElementRegistry,
-    canvas,
-  );
+  const exporter = new EventStormingExporter({
+    getAll: () => [],
+    get: registry.get,
+  } as unknown as ElementRegistry);
   return { modeling, exporter, commandStack, eventBus };
 }
 

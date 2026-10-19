@@ -191,3 +191,114 @@ describe('EventStormingLabelEditing', () => {
     expect(field.style.width).toBe('130px');
   });
 });
+
+describe('EventStormingLabelEditing: an import while the editor is open', () => {
+  function importHarness(options: { readOnly?: boolean } = {}) {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const canvas = {
+      getContainer: () => container,
+      zoom: () => 1,
+      viewbox: () => ({ x: 0, y: 0 }),
+    } as unknown as Canvas;
+    const listeners = new Map<string, Array<(event: unknown) => void>>();
+    const eventBus = {
+      on: (names: string | string[], listener: (event: unknown) => void) => {
+        for (const name of ([] as string[]).concat(names)) {
+          listeners.set(name, [...(listeners.get(name) ?? []), listener]);
+        }
+      },
+    } as unknown as EventBus;
+    const fire = (name: string, event: unknown = {}) =>
+      (listeners.get(name) ?? []).forEach((listener) => listener(event));
+    const updateLabel: unknown[][] = [];
+    const modeling = {
+      updateLabel: (...args: unknown[]) => updateLabel.push(args),
+      updateProperties: () => {},
+    } as unknown as EventStormingModeling;
+    const elements = new Map<string, EventStormingShape>();
+    const sticky = (label: string) =>
+      ({
+        id: 'event_order_placed',
+        eventStormingType: 'event',
+        eventStormingLabel: label,
+        x: 0,
+        y: 0,
+        width: 130,
+        height: 90,
+      }) as unknown as EventStormingShape;
+    elements.set('event_order_placed', sticky('Order Placed'));
+    const editing = new EventStormingLabelEditing(
+      eventBus,
+      canvas,
+      modeling,
+      { get: (id: string) => elements.get(id) } as never,
+      { isReadOnly: () => options.readOnly ?? false },
+    );
+    const field = () => container.querySelector('textarea');
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+    return { container, editing, elements, sticky, field, fire, settle, updateLabel };
+  }
+
+  // Hosts re-import remote states while the user types; a commit on the removed shape would be
+  // wiped with the history, and the typed text with it.
+  it('takes the editor down without committing and reopens it with the typed text', async () => {
+    const { editing, elements, sticky, field, fire, settle, updateLabel, container } =
+      importHarness();
+    editing.activate(elements.get('event_order_placed')!);
+    field()!.value = 'Order Confirmed';
+    expect(editing.openEdit()).toEqual({
+      elementId: 'event_order_placed',
+      value: 'Order Confirmed',
+    });
+
+    editing.suspend();
+    expect(field()).toBeNull();
+    expect(editing.openEdit()).toBeUndefined();
+    elements.set('event_order_placed', sticky('Order Placed'));
+    fire('canvas.viewbox.changing');
+    editing.resumeAfterImport();
+    expect(field()).toBeNull();
+
+    await settle();
+    expect(field()!.value).toBe('Order Confirmed');
+    expect(editing.openEdit()).toEqual({
+      elementId: 'event_order_placed',
+      value: 'Order Confirmed',
+    });
+    expect(updateLabel).toEqual([]);
+    field()!.dispatchEvent(new Event('blur'));
+    expect(updateLabel).toEqual([[elements.get('event_order_placed'), 'Order Confirmed']]);
+    container.remove();
+  });
+
+  it('drops the edit when the imported board no longer has the element', async () => {
+    const { editing, elements, field, settle, updateLabel, container } = importHarness();
+    editing.activate(elements.get('event_order_placed')!);
+    field()!.value = 'Order Confirmed';
+    editing.suspend();
+    elements.clear();
+    editing.resumeAfterImport();
+    await settle();
+    expect(field()).toBeNull();
+    expect(updateLabel).toEqual([]);
+    container.remove();
+  });
+
+  it('opens no editor under the read-only lock', () => {
+    const { editing, elements, field, container } = importHarness({ readOnly: true });
+    editing.activate(elements.get('event_order_placed')!);
+    expect(field()).toBeNull();
+    container.remove();
+  });
+
+  it('closes an open editor without committing when the lock engages', () => {
+    const { editing, elements, field, fire, updateLabel, container } = importHarness();
+    editing.activate(elements.get('event_order_placed')!);
+    field()!.value = 'Order Confirmed';
+    fire('eventStorming.readOnly.changed', { readOnly: true });
+    expect(field()).toBeNull();
+    expect(updateLabel).toEqual([]);
+    container.remove();
+  });
+});

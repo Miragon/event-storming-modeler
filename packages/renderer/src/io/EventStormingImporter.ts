@@ -21,6 +21,14 @@ const TYPE_ORDER: Record<string, number> = {
 };
 
 /**
+ * diagram-js reads its zoom back rounded to three decimals: a fit below 0.0005 would read back as
+ * zoom 0 and a NaN viewbox. A board wider than about 2000 viewports shows its centre at this zoom.
+ */
+const SMALLEST_FIT_ZOOM = 0.001;
+
+type BoardRoot = Root & { businessObject?: RootBusinessObject };
+
+/**
  * Bridges the EventStormingBoard model into the diagram-js canvas. Deliberately bypasses the
  * commandStack (import path): no undo, no dirty.
  */
@@ -52,22 +60,7 @@ export default class EventStormingImporter {
       ...(board.rawPassthrough ? { rawPassthrough: board.rawPassthrough } : {}),
     };
 
-    // Reuse the existing root (re-import), otherwise create a new one.
-    let existing: (Root & { businessObject?: RootBusinessObject }) | undefined;
-    try {
-      existing = this.canvas.getRootElement() as Root & { businessObject?: RootBusinessObject };
-    } catch {
-      existing = undefined;
-    }
-    let root: Root & { businessObject?: RootBusinessObject };
-    if (existing && existing.id === ROOT_ID) {
-      root = existing;
-    } else {
-      root = this.elementFactory.createRoot({ id: ROOT_ID }) as Root & {
-        businessObject?: RootBusinessObject;
-      };
-      this.canvas.setRootElement(root);
-    }
+    const root = this.boardRoot();
     root.businessObject = meta;
 
     const shapeById = new Map<string, EventStormingShape>();
@@ -121,9 +114,49 @@ export default class EventStormingImporter {
       this.canvas.addConnection(conn, root, drawings.length);
     }
 
-    this.canvas.viewbox(this.boardBounds.contentBounds());
+    this.fitToContent();
     this.eventBus.fire('import.render.done', { warnings });
     return warnings;
+  }
+
+  /**
+   * The board root, created on the first import. Any other root goes: diagram-js creates an
+   * implicit one whenever something asks for the root before the first import (an export, a
+   * palette create), and it would stay in the registry under an id the next board could reuse.
+   */
+  private boardRoot(): BoardRoot {
+    let root = this.elementRegistry.get(ROOT_ID) as BoardRoot | undefined;
+    if (!root) {
+      root = this.elementFactory.createRoot({ id: ROOT_ID }) as BoardRoot;
+      this.canvas.setRootElement(root);
+    }
+    for (const other of this.canvas.getRootElements()) {
+      if (other !== root) this.canvas.removeRootElement(other);
+    }
+    return root;
+  }
+
+  /**
+   * Centres the content at the largest zoom that shows all of it, never above 100% (guide §5.9);
+   * an empty board, with nothing to fit, shows the centre of its default frame at 100%. Hosts with
+   * their own fit insets refit after.
+   */
+  private fitToContent(): void {
+    const bounds = this.boardBounds.contentBounds();
+    const { width, height } = this.canvas.getSize();
+    if (!(width > 0 && height > 0)) {
+      this.canvas.viewbox(bounds);
+      return;
+    }
+    const scale = this.boardBounds.isEmpty()
+      ? 1
+      : Math.max(Math.min(width / bounds.width, height / bounds.height, 1), SMALLEST_FIT_ZOOM);
+    this.canvas.viewbox({
+      x: bounds.x + bounds.width / 2 - width / 2 / scale,
+      y: bounds.y + bounds.height / 2 - height / 2 / scale,
+      width: width / scale,
+      height: height / scale,
+    });
   }
 
   private createShape(el: BoardElement): EventStormingShape {
@@ -137,10 +170,12 @@ export default class EventStormingImporter {
     }
   }
 
+  /** Removes every element but the roots (removing a root as a shape corrupts the canvas). */
   clear(): void {
+    const roots = new Set<unknown>(this.canvas.getRootElements());
     for (const el of [...this.elementRegistry.getAll()]) {
+      if (roots.has(el)) continue;
       const e = el as { waypoints?: unknown; id: string };
-      if (e.id === ROOT_ID) continue;
       try {
         if (e.waypoints) this.canvas.removeConnection(e.id);
         else this.canvas.removeShape(e.id);

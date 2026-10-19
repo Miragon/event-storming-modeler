@@ -5,6 +5,15 @@ export { NavigatedViewer } from './NavigatedViewer.js';
 export { Modeler } from './Modeler.js';
 export { EventStormingBaseViewer } from './EventStormingBaseViewer.js';
 export type { EventStormingViewerOptions, EventCallback } from './EventStormingBaseViewer.js';
+export {
+  EVENT_STORMING_NOTATION,
+  createCollaborativeModeler,
+  createCollaborativeViewer,
+} from './collaborative/index.js';
+export type {
+  CollaborativeEventStormingModeler,
+  CollaborativeEventStormingOptions,
+} from './collaborative/index.js';
 
 export { eventStormingModelModule, EventStormingElementFactory } from './model/index.js';
 export { boardBoundsModule, BoardBounds } from './board-bounds/index.js';
@@ -34,6 +43,7 @@ export { eventStormingPaletteModule } from './palette/index.js';
 export { eventStormingContextPadModule } from './context-pad/index.js';
 export { labelEditingModule, EventStormingLabelEditing } from './label-editing/index.js';
 export { eventStormingKeyboardModule } from './keyboard/index.js';
+export type { EventStormingKeyboardConfig } from './keyboard/index.js';
 export {
   eventStormingPopupModule,
   EventStormingElementSettingsProvider,
@@ -43,6 +53,12 @@ export { eventStormingAppendModule, EventStormingAppendBehavior } from './append
 export { eventStormingAttachModule, EventStormingAttachBehavior } from './attach/index.js';
 export { eventStormingColorPickerModule, EventStormingColorPicker } from './color-picker/index.js';
 export { eventStormingResizeModule, EventStormingResizeBehavior } from './resize/index.js';
+export {
+  eventStormingReadOnlyModule,
+  EventStormingReadOnly,
+  READ_ONLY_CHANGED_EVENT,
+} from './read-only/index.js';
+export type { FreeRectInsets } from './palette/EventStormingPaletteProvider.js';
 
 export {
   isEventStormingShape,

@@ -44,13 +44,41 @@ Prefer a plain Vite server with no proxy? `npm run dev:webapp:plain` (or
 
 ## Browser & e2e tests
 
-`npm run test:browser` (Vitest browser mode) and `npm run test:e2e` (Playwright, in `e2e/`) need a
-Chromium browser. Locally, run `npx playwright install chromium` once. In CI these two jobs run inside
-the official Playwright container (`mcr.microsoft.com/playwright`); its image tag is derived from the
-root `package.json` `playwright` devDependency (see the `playwright-version` job in
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml)) — so **when you bump `@playwright/test` in
-`e2e/package.json`, bump the root `playwright` devDependency to the identical version** (the version
-pin-check does not enforce that the two stay in sync).
+`npm run test:browser` (Vitest browser mode, incl. the `@miragon/modeler-api` conformance kit for
+the collaborative modeler and viewer) and `npm run test:e2e` (Playwright, in `e2e/`) need a
+Chromium browser. Locally, run `npx playwright install chromium` once.
+
+`npm run test:e2e` runs two Playwright projects, each with its own Vite dev server built from the
+package sources (no build needed):
+
+| Project          | Serves                                                               | Port (env)                |
+| ---------------- | -------------------------------------------------------------------- | ------------------------- |
+| `webapp`         | the web app (`e2e/tests/*.spec.ts`)                                  | 5180 (`E2E_PORT`)         |
+| `vscode-webview` | the VS Code webview inside the shell's VS Code stub (`e2e/webview/`) | 5190 (`E2E_WEBVIEW_PORT`) |
+
+The `vscode-webview` project runs `@miragon/modeler-shell`'s conformance kit (geometry, ARIA, keys,
+keyboard creation, the read-only lock of an invalid file, appearance, cleanup; the harness declares
+the legend and the inspector `absent`, since Event Storming has neither, and any skip fails the
+suite) and the webview's own protocol and chrome specs. Run one project with
+`npm run test:e2e -- --project=vscode-webview`. Locally an already running server on a port is
+reused, so pick free ports (`E2E_PORT=5387 E2E_WEBVIEW_PORT=5397 npm run test:e2e`) when another
+app occupies 5180 or 5190.
+
+In CI these two jobs run inside the official Playwright container (`mcr.microsoft.com/playwright`);
+its image tag is derived from the root `package.json` `playwright` devDependency (see the
+`playwright-version` job in [`.github/workflows/ci.yml`](.github/workflows/ci.yml)) — so **when you
+bump `@playwright/test` in `e2e/package.json`, bump the root `playwright` devDependency to the
+identical version** (the version pin-check does not enforce that the two stay in sync).
+
+## Design tokens
+
+`packages/renderer/src/theme/cd-tokens.generated.css`, `cd-tokens.generated.json` and
+`cd-canvas.css` are vendored unchanged from the `miragon-brand:modeler-tool-design` skill
+(`assets/`). To update them, copy all three again, put the vendoring header back as the first line
+of the two CSS files (the JSON gets none), and run `npm test` (`theme.sync` in the renderer,
+`tokens.sync` in apps/vscode against the shell's sizes) and
+`npm run test:e2e -- --project=vscode-webview` (the shell conformance kit). Never edit or reformat
+them by hand.
 
 ## Pre-commit reality
 

@@ -1,51 +1,119 @@
-// Geist (Miragon typeface), self-hosted variable font (all weights in one file). esbuild inlines the
-// woff2 as data-URLs; the webview has no code area, so Geist Mono is not needed here.
+import './zod-jitless.js';
 import '@fontsource-variable/geist/wght.css';
-// Pulls the renderer CSS (incl. diagram-js.css) into the bundle.
+import '@fontsource-variable/geist-mono/wght.css';
 import {
-  Modeler,
-  iconMarkup,
-  ICON_MENU,
-  ICON_FIT,
-  ICON_DOWNLOAD,
-  ICON_IMAGE,
+  createCollaborativeModeler,
+  type BoardBounds,
+  type CollaborativeEventStormingModeler,
+  type EventStormingReadOnly,
 } from '@miragon/event-storming-renderer';
 import './style.css';
-import type { BoardLevel } from '@miragon/event-storming-schema-model';
-import { svgToPng, blobToBase64 } from './io.js';
-import type { HostToWebview, WebviewToHost } from '../protocol.js';
+import '@miragon/modeler-shell/shell.css';
+import type { ShellHandle } from '@miragon/modeler-shell';
+import { INVALID_STATUS_DELAY_MS } from '@miragon/modeler-shell/core';
+import {
+  connectDiagramJs,
+  shellModule,
+  type DiagramJsConnection,
+} from '@miragon/modeler-shell/diagram-js';
+import {
+  mountVsCodeShell,
+  persistView,
+  readShellState,
+} from '@miragon/modeler-shell/vscode/webview';
+import type { HostToWebview, WebviewCommand, WebviewToHost } from '../protocol.js';
+import { WEBVIEW_THEMES } from '../themes.js';
+import { blobToBase64, svgToPng } from './io.js';
+import { boardMenu, type BoardLevels, type TypeCaptions } from './menu.js';
+import { createShortcutsDialog } from './shortcutsDialog.js';
+import { readTypeCaptionsVisible, writeTypeCaptionsVisible } from './state.js';
 
 interface VsCodeApi {
-  postMessage(msg: WebviewToHost): void;
+  postMessage(message: WebviewToHost): void;
   getState(): unknown;
   setState(state: unknown): void;
 }
 declare const acquireVsCodeApi: () => VsCodeApi;
+
+interface DiagramElement {
+  id: string;
+  parent?: unknown;
+  waypoints?: unknown;
+}
+interface ElementRegistryLike {
+  getAll(): DiagramElement[];
+  get(id: string): DiagramElement | undefined;
+}
+interface SelectionLike {
+  get(): DiagramElement[];
+  select(elements: DiagramElement[] | null): void;
+}
+
+const BOARD_NAME = 'Event Storming board';
+
 const vscode = acquireVsCodeApi();
+const storedShellState = readShellState(vscode);
 
-const container = document.getElementById('canvas');
-const toolbar = document.getElementById('toolbar');
-if (!container || !toolbar) throw new Error('Webview layout incomplete (#canvas/#toolbar).');
+// The diagram first: Event Storming's keyboard listens on document and must run before the shell's
+// key listener, and the Modeler builds its diagram lazily on the first get(). Undo and redo keys
+// stay unbound: VS Code's document history owns them (guide §13.5). The webview runs the same
+// collaborative-modeler contract as every other host, so its imports are silent and fitted.
+const collaborative = createCollaborativeModeler({
+  additionalModules: [shellModule],
+  undoRedoKeys: false,
+  freeRectInsets: () => shell.fitInsets(),
+});
+const modeler = collaborative.diagram;
+modeler.get('canvas');
+const registry = modeler.get<ElementRegistryLike>('elementRegistry');
+const selection = modeler.get<SelectionLike>('selection');
+const boardBounds = modeler.get<BoardBounds>('boardBounds');
+const typeCaptions = modeler.get<TypeCaptions>('eventStormingViewOptions');
+const levels = modeler.get<BoardLevels>('eventStormingModeling');
+const canvasLock = modeler.get<EventStormingReadOnly>('eventStormingReadOnly');
+if (readTypeCaptionsVisible(vscode) === false) typeCaptions.setTypeCaptionsVisible(false);
 
-const modeler = new Modeler({ container });
-// Debug handle (like the webapp). Harmless in the sandboxed webview, helpful for diagnostics/tests.
-(globalThis as Record<string, unknown>).__eventStormingModeler = modeler;
+const app = document.getElementById('app');
+if (!app) throw new Error('The webview HTML has no #app root.');
+
+const shell = mountVsCodeShell(app, {
+  themes: WEBVIEW_THEMES,
+  canvas: modeler.container,
+  messages: { canvas: BOARD_NAME },
+  menu: boardMenu({
+    levels,
+    typeCaptions,
+    onTypeCaptionsToggled: (visible) => writeTypeCaptionsVisible(vscode, visible),
+    exportPng: () => void exportPng(),
+    exportSvg: () => void exportSvg(),
+    showKeyboardShortcuts: () => shortcutsDialog.open(),
+  }),
+  problems: { onActivate: () => post({ type: 'showProblems' }) },
+  emptyHint: { onInsertExample: () => post({ type: 'insertExample' }) },
+});
+const shortcutsDialog = createShortcutsDialog(shell);
+modeler.on('diagram.destroy', () => shortcutsDialog.destroy());
+
+// Cheap tests only: the shell asks on every content change, and exportMap() validates the board.
+const isEmpty = (): boolean =>
+  !registry.getAll().some((element) => element.parent && !element.waypoints);
+const connection = connectDiagramJs(shell, modeler, {
+  isEmpty,
+  // No padding of its own: the shell's fit insets are the only margin.
+  contentBounds: () => (isEmpty() ? undefined : boardBounds.contentBounds(0)),
+});
+const { viewport } = connection;
+persistView(vscode, viewport);
 
 // ---------------------------------------------------------------------------
 // Two-way sync with the document
 // ---------------------------------------------------------------------------
 
-let lastText = ''; // text last reconciled with the host
-let importing = false; // suppresses the edit echo during import
-let importFailed = false; // the last import (e.g. externally typed text) was unparsable
-let initialized = false; // first init done -> preserve zoom/viewport from then on
+let lastText = '';
+let initialized = false;
 
-// Serialize imports STRICTLY: init/update arrive as (un-awaited) messages; without chaining, two
-// quick updates (e.g. several undos) could import concurrently and finish in the wrong order.
-let importChain: Promise<void> = Promise.resolve();
-function enqueueImport(text: string, fit: boolean): Promise<void> {
-  importChain = importChain.then(() => importText(text, fit)).catch(() => {});
-  return importChain;
+function post(message: WebviewToHost): void {
+  vscode.postMessage(message);
 }
 
 /** Compares two DSL texts modulo line endings/trailing whitespace (= save transforms). */
@@ -53,289 +121,173 @@ function sameBoardText(a: string, b: string): boolean {
   return a.replace(/\r\n/g, '\n').trim() === b.replace(/\r\n/g, '\n').trim();
 }
 
+function selectedIds(): string[] {
+  return selection.get().map((element) => element.id);
+}
+
+function reselect(ids: readonly string[]): void {
+  const elements = ids
+    .map((id) => registry.get(id))
+    .filter((element): element is DiagramElement => element !== undefined);
+  if (elements.length) selection.select(elements);
+}
+
+function showValidBoard(): void {
+  canvasLock.setReadOnly(false);
+  shell.setReadOnly(false);
+  shell.setStatus(null);
+}
+
+function showInvalidBoard(): void {
+  // Locked at once; the marks and the status box follow after 800ms without a valid import, so
+  // typing in the text editor neither flickers nor re-announces the alert (guide §13.5).
+  canvasLock.setReadOnly(true);
+  shell.setReadOnly(true, { delayMs: INVALID_STATUS_DELAY_MS });
+  shell.setStatus(
+    { severity: 'danger', text: shell.messages.invalidFile(BOARD_NAME) },
+    { delayMs: INVALID_STATUS_DELAY_MS },
+  );
+}
+
 /**
- * Loads `text` into the modeler. `fit=true` (first load) fits the board; `fit=false` (external or
- * echo-missed change) PRESERVES the current zoom/viewport — otherwise every change mirrored back by
- * the host (e.g. the `insertFinalNewline` appended on save) would reset the zoom to default. If the
- * incoming `update` describes the same board as the current state (only whitespace/EOL difference),
- * it is not re-imported at all (no flicker, no zoom/selection loss).
+ * Loads `text` into the modeler. The first import takes the stored view or fits; every later one
+ * (a host undo, the text editor, Git) keeps viewbox and selection. An update that describes the
+ * board the canvas already shows (only whitespace/EOL differ, e.g. `insertFinalNewline` on save)
+ * is not re-imported at all.
  */
-async function importText(text: string, fit: boolean): Promise<void> {
-  if (!fit && initialized && sameBoardText(text, modeler.exportDSL())) {
+async function importText(text: string): Promise<void> {
+  const first = !initialized;
+  if (!first && sameBoardText(text, collaborative.exportText())) {
     lastText = text;
+    showValidBoard();
     return;
   }
-  importing = true;
-  const prevView = fit ? undefined : currentViewbox();
+  const keep = first ? undefined : viewport.getViewbox();
+  const selected = first ? [] : selectedIds();
   try {
-    await modeler.importDSL(text);
+    await collaborative.importText(text);
     lastText = text;
-    importFailed = false;
-    if (fit) fitView();
-    else if (prevView) restoreViewbox(prevView);
-  } catch (err) {
-    // Parse error: the canvas keeps showing the last good board. Block pushEdit so a graphical
-    // action doesn't overwrite the (just externally typed) unparsable text — until a successful
-    // re-import (valid 'update') restores a known state.
-    importFailed = true;
-    vscode.postMessage({
-      type: 'error',
-      message: `Could not parse this Event Storming board: ${(err as Error).message}`,
-    });
+    showValidBoard();
+    if (keep) viewport.restore(keep);
+    else if (first && storedShellState.view) viewport.setState(storedShellState.view);
+    reselect(selected);
+    viewport.afterImport();
+    shell.menu.refresh();
+  } catch {
+    showInvalidBoard();
   } finally {
-    importing = false;
     initialized = true;
   }
 }
 
+// Strictly serialized: init/update arrive as un-awaited messages, and two quick updates (several
+// undos) must not import concurrently and finish in the wrong order.
+let importChain: Promise<void> = Promise.resolve();
+function enqueueImport(text: string): Promise<void> {
+  importChain = importChain
+    .then(() => importText(text))
+    .catch((error: unknown) => console.error('Event Storming import failed', error));
+  return importChain;
+}
+
 /** Graphical change -> serialize DSL and (only on a real difference) report it to the host. */
 function pushEdit(): void {
-  if (importing || importFailed) return;
-  const dsl = modeler.exportDSL();
-  if (dsl === lastText) return;
-  lastText = dsl;
-  vscode.postMessage({ type: 'edit', text: dsl });
+  // Before the first import the canvas does not show the document yet; read-only: it shows the
+  // last valid board. Either way an edit would overwrite text the canvas never saw.
+  if (!initialized || shell.isReadOnly()) return;
+  const text = collaborative.exportText();
+  if (text === lastText) return;
+  lastText = text;
+  post({ type: 'edit', text });
 }
 
-modeler.on('commandStack.changed', pushEdit);
-// Do NOT hook fitView globally onto import.done — otherwise every mirrored-back 'update' resets the
-// zoom. Fit happens deliberately: on first load (importText fit=true) and via the menu's
-// "Fit to view" item.
-
-window.addEventListener('message', (event: MessageEvent<HostToWebview>) => {
-  const msg = event.data;
-  if (msg.type === 'init') void enqueueImport(msg.text, true);
-  else if (msg.type === 'update') void enqueueImport(msg.text, false);
-});
-
-// ---------------------------------------------------------------------------
-// Viewport: fit the board, leaving room at the top for the floating toolbar
-// ---------------------------------------------------------------------------
-
-const VIEW_INSET = { top: 72, side: 28, bottom: 28 };
-function fitView(): void {
-  const canvas = modeler.get<{
-    viewbox(box?: { x: number; y: number; width: number; height: number }): void;
-  }>('canvas');
-  const bounds = modeler.get<{
-    contentBounds(): { x: number; y: number; width: number; height: number };
-  }>('boardBounds');
-  const rect = container!.getBoundingClientRect();
-  const W = rect.width;
-  const H = rect.height;
-  if (!W || !H) return;
-  const p = bounds.contentBounds();
-  const availW = Math.max(W - 2 * VIEW_INSET.side, 50);
-  const availH = Math.max(H - VIEW_INSET.top - VIEW_INSET.bottom, 50);
-  const s = Math.min(availW / p.width, availH / p.height);
-  canvas.viewbox({
-    x: p.x + p.width / 2 - W / 2 / s,
-    y: p.y - VIEW_INSET.top / s,
-    width: W / s,
-    height: H / s,
-  });
-}
-
-type ViewBox = { x: number; y: number; width: number; height: number };
-
-/** Read the current zoom/viewport (or undefined if there is no canvas yet). */
-function currentViewbox(): ViewBox | undefined {
-  try {
-    const vb = modeler.get<{ viewbox(): ViewBox }>('canvas').viewbox();
-    return { x: vb.x, y: vb.y, width: vb.width, height: vb.height };
-  } catch {
-    return undefined;
-  }
-}
-
-function restoreViewbox(box: ViewBox): void {
-  try {
-    modeler.get<{ viewbox(box: ViewBox): void }>('canvas').viewbox(box);
-  } catch {
-    /* no canvas yet -> ignore */
-  }
-}
-
-function deselect(): void {
-  modeler.get<{ select: (e: unknown) => void }>('selection').select(null);
-}
-
-// ---------------------------------------------------------------------------
-// Menu (collapsed hamburger top right, Excalidraw style; light Miragon chrome like the palette, in
-// every VS Code theme). NO undo/redo — VS Code handles that via Ctrl/Cmd+Z out of the box
-// (the modeler's keyboard service is bound within the webview canvas).
-// ---------------------------------------------------------------------------
-
-function setMenuOpen(open: boolean): void {
-  dropdown.hidden = !open;
-  menuBtn.setAttribute('aria-expanded', String(open));
-}
-
-function menuItem(icon: string, label: string, onClick: () => void): HTMLButtonElement {
-  const item = document.createElement('button');
-  item.type = 'button';
-  item.className = 'menu-item';
-  item.setAttribute('role', 'menuitem');
-  item.innerHTML = `${iconMarkup(icon, 16)}<span>${label}</span>`;
-  item.addEventListener('click', () => {
-    setMenuOpen(false);
-    onClick();
-  });
-  return item;
-}
-
-function menuSep(): HTMLDivElement {
-  const sep = document.createElement('div');
-  sep.className = 'menu-sep';
-  sep.setAttribute('role', 'separator');
-  return sep;
-}
-
-function menuLabel(text: string): HTMLDivElement {
-  const label = document.createElement('div');
-  label.className = 'menu-label';
-  label.setAttribute('role', 'presentation');
-  label.textContent = text;
-  return label;
-}
-
-// --- Workshop level (menu radio group) ---
-
-// check — Material Icons (same source as the renderer's icon set); marks the active level.
-const ICON_CHECK = 'M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z';
-
-const LEVELS: ReadonlyArray<{ level: BoardLevel; label: string }> = [
-  { level: 'big-picture', label: 'Big Picture' },
-  { level: 'process', label: 'Process Modelling' },
-  { level: 'design', label: 'Software Design' },
-];
-
-function levelModeling(): { setLevel(level: BoardLevel): void; getLevel(): BoardLevel } {
-  return modeler.get('eventStormingModeling');
-}
-
-/** Checkmark in the icon slot marks a checked item; a spacer keeps the labels aligned. */
-function levelMarkup(label: string, active: boolean): string {
-  return active
-    ? `${iconMarkup(ICON_CHECK, 16)}<span>${label}</span>`
-    : `<span class="menu-icon-spacer"></span><span>${label}</span>`;
-}
-
-const levelItems = LEVELS.map((spec) => {
-  const item = menuItem(ICON_CHECK, spec.label, () => levelModeling().setLevel(spec.level));
-  item.setAttribute('role', 'menuitemradio');
-  item.setAttribute('aria-checked', 'false');
-  // Unchecked until the first import reports the board's level (the click wiring survives).
-  item.innerHTML = levelMarkup(spec.label, false);
-  return { ...spec, item };
-});
-
-function updateLevelMenu(): void {
-  const active = levelModeling().getLevel();
-  for (const { level, label, item } of levelItems) {
-    item.setAttribute('aria-checked', String(level === active));
-    item.innerHTML = levelMarkup(label, level === active);
-  }
-}
-
-// setLevel is undoable and the level also arrives via document updates — re-sync on both.
-modeler.on('commandStack.changed', updateLevelMenu);
-modeler.on('import.done', updateLevelMenu);
-
-// --- Type captions (menu checkbox; a VIEW preference, persisted in the webview state) ---
-
-const viewOptions = modeler.get<{
-  typeCaptionsVisible(): boolean;
-  setTypeCaptionsVisible(visible: boolean): void;
-}>('eventStormingViewOptions');
-
-const typeCaptionsItem = menuItem(ICON_CHECK, 'Type captions', () => {
-  const visible = !viewOptions.typeCaptionsVisible();
-  viewOptions.setTypeCaptionsVisible(visible);
-  // Merge into the webview state — never clobber keys other consumers may have stored.
-  const state = (vscode.getState() ?? {}) as Record<string, unknown>;
-  vscode.setState({ ...state, typeCaptionsVisible: visible });
-  updateTypeCaptionsItem();
-});
-typeCaptionsItem.setAttribute('role', 'menuitemcheckbox');
-
-function updateTypeCaptionsItem(): void {
-  const visible = viewOptions.typeCaptionsVisible();
-  typeCaptionsItem.setAttribute('aria-checked', String(visible));
-  typeCaptionsItem.innerHTML = levelMarkup('Type captions', visible);
-}
-
-// Webview state survives tab switches/reloads — re-apply the stored choice before the first paint.
-const storedState = (vscode.getState() ?? {}) as Record<string, unknown>;
-if (storedState.typeCaptionsVisible === false) viewOptions.setTypeCaptionsVisible(false);
-updateTypeCaptionsItem();
-
-const menuBtn = document.createElement('button');
-menuBtn.type = 'button';
-menuBtn.className = 'menu-btn';
-menuBtn.title = 'Menu';
-menuBtn.setAttribute('aria-label', 'Menu');
-menuBtn.setAttribute('aria-haspopup', 'true');
-menuBtn.setAttribute('aria-expanded', 'false');
-menuBtn.innerHTML = iconMarkup(ICON_MENU, 18);
-
-const dropdown = document.createElement('div');
-dropdown.className = 'menu-dropdown';
-dropdown.setAttribute('role', 'menu');
-dropdown.hidden = true;
-
-dropdown.append(
-  menuItem(ICON_FIT, 'Fit to view', fitView),
-  menuSep(),
-  menuItem(ICON_DOWNLOAD, 'Export · SVG', exportSvg),
-  menuItem(ICON_IMAGE, 'Export · PNG', exportPng),
-  menuSep(),
-  menuLabel('Level'),
-  ...levelItems.map(({ item }) => item),
-  menuSep(),
-  typeCaptionsItem,
-);
-
-toolbar.append(menuBtn, dropdown);
-
-menuBtn.addEventListener('click', (e) => {
-  e.stopPropagation();
-  setMenuOpen(dropdown.hidden === true);
-});
-document.addEventListener('click', (e) => {
-  if (!(e.target as Element | null)?.closest('#toolbar')) setMenuOpen(false);
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') setMenuOpen(false);
-});
+collaborative.onContentChanged(pushEdit);
+modeler.on('commandStack.changed', () => shell.menu.refresh());
 
 // ---------------------------------------------------------------------------
 // Export (the webview rasterizes/serializes; the host shows the save dialog)
 // ---------------------------------------------------------------------------
 
-async function exportSvg(): Promise<void> {
-  deselect();
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/** The picture shows the board, not the current selection outlines. */
+async function withoutSelection<T>(task: () => Promise<T>): Promise<T> {
+  const ids = selectedIds();
+  selection.select(null);
   try {
-    const { svg } = await modeler.saveSVG();
-    vscode.postMessage({ type: 'export', format: 'svg', data: svg });
-  } catch (err) {
-    vscode.postMessage({ type: 'error', message: `SVG export failed: ${(err as Error).message}` });
+    return await task();
+  } finally {
+    reselect(ids);
+  }
+}
+
+async function exportSvg(): Promise<void> {
+  try {
+    const { svg } = await withoutSelection(() => modeler.saveSVG());
+    post({ type: 'export', format: 'svg', data: svg });
+  } catch (error) {
+    post({ type: 'error', message: `Could not export the board as SVG: ${messageOf(error)}` });
   }
 }
 
 async function exportPng(): Promise<void> {
-  deselect();
   try {
-    const { svg } = await modeler.saveSVG();
-    const blob = await svgToPng(svg);
-    vscode.postMessage({ type: 'export', format: 'png', data: await blobToBase64(blob) });
-  } catch (err) {
-    vscode.postMessage({ type: 'error', message: `PNG export failed: ${(err as Error).message}` });
+    const { svg } = await withoutSelection(() => modeler.saveSVG());
+    post({ type: 'export', format: 'png', data: await blobToBase64(await svgToPng(svg)) });
+  } catch (error) {
+    post({ type: 'error', message: `Could not export the board as PNG: ${messageOf(error)}` });
   }
 }
 
 // ---------------------------------------------------------------------------
-// Start
+// Messages from the extension host
 // ---------------------------------------------------------------------------
 
-vscode.postMessage({ type: 'ready' });
+const COMMANDS: Readonly<Record<WebviewCommand, () => void>> = {
+  fitView: () => viewport.fit(),
+  exportPng: () => void exportPng(),
+  exportSvg: () => void exportSvg(),
+};
+
+function isHostMessage(data: unknown): data is HostToWebview {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    typeof (data as { type?: unknown }).type === 'string'
+  );
+}
+
+let firstImportSettled: () => void = () => undefined;
+const ready = new Promise<void>((resolve) => (firstImportSettled = resolve));
+
+window.addEventListener('message', (event: MessageEvent<unknown>) => {
+  if (!isHostMessage(event.data)) return;
+  const message = event.data;
+  switch (message.type) {
+    case 'init':
+      void enqueueImport(message.text).then(firstImportSettled);
+      break;
+    case 'update':
+      void enqueueImport(message.text);
+      break;
+    case 'problems':
+      shell.setProblems({ count: message.count, errors: message.errors });
+      break;
+    case 'command':
+      // Only own entries: a name such as "constructor" must not reach Object.prototype.
+      if (Object.hasOwn(COMMANDS, message.name)) COMMANDS[message.name]();
+      break;
+  }
+});
+
+post({ type: 'ready' });
+
+/** For test pages: the mounted parts, and `ready` once the first `init` import settled. */
+export const webview: {
+  shell: ShellHandle;
+  modeler: CollaborativeEventStormingModeler;
+  connection: DiagramJsConnection;
+  ready: Promise<void>;
+} = { shell, modeler: collaborative, connection, ready };

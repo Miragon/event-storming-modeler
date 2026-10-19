@@ -104,3 +104,51 @@ describe('EventStormingContextPadProvider: blank append', () => {
     }
   });
 });
+
+describe('EventStormingContextPadProvider: read-only lock', () => {
+  it('offers no entry while the canvas is locked and closes an open pad when it locks', () => {
+    const close = vi.fn();
+    let listener: ((event: { readOnly?: boolean }) => void) | undefined;
+    let readOnly = false;
+    const provider = new EventStormingContextPadProvider(
+      { registerProvider: vi.fn(), close } as never,
+      { removeElements: vi.fn() } as never,
+      { start: vi.fn() } as never,
+      { start: vi.fn() } as never,
+      { open: vi.fn() } as never,
+      { setStrokeStyle: vi.fn(), getLevel: () => 'design' } as never,
+      { activate: vi.fn(), activateConnection: vi.fn() } as never,
+      { createProvisional: vi.fn() } as never,
+      { open: vi.fn() } as never,
+      { on: (_name: string, callback: typeof listener) => (listener = callback) } as never,
+      { isReadOnly: () => readOnly },
+    );
+    expect(Object.keys(provider.getContextPadEntries(sticky('cmd_a')))).not.toEqual([]);
+    readOnly = true;
+    listener?.({ readOnly: true });
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(provider.getContextPadEntries(sticky('cmd_a'))).toEqual({});
+  });
+
+  it('draws every entry with a 16px Lucide icon at stroke 2.5', () => {
+    const { provider } = providerHarness();
+    const entries = Object.values(provider.getContextPadEntries(sticky('cmd_a')));
+    expect(entries.length).toBeGreaterThan(3);
+    for (const entry of entries) {
+      expect(entry.html).toContain('width="16"');
+      expect(entry.html).toContain('stroke-width="2.5"');
+      expect(entry.html).toContain('stroke="currentColor"');
+      expect(entry.html).toContain('fill="none"');
+    }
+  });
+});
+
+describe('EventStormingContextPadProvider: entry order', () => {
+  it('ends with delete, in a group of its own', () => {
+    const { provider } = providerHarness();
+    const entries = provider.getContextPadEntries(sticky('cmd_a'));
+    expect(Object.keys(entries).at(-1)).toBe('delete');
+    expect(entries['delete']!.group).toBe('delete');
+    expect(Object.values(entries).filter((entry) => entry.group === 'delete')).toHaveLength(1);
+  });
+});

@@ -1,4 +1,3 @@
-import type Canvas from 'diagram-js/lib/core/Canvas';
 import type ElementRegistry from 'diagram-js/lib/core/ElementRegistry';
 import type { Root } from 'diagram-js/lib/model/Types';
 import {
@@ -24,16 +23,15 @@ import { ROOT_ID, type RootBusinessObject } from './types.js';
  * geometry; the `businessObject` only serves as identity backref and is not consulted for data.
  */
 export default class EventStormingExporter {
-  static $inject = ['elementRegistry', 'canvas'];
+  static $inject = ['elementRegistry'];
 
-  constructor(
-    private readonly elementRegistry: ElementRegistry,
-    private readonly canvas: Canvas,
-  ) {}
+  constructor(private readonly elementRegistry: ElementRegistry) {}
 
   export(): EventStormingBoard {
-    const root = this.canvas.getRootElement() as Root & { businessObject?: RootBusinessObject };
-    const meta = root.businessObject;
+    // Through the registry: asking the canvas would create an implicit root before the first import.
+    const root = this.elementRegistry.get(ROOT_ID) as
+      (Root & { businessObject?: RootBusinessObject }) | undefined;
+    const meta = root?.businessObject;
     const config: BoardConfig = meta?.config ?? { title: 'Untitled Board' };
 
     const elements: BoardElement[] = [];

@@ -115,16 +115,15 @@ export const COLORS = {
   arrow: '#9E9E9E',
   accent: MIRAGON.blau,
   accentSoft: 'rgba(51,93,229,0.12)',
-  /** Dark text inside every sticky. */
-  stickyText: '#333333',
+  /** Text inside every sticky: #1D1D1D reaches 4.5:1 on all eight fills, the hotspot included. */
+  stickyText: MIRAGON.schwarz,
 } as const;
 
 /**
- * Default stroke for freeform drawings and the draw-tool preview: theme-aware via CSS variable
- * (dark boards flip it to a light ink — near-black on navy is invisible), with the light value as
- * literal fallback so exported SVGs opened standalone (no stylesheet) stay stable.
+ * Default stroke for freeform drawings and the draw-tool preview. A literal, never a `var()`: SVG
+ * attributes travel into exports and other tools, which do not resolve CSS variables (guide §10.2).
  */
-export const DRAWING_INK = `var(--event-storming-drawing-ink, ${MIRAGON.schwarz})`;
+export const DRAWING_INK = MIRAGON.schwarz;
 
 export const FONT = {
   /**

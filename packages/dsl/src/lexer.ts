@@ -10,13 +10,29 @@ export interface ParsedCoords {
 
 const COORDS_RE = /\[\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\]/;
 
+/**
+ * The canvas places shapes with 32-bit SVG transforms, which overflow near 3.4e38 and would make
+ * an import throw half-way; 1e38 leaves room for a corner half a note's size beyond its centre.
+ * A larger number (a digit run of 309 or more even overflows to Infinity) is unreadable like
+ * `1.2.3`, so its line stays in rawPassthrough.
+ */
+const LARGEST_DRAWABLE_NUMBER = 1e38;
+
+function isDrawable(value: number): boolean {
+  return Math.abs(value) <= LARGEST_DRAWABLE_NUMBER;
+}
+
+function drawablePair(a: number, b: number): boolean {
+  return isDrawable(a) && isDrawable(b);
+}
+
 /** Order stays raw (a, b). */
 export function parseCoords(line: string): ParsedCoords | null {
   const m = COORDS_RE.exec(line);
   if (!m) return null;
   const a = Number(m[1]);
   const b = Number(m[2]);
-  if (Number.isNaN(a) || Number.isNaN(b)) return null;
+  if (!drawablePair(a, b)) return null;
   return { a, b };
 }
 
@@ -32,7 +48,7 @@ export function splitAtCoords(
   if (!m) return null;
   const a = Number(m[1]);
   const b = Number(m[2]);
-  if (Number.isNaN(a) || Number.isNaN(b)) return null;
+  if (!drawablePair(a, b)) return null;
   return {
     name: line.slice(0, m.index).trim(),
     coords: { a, b },
@@ -53,7 +69,8 @@ export function parseMultiCoords(line: string): { tuples: ParsedCoords[]; rest: 
   while ((t = inner.exec(m[1]!))) {
     const a = Number(t[1]);
     const b = Number(t[2]);
-    if (!Number.isNaN(a) && !Number.isNaN(b)) tuples.push({ a, b });
+    if (!drawablePair(a, b)) return null;
+    tuples.push({ a, b });
   }
   if (!tuples.length) return null;
   return { tuples, rest: line.replace(MULTI_COORDS_RE, ' ') };
@@ -158,8 +175,8 @@ export function parseSize(line: string): {
   if (m) {
     const width = Number(m[1]);
     const height = Number(m[2]);
-    // Non-positive (or NaN from e.g. `1.2.3`) falls through to the malformed branch.
-    if (width > 0 && height > 0) {
+    // Non-positive, NaN (`1.2.3`) or beyond the canvas falls through to the malformed branch.
+    if (width > 0 && height > 0 && isDrawable(width) && isDrawable(height)) {
       return { size: { width, height }, rest: line.replace(SIZE_RE, ' ') };
     }
   }
@@ -199,6 +216,11 @@ export function parseAlign(line: string): {
   const p = ALIGN_PRESENT_RE.exec(line);
   if (!p) return { rest: line };
   return { invalid: p[0], rest: line.replace(ALIGN_PRESENT_RE, ' ') };
+}
+
+/** Undoes the serializer's `\n` name escaping (line-based DSL, multi-line labels). */
+export function decodeName(name: string): string {
+  return name.replace(/\\n/g, '\n');
 }
 
 /** First word (keyword) of a line, lowercased. */

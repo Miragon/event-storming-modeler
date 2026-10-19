@@ -73,6 +73,33 @@
         "command": "eventStorming.newBoardFromExample",
         "title": "New Board from Example",
         "category": "Event Storming"
+      },
+      {
+        "command": "eventStorming.openSource",
+        "title": "Open Source to the Side",
+        "category": "Event Storming",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "eventStorming.openBoard",
+        "title": "Open Board to the Side",
+        "category": "Event Storming",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "eventStorming.fitView",
+        "title": "Fit to View",
+        "category": "Event Storming"
+      },
+      {
+        "command": "eventStorming.exportPng",
+        "title": "Export as PNG",
+        "category": "Event Storming"
+      },
+      {
+        "command": "eventStorming.exportSvg",
+        "title": "Export as SVG",
+        "category": "Event Storming"
       }
     ],
     "menus": {
@@ -80,6 +107,55 @@
         {
           "command": "eventStorming.newBoard",
           "group": "eventStorming"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "eventStorming.openSource",
+          "when": "activeCustomEditorId == eventStorming.boardEditor",
+          "group": "navigation"
+        },
+        {
+          "command": "eventStorming.openBoard",
+          "when": "editorLangId == event-storming-dsl",
+          "group": "navigation"
+        },
+        {
+          "command": "eventStorming.fitView",
+          "when": "activeCustomEditorId == eventStorming.boardEditor",
+          "group": "eventStorming@1"
+        },
+        {
+          "command": "eventStorming.exportPng",
+          "when": "activeCustomEditorId == eventStorming.boardEditor",
+          "group": "eventStorming@2"
+        },
+        {
+          "command": "eventStorming.exportSvg",
+          "when": "activeCustomEditorId == eventStorming.boardEditor",
+          "group": "eventStorming@3"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "eventStorming.openSource",
+          "when": "activeCustomEditorId == eventStorming.boardEditor"
+        },
+        {
+          "command": "eventStorming.openBoard",
+          "when": "editorLangId == event-storming-dsl"
+        },
+        {
+          "command": "eventStorming.fitView",
+          "when": "activeCustomEditorId == eventStorming.boardEditor"
+        },
+        {
+          "command": "eventStorming.exportPng",
+          "when": "activeCustomEditorId == eventStorming.boardEditor"
+        },
+        {
+          "command": "eventStorming.exportSvg",
+          "when": "activeCustomEditorId == eventStorming.boardEditor"
         }
       ]
     },
@@ -90,21 +166,42 @@
         "description": "Event Storming is a workshop format for exploring a business domain with sticky notes: domain events, the commands that trigger them, and the people and systems involved. This extension lets you create and edit Event Storming boards in VS Code as plain-text .storm files.",
         "steps": [
           {
-            "id": "create",
-            "title": "Create your first board",
-            "description": "Open a ready-made example board, or start from a blank canvas.\n[Create board from example](command:eventStorming.newBoardFromExample)",
+            "id": "new",
+            "title": "Create a board",
+            "description": "Start from an empty board: a plain-text .storm file that opens as a canvas.\n[Create empty board](command:eventStorming.newBoard)",
             "media": {
-              "markdown": "media/walkthrough/create.md"
+              "markdown": "media/walkthrough/new.md"
             },
             "completionEvents": [
-              "onCommand:eventStorming.newBoardFromExample",
               "onCommand:eventStorming.newBoard"
+            ]
+          },
+          {
+            "id": "example",
+            "title": "Open the example",
+            "description": "See a finished design-level board: a checkout flow with every sticky kind.\n[Create board from example](command:eventStorming.newBoardFromExample)",
+            "media": {
+              "markdown": "media/walkthrough/example.md"
+            },
+            "completionEvents": [
+              "onCommand:eventStorming.newBoardFromExample"
+            ]
+          },
+          {
+            "id": "source",
+            "title": "Open the source to the side",
+            "description": "The text is the board: edit it beside the canvas and watch both stay in sync.\n[Open Source to the Side](command:eventStorming.openSource)",
+            "media": {
+              "markdown": "media/walkthrough/source.md"
+            },
+            "completionEvents": [
+              "onCommand:eventStorming.openSource"
             ]
           },
           {
             "id": "learn",
             "title": "Learn the basics",
-            "description": "Add stickies for events, commands and aggregates, connect them with arrows, then export the board as SVG or PNG.",
+            "description": "Add stickies for events, commands and aggregates, connect them with arrows, then export the board as PNG or SVG.",
             "media": {
               "markdown": "media/walkthrough/learn.md"
             },
@@ -120,6 +217,7 @@
     "build": "node esbuild.config.mjs",
     "watch": "node esbuild.config.mjs --watch",
     "typecheck": "tsc -p tsconfig.json",
+    "notices": "node scripts/third-party-notices.mjs",
     "vscode:prepublish": "node esbuild.config.mjs --production",
     "package": "vsce package --no-dependencies -o event-storming-modeler.vsix"
   },
@@ -129,6 +227,7 @@
     "@miragon/event-storming-dsl": "0.2.2",
     "@miragon/event-storming-renderer": "0.2.2",
     "@miragon/event-storming-schema-model": "0.2.1",
+    "@miragon/modeler-shell": "0.1.0",
     "diagram-js": "15.28.1",
     "didi": "12.0.0",
     "tiny-svg": "4.1.4",

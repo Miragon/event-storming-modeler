@@ -72,13 +72,13 @@ describe('EventStormingRenderer: note text', () => {
     expect(textLines(visuals)).toHaveLength(lineCount);
   });
 
-  it('renders a left-aligned, top-anchored document in regular #333 (not centered italic)', () => {
+  it('renders a left-aligned, top-anchored document in regular #1D1D1D (not centered italic)', () => {
     const texts = [...draw(note('first\nsecond')).querySelectorAll('text')] as SVGElement[];
     expect(texts.map((t) => t.textContent)).toEqual(['first', 'second']);
     texts.forEach((text, i) => {
       expect(text.style.textAnchor).toBe('start');
       expect(text.style.fontStyle).toBe('');
-      expect(text.style.fill).toBe('rgb(51, 51, 51)');
+      expect(text.style.fill).toBe('rgb(29, 29, 29)');
       expect(text.getAttribute('x')).toBe(String(STICKY_PADDING));
       expect(text.getAttribute('y')).toBe(String(TOP_BASELINE + i * STICKY_LINE_HEIGHT));
     });
@@ -212,12 +212,12 @@ describe('EventStormingRenderer: drawing ink', () => {
     ],
   };
 
-  // Regression: default drawings stroked a fixed near-black, invisible on `style dark` boards.
-  it('strokes default-colored drawings with the theme-aware ink variable (light fallback)', () => {
+  // Exports and other tools read the SVG attributes as they are: no CSS variable in paint (§10.2).
+  it('strokes default-colored drawings in the literal brand black', () => {
     const visuals = draw(drawingShape);
     const stroke = visuals.querySelector('polyline')!.style.stroke;
-    expect(stroke).toContain('var(--event-storming-drawing-ink');
-    expect(stroke.toLowerCase()).toContain('#1d1d1d');
+    expect(stroke).not.toContain('var(');
+    expect(stroke).toBe('rgb(29, 29, 29)');
   });
 
   it('keeps a user-picked color as a plain stroke', () => {
@@ -251,7 +251,7 @@ describe('EventStormingRenderer: type captions', () => {
     expect(caption.getAttribute('y')).toBe(String((shape['height'] as number) - 7));
     expect(caption.style.textAnchor).toBe('middle');
     expect(caption.style.fontSize).toBe('9px');
-    expect(caption.style.fill).toBe('rgb(96, 96, 96)');
+    expect(caption.style.fill).toBe('rgb(29, 29, 29)');
     // Plain attribute (not inline style) so exports and e2e selectors see it directly.
     expect(caption.getAttribute('font-weight')).toBe('300');
   });

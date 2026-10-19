@@ -1,4 +1,5 @@
 import type Canvas from 'diagram-js/lib/core/Canvas';
+import type ElementRegistry from 'diagram-js/lib/core/ElementRegistry';
 import type EventBus from 'diagram-js/lib/core/EventBus';
 import {
   isEventStormingConnection,
@@ -7,6 +8,7 @@ import {
   type EventStormingShape,
 } from '../model/di-types.js';
 import type EventStormingModeling from '../modeling/EventStormingModeling.js';
+import { READ_ONLY_CHANGED_EVENT, type EventStormingReadOnly } from '../read-only/index.js';
 import { isManualNoteBox, noteMetrics } from '../draw/styles.js';
 import {
   NOTE_BULLET_CLASS,
@@ -32,6 +34,19 @@ interface ActiveEdit {
   commit: () => void;
   /** Discards and closes (only for Escape). */
   cleanup: () => void;
+  /** What was typed so far, to reopen the same edit after an import. */
+  snapshot: () => SuspendedEdit;
+}
+
+/** An open edit taken down for an import: the element it belongs to and the uncommitted text. */
+interface SuspendedEdit {
+  elementId: string;
+  connection: boolean;
+  /** The field's raw value (the note editor's markdown), not yet sanitized. */
+  value: string;
+  selectionStart?: number | undefined;
+  selectionEnd?: number | undefined;
+  align?: NoteAlignState | undefined;
 }
 
 /**
@@ -61,15 +76,35 @@ export function sanitizeLabel(raw: string): string {
  * semantics, plus live bold/italic/bullet formatting and the floating alignment toolbar.
  */
 export default class EventStormingLabelEditing {
-  static $inject = ['eventBus', 'canvas', 'eventStormingModeling'];
+  static $inject = [
+    'eventBus',
+    'canvas',
+    'eventStormingModeling',
+    'elementRegistry',
+    'eventStormingReadOnly',
+  ];
 
   private active: ActiveEdit | null = null;
+  private suspended: SuspendedEdit | null = null;
+  private resumeTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(
     eventBus: EventBus,
     private readonly canvas: Canvas,
     private readonly modeling: EventStormingModeling,
+    private readonly elementRegistry?: ElementRegistry,
+    private readonly readOnly?: Pick<EventStormingReadOnly, 'isReadOnly'>,
   ) {
+    eventBus.on(READ_ONLY_CHANGED_EVENT, (event: { readOnly?: boolean }) => {
+      if (event.readOnly) this.cancel();
+    });
+    // Before the canvas tears down (priority 500): a field still open would blur when the
+    // container leaves the document, commit onto the destroyed diagram and queue a canvas focus.
+    eventBus.on('diagram.destroy', () => {
+      clearTimeout(this.resumeTimer);
+      this.suspended = null;
+      this.cancel();
+    });
     eventBus.on('element.dblclick', (event: { element?: unknown }) => {
       if (isEventStormingShape(event.element)) this.activate(event.element);
       else if (isEventStormingConnection(event.element)) this.activateConnection(event.element);
@@ -80,8 +115,66 @@ export default class EventStormingLabelEditing {
     );
   }
 
+  /**
+   * Takes an open edit down WITHOUT committing it, for an import that replaces the board: its
+   * element is about to be removed, so a commit (the importer's viewbox change triggers one)
+   * would land on a detached shape and be wiped with the history. Hosts re-import remote states
+   * while the user types; `resumeAfterImport` brings the editor back with the typed text.
+   */
+  suspend(): void {
+    clearTimeout(this.resumeTimer);
+    if (!this.active) return;
+    this.suspended = this.active.snapshot();
+    this.active.cleanup();
+  }
+
+  /**
+   * Reopens a suspended edit on the element with the same id, if the imported board still has
+   * it. Deferred to the next task, after the host has restored its viewbox around the import
+   * (a viewbox change commits an open editor).
+   */
+  resumeAfterImport(): void {
+    clearTimeout(this.resumeTimer);
+    if (!this.suspended) return;
+    this.resumeTimer = setTimeout(() => {
+      const edit = this.suspended;
+      this.suspended = null;
+      if (edit && !this.active) this.resume(edit);
+    }, 0);
+  }
+
+  private resume(edit: SuspendedEdit): void {
+    const element = this.elementRegistry?.get(edit.elementId);
+    if (edit.connection) {
+      if (!isEventStormingConnection(element)) return;
+      this.activateConnection(element);
+    } else {
+      if (!isEventStormingShape(element)) return;
+      this.activate(element);
+    }
+    const field = this.active?.field;
+    if (!field) return;
+    if (field instanceof HTMLTextAreaElement || field instanceof HTMLInputElement) {
+      field.value = edit.value;
+      if (field instanceof HTMLTextAreaElement) {
+        field.rows = Math.max(2, edit.value.split('\n').length);
+      }
+      field.setSelectionRange(
+        edit.selectionStart ?? edit.value.length,
+        edit.selectionEnd ?? edit.value.length,
+      );
+    } else {
+      noteMarkdownToDom(field, edit.value);
+      if (edit.align) this.restoreNoteAlign?.(edit.align);
+      placeCaretAtEnd(field);
+    }
+  }
+
+  private restoreNoteAlign: ((align: NoteAlignState) => void) | undefined;
+
   activate(element: EventStormingShape): void {
     this.active?.commit();
+    if (this.readOnly?.isReadOnly()) return;
     if (element.eventStormingType === 'drawing') return; // pure geometry, no label
     if (element.eventStormingType === 'note') {
       this.activateNote(element);
@@ -118,6 +211,7 @@ export default class EventStormingLabelEditing {
       field.removeEventListener('blur', onBlur);
       field.remove();
       this.active = null;
+      this.canvas.restoreFocus?.();
     };
     const commit = () => {
       if (done) return;
@@ -148,7 +242,14 @@ export default class EventStormingLabelEditing {
     field.addEventListener('keydown', onKey as EventListener);
     field.addEventListener('blur', onBlur);
 
-    this.active = { field, commit, cleanup };
+    const snapshot = (): SuspendedEdit => ({
+      elementId: element.id,
+      connection: false,
+      value: field.value,
+      selectionStart: field.selectionStart ?? undefined,
+      selectionEnd: field.selectionEnd ?? undefined,
+    });
+    this.active = { field, commit, cleanup, snapshot };
   }
 
   /**
@@ -249,6 +350,8 @@ export default class EventStormingLabelEditing {
       editor.remove();
       toolbar.remove();
       this.active = null;
+      this.restoreNoteAlign = undefined;
+      this.canvas.restoreFocus?.();
     };
     const commit = () => {
       if (done) return;
@@ -294,7 +397,19 @@ export default class EventStormingLabelEditing {
     editor.addEventListener('paste', onPaste as EventListener);
 
     refreshToolbar();
-    this.active = { field: editor, commit, cleanup };
+    this.restoreNoteAlign = (restored) => {
+      align.horizontal = restored.horizontal;
+      align.vertical = restored.vertical;
+      applyAlignPreview(editor, align);
+      refreshToolbar();
+    };
+    const snapshot = (): SuspendedEdit => ({
+      elementId: element.id,
+      connection: false,
+      value: domToNoteMarkdown(editor),
+      align: { ...align },
+    });
+    this.active = { field: editor, commit, cleanup, snapshot };
   }
 
   /**
@@ -303,6 +418,7 @@ export default class EventStormingLabelEditing {
    */
   activateConnection(conn: EventStormingConnection): void {
     this.active?.commit();
+    if (this.readOnly?.isReadOnly()) return;
 
     const container = this.canvas.getContainer();
     const scale = this.canvas.zoom();
@@ -331,6 +447,7 @@ export default class EventStormingLabelEditing {
       field.removeEventListener('blur', onBlur);
       field.remove();
       this.active = null;
+      this.canvas.restoreFocus?.();
     };
     const commit = () => {
       if (done) return;
@@ -355,11 +472,25 @@ export default class EventStormingLabelEditing {
     field.addEventListener('keydown', onKey as EventListener);
     field.addEventListener('blur', onBlur);
 
-    this.active = { field, commit, cleanup };
+    const snapshot = (): SuspendedEdit => ({
+      elementId: conn.id,
+      connection: true,
+      value: field.value,
+      selectionStart: field.selectionStart ?? undefined,
+      selectionEnd: field.selectionEnd ?? undefined,
+    });
+    this.active = { field, commit, cleanup, snapshot };
   }
 
   cancel(): void {
     this.active?.cleanup();
+  }
+
+  /** The edit open right now (its element and the uncommitted text), for hosts and tests. */
+  openEdit(): { elementId: string; value: string } | undefined {
+    if (!this.active) return undefined;
+    const { elementId, value } = this.active.snapshot();
+    return { elementId, value };
   }
 }
 
@@ -398,6 +529,15 @@ function noteCommitProperties(
     properties.alignVertical = align.vertical === 'top' ? undefined : align.vertical;
   }
   return properties;
+}
+
+function placeCaretAtEnd(field: HTMLElement): void {
+  const range = document.createRange();
+  range.selectNodeContents(field);
+  range.collapse(false);
+  const selection = window.getSelection();
+  selection?.removeAllRanges();
+  selection?.addRange(range);
 }
 
 /** Bold/italic state at the caret — absent in jsdom (the button simply never shows active). */

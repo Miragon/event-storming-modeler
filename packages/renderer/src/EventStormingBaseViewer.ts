@@ -3,13 +3,16 @@ import type { ModuleDeclaration } from 'didi';
 import type Canvas from 'diagram-js/lib/core/Canvas';
 import type CommandStack from 'diagram-js/lib/command/CommandStack';
 import type EventBus from 'diagram-js/lib/core/EventBus';
+import type PopupMenu from 'diagram-js/lib/features/popup-menu/PopupMenu';
 import type { EventStormingBoard } from '@miragon/event-storming-schema-model';
 import { parseDSLWithDiagnostics, serializeDSL } from '@miragon/event-storming-dsl';
 import { saveSVG } from './io/saveSvg.js';
 import type EventStormingImporter from './io/EventStormingImporter.js';
 import type EventStormingExporter from './io/EventStormingExporter.js';
 import type BoardBounds from './board-bounds/BoardBounds.js';
-import type { ImportWarning } from './io/types.js';
+import type EventStormingLabelEditing from './label-editing/EventStormingLabelEditing.js';
+import { ROOT_ID, type ImportWarning } from './io/types.js';
+import type { FreeRectInsets } from './palette/EventStormingPaletteProvider.js';
 
 export interface EventStormingViewerOptions {
   /** Host element. If missing, a detached <div> is created (can be attached later via attachTo). */
@@ -18,9 +21,32 @@ export interface EventStormingViewerOptions {
   height?: number | string;
   /** Concatenated to the end of the module list (extension point). */
   additionalModules?: ModuleDeclaration[];
+  /**
+   * Bind Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z and Cmd/Ctrl+Y to the board's undo/redo (default true).
+   * Pass false when the host owns the history (the VS Code document), so the keys reach it.
+   */
+  undoRedoKeys?: boolean | undefined;
+  /**
+   * The margins of the container that chrome covers (palette row, zoom panel). An element created
+   * from the palette with Enter or Space lands in the centre of what is left (guide §5.5); without
+   * it, in the centre of the container.
+   */
+  freeRectInsets?: (() => FreeRectInsets) | undefined;
 }
 
 export type EventCallback<T = unknown> = (event: T) => void;
+
+/**
+ * Board ids become diagram-js ids next to the root elements; a collision would throw only after
+ * the previous board was cleared. Checked first, so such a board is rejected without a trace.
+ */
+function assertNoEngineIds(board: EventStormingBoard): void {
+  for (const { id } of [...board.elements, ...board.edges]) {
+    if (id === ROOT_ID || id.startsWith('__implicitroot')) {
+      throw new Error(`Element id "${id}" is reserved for the board itself.`);
+    }
+  }
+}
 
 function sizeToCss(value: number | string): string {
   return typeof value === 'number' ? `${value}px` : value;
@@ -56,7 +82,12 @@ export abstract class EventStormingBaseViewer {
   private _ensureDiagram(): Diagram {
     if (!this._diagram) {
       const modules = [...this._getModules(), ...(this._options.additionalModules ?? [])];
-      this._diagram = new Diagram({ canvas: { container: this._container }, modules });
+      this._diagram = new Diagram({
+        canvas: { container: this._container },
+        modules,
+        eventStormingKeyboard: { undoRedoKeys: this._options.undoRedoKeys ?? true },
+        eventStormingPalette: { freeRectInsets: this._options.freeRectInsets },
+      });
     }
     return this._diagram;
   }
@@ -78,21 +109,20 @@ export abstract class EventStormingBaseViewer {
     const diagram = this._ensureDiagram();
     const eventBus = diagram.get<EventBus>('eventBus');
     const importer = diagram.get<EventStormingImporter>('eventStormingImporter');
+    assertNoEngineIds(board);
+    const labelEditing = diagram.get<EventStormingLabelEditing>('eventStormingLabelEditing', false);
+    labelEditing?.suspend();
+    diagram.get<PopupMenu>('popupMenu', false)?.close();
     importer.clear();
     const warnings = importer.import(board);
-    this._applyStyleClass(board.config.style);
     // Discard the PREVIOUS board's undo history: undo on orphaned elements would otherwise
-    // crash or insert zombie elements into the new board.
-    diagram.get<CommandStack>('commandStack').clear();
+    // crash or insert zombie elements into the new board. Silently, because an import is no
+    // content change (hosts would echo it back), and only where a stack exists: the viewers
+    // have none.
+    diagram.get<CommandStack>('commandStack', false)?.clear(false);
     eventBus.fire('import.done', { warnings });
+    labelEditing?.resumeAfterImport();
     return { warnings };
-  }
-
-  /** DSL `style` directive as a CSS class on the container (`event-storming-dark` etc.). */
-  private _applyStyleClass(style?: string): void {
-    const cls = this._container.classList;
-    for (const s of ['classic', 'dark']) cls.remove(`event-storming-${s}`);
-    if (style && style !== 'classic') cls.add(`event-storming-${style}`);
   }
 
   /** Load `.storm` DSL text (internally parse -> importMap). Parser findings land in the warnings. */
@@ -128,7 +158,7 @@ export abstract class EventStormingBaseViewer {
   }
 
   /** Own implementation (not a diagram-js primitive): attach the container to `target`. */
-  attachTo(target: HTMLElement): void {
+  attachTo(target: Element): void {
     target.appendChild(this._container);
     this.get<Canvas>('canvas').resized();
   }

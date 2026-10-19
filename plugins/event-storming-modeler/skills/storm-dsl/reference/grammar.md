@@ -79,8 +79,8 @@ level big-picture|process|design
 - The label is everything between the keyword and the coordinate tuple, trimmed. It may contain
   spaces, punctuation and parentheses.
 - Coordinates are optional. Missing ⇒ `[0, 0]` (written back explicitly). A tuple that is present
-  but malformed (`[` without a readable pair) rejects the line into `rawPassthrough` rather than
-  swallowing it into the label.
+  but malformed (`[` without a readable pair, or a number beyond ±1e38) rejects the line into
+  `rawPassthrough` rather than swallowing it into the label.
 - Suffixes are only looked up **after** the tuple, and in this extraction order: `(on …)` first
   (its host name runs to the final `)`, so it may itself contain other suffix-looking text), then
   `(id …)`, `(align …)`, `(size …)`, `(color …)`.
@@ -102,9 +102,15 @@ Charset `[A-Za-z0-9_-]+` — deliberately tight so an id can never collide with 
   `<prefix>_<slug(label)>`, with a `_2`, `_3`, … suffix on collision. Prefixes: `event`, `cmd`,
   `actor`, `agg`, `policy`, `read`, `ext`, `hot`, `note`, `draw`. `slug` lowercases and replaces
   every run of non-alphanumerics with `_`.
-- The serializer writes `(id …)` **only** when it is needed: the element's serialized name is shared
-  by two or more stickies, or it literally starts with `#`. An explicit but unnecessary id is
-  accepted on parse and dropped again on the next serialize.
+- The serializer writes `(id …)` **only** when the id would not come back without it: the
+  element's serialized name is shared by two or more stickies, it literally starts with `#`, or the
+  id differs from the one the parser would allocate at that line. The last case covers a sticky
+  created on the canvas (`event_3`), a renamed one (it keeps the id derived from its old label) and
+  any explicit id you chose. That way every sticky keeps its id across a save and a re-open, and
+  tools that anchor todos or links to it keep finding it. An explicit id equal to the auto-allocated
+  one is dropped on the next serialize.
+- `event-storming-root` and ids starting with `__implicitroot` are reserved for the board itself: a
+  sticky that claims one gets a fresh id and a diagnostic.
 - A malformed id yields a diagnostic; a duplicate id yields a diagnostic and the element gets a
   fresh one.
 - Notes and drawings cannot carry `(id …)` — they are never referenced. Attempting it is a
@@ -135,7 +141,7 @@ note <Text> [x, y] (color …) (size <w>x<h>) (align <h> <v>) (on <Host Label>)
 
 - `(size …)` — positive numbers, board pixels. Absent = the note auto-sizes to its text (minimum
   180 × 110). The serializer writes no spaces around the `x`; the parser tolerates them. A malformed
-  or non-positive size is a diagnostic and is ignored.
+  or non-positive size, or one beyond 1e38, is a diagnostic and is ignored.
 - `(align …)` — `left|center|right` then `top|middle|bottom`, both words always together. The
   serializer emits the suffix only when at least one axis differs from the default `left top`, so
   unaligned boards stay byte-identical. `(align left top)` and no suffix are the same board.
@@ -228,7 +234,8 @@ Trailing newline at the end of the file.
 - comments move to the end of the file;
 - missing coordinates become explicit `[0, 0]`;
 - coordinates are rounded to 3 decimals;
-- unnecessary `(id …)` suffixes are dropped, necessary ones added (and arrows rewritten to `#id`);
+- `(id …)` suffixes equal to the auto-allocated id are dropped, necessary ones added (and arrows
+  rewritten to `#id` where the name is ambiguous);
 - `(align left top)` is dropped;
 - labels are escaped as above;
 - elements are emitted before arrows.
@@ -241,20 +248,21 @@ Everything else — labels, colours, sizes, pins, unknown lines, comment text �
 `{ line, message, text }` with a 1-based line number and the comment-stripped source line.
 Diagnostics from the line scan come first, then attachment diagnostics, then arrow diagnostics.
 
-| Message                                                              | Cause                                                                                          |
-| -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `Line could not be interpreted (kept losslessly in rawPassthrough)`  | unknown `style`/`level` value, malformed coordinates, a `line` with < 2 points, an empty label |
-| `Id: could not read "…"`                                             | `(id …)` outside `A-Za-z0-9_-`                                                                 |
-| `Id: "…" is already taken — the element got a fresh id`              | duplicate explicit id                                                                          |
-| `Id: a note cannot be referenced` / `a drawing cannot be referenced` | `(id …)` on a note or drawing                                                                  |
-| `Size: a <kind> cannot be resized`                                   | `(size …)` on a non-note                                                                       |
-| `Size: could not read "…"`                                           | malformed or non-positive `(size …)`                                                           |
-| `Align: a <kind> cannot be aligned`                                  | `(align …)` on a non-note                                                                      |
-| `Align: could not read "…"`                                          | unknown axis words in `(align …)`                                                              |
-| `Attachment: a <kind> cannot be pinned`                              | `(on …)` on something other than actor/hotspot/note                                            |
-| `Attachment: "…" not found`                                          | unresolved host                                                                                |
-| `Attachment: "…" is a <kind>`                                        | host is not a host kind                                                                        |
-| `Arrow: "…" not found`                                               | unresolved endpoint — the arrow does not exist                                                 |
-| `Arrow: "…" is a <kind> — arrows may only connect stickies`          | endpoint resolves to a note or drawing                                                         |
+| Message                                                                 | Cause                                                                                                                                                 |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Line could not be interpreted (kept losslessly in rawPassthrough)`     | unknown `style`/`level` value, malformed coordinates (also a number beyond ±1e38, too large for the canvas), a `line` with < 2 points, an empty label |
+| `Id: could not read "…"`                                                | `(id …)` outside `A-Za-z0-9_-`                                                                                                                        |
+| `Id: "…" is already taken — the element got a fresh id`                 | duplicate explicit id                                                                                                                                 |
+| `Id: "…" is reserved for the board itself — the element got a fresh id` | `(id event-storming-root)` or an id starting with `__implicitroot`                                                                                    |
+| `Id: a note cannot be referenced` / `a drawing cannot be referenced`    | `(id …)` on a note or drawing                                                                                                                         |
+| `Size: a <kind> cannot be resized`                                      | `(size …)` on a non-note                                                                                                                              |
+| `Size: could not read "…"`                                              | malformed, non-positive or beyond 1e38 `(size …)`                                                                                                     |
+| `Align: a <kind> cannot be aligned`                                     | `(align …)` on a non-note                                                                                                                             |
+| `Align: could not read "…"`                                             | unknown axis words in `(align …)`                                                                                                                     |
+| `Attachment: a <kind> cannot be pinned`                                 | `(on …)` on something other than actor/hotspot/note                                                                                                   |
+| `Attachment: "…" not found`                                             | unresolved host                                                                                                                                       |
+| `Attachment: "…" is a <kind>`                                           | host is not a host kind                                                                                                                               |
+| `Arrow: "…" not found`                                                  | unresolved endpoint — the arrow does not exist                                                                                                        |
+| `Arrow: "…" is a <kind> — arrows may only connect stickies`             | endpoint resolves to a note or drawing                                                                                                                |
 
 An empty `diagnostics` array is the practical definition of "this file is clean".

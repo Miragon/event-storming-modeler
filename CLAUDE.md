@@ -38,6 +38,11 @@ Enforced twice — ESLint (`no-restricted-imports`/`no-restricted-globals`) **an
 portless service install` — see [`CONTRIBUTING.md`](CONTRIBUTING.md)). `npm run dev:webapp:plain`
   for plain Vite on `:5180`. · `npm run dev:vscode`
 - `npm test` — Vitest · `npm run typecheck` · `npm run lint` (ESLint + typecheck)
+- `npm run test:browser` — Vitest in Chromium (renderer integration, the `@miragon/modeler-api`
+  conformance kit) · `npm run test:e2e` — Playwright, two projects: `webapp` and `vscode-webview`
+  (the webview inside the shell's VS Code stub, incl. the shell conformance kit); one project with
+  `npm run test:e2e -- --project=vscode-webview`, other ports via `E2E_PORT` /
+  `E2E_WEBVIEW_PORT` (default 5180 / 5190)
 - `npm run format` — Prettier · `npm run depcruise` — check the module graph
 
 Requirements: Node ≥ 22.13, npm. Build packages before running tests (workspace deps resolve to
@@ -83,6 +88,17 @@ libraries to npm (with provenance) and the VS Code extension
   diagnostics). Install once with `/plugin marketplace add Miragon/event-storming-modeler` and
   `/plugin install event-storming-modeler@event-storming`; the skill files are readable directly
   under `plugins/event-storming-modeler/skills/` either way.
+- The renderer implements the collaborative-modeler contract
+  [`@miragon/modeler-api`](https://www.npmjs.com/package/@miragon/modeler-api)
+  (`createCollaborativeModeler` / `createCollaborativeViewer`, notation `event-storming`, in
+  [`packages/renderer/src/collaborative/`](packages/renderer/src/collaborative/)); its conformance
+  kit runs in `npm run test:browser`. The DOM-free packages may take only type-only imports from
+  the contract (ESLint and dependency-cruiser). The elements surface lists stickies only: their ids
+  survive a save and re-open because the serializer writes `(id …)` back whenever the parser would
+  not derive the same id at that line; notes, drawings and arrows have no id grammar yet. New
+  sticky ids come from a per-instance counter (`allocateId`), so stickies two peers add at the same
+  time can collide (`event_1`); the conformance test accepts the kit's advisory for it (contract 1.1
+  only recommends collision-free ids).
 - Contributor onboarding in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Design system (mandatory)
@@ -96,14 +112,47 @@ https://raw.githubusercontent.com/Miragon/corporate-identity/main/plugins/mirago
 Install once: `/plugin marketplace add Miragon/corporate-identity` then
 `/plugin install miragon-brand@miragon`.
 
-Brand tokens are vendored from that skill (`cd-tokens.generated.css`) — do not fork hex values;
-re-copy from the skill to update. Reference implementation in this repo: tokens
-[`packages/renderer/src/theme/palette.ts`](packages/renderer/src/theme/palette.ts) · drift test
-[`packages/renderer/test/theme.sync.test.ts`](packages/renderer/test/theme.sync.test.ts) · canvas
+The design-system files are vendored **unchanged** from that skill (design system 1.12.0) into
+[`packages/renderer/src/theme/`](packages/renderer/src/theme/): `cd-tokens.generated.css`,
+`cd-tokens.generated.json` and `cd-canvas.css`. The two CSS files carry one extra first line, the
+vendoring header; the JSON is byte-identical. Never edit or reformat them (Prettier-ignored, marked
+`linguist-generated`) and never fork a hex value: re-copy all three from the skill's `assets/` to
+update, re-add the header, and run `npm test`.
+[`event-storming.css`](packages/renderer/src/assets/event-storming.css) starts with
+`@import '../theme/cd-tokens.generated.css' layer(event-storming-tokens)`, then `diagram-js.css`,
+then `cd-canvas.css` (unlayered, so its `--bio-*`/`.djs-parent` mapping beats diagram-js's
+defaults); both apps get the tokens through the renderer CSS and import no token file themselves.
+Drift tests: [`packages/renderer/test/theme.sync.test.ts`](packages/renderer/test/theme.sync.test.ts)
+(import order and layer, the header, the JSON roles against the CSS so a partial re-copy fails,
+every `MIRAGON` value in [`palette.ts`](packages/renderer/src/theme/palette.ts) against its `--cd-*`
+token, no colour literal and no fixed palette token in `event-storming.css` (it reads the
+`--cd-ui-*` roles only), no `style dark` rendering, overlays below the palette, palette rules scoped
+away from the shell) and [`apps/vscode/test/tokens.sync.test.ts`](apps/vscode/test/tokens.sync.test.ts)
+(the shell's `SHELL` sizes against the vendored `shell` group). The canvas drawing keeps literal
+light colours in its SVG attributes (`draw/styles.ts`), never a `var()`. The DSL's `style dark`
+stays in the board config for the round-trip, but nothing renders it (guide §10.7).
+
+**VS Code chrome = `@miragon/modeler-shell`.** The webview
+([`apps/vscode/src/webview/main.ts`](apps/vscode/src/webview/main.ts)) mounts the shared Miragon
+modeler chrome (menu, palette skin, chrome tooltip, zoom panel and keys, fit, problems pill, status
+box, empty-file hint, theme bridge, key interception); the extension host uses the shell's webview
+HTML/CSP and theme bridge. Stylesheet order there: fonts, the renderer, `./style.css` (modeler-owned
+content only, `--cd-ui-*` roles only, never `var(--vscode-*)`), `@miragon/modeler-shell/shell.css`
+last. The renderer's own palette rules apply only to `.djs-palette:not([data-chrome='palette'])`,
+so a shell-skinned palette wears the shell's look alone. **Renderers never import the shell** — only
+the apps (and `e2e/`) do; `packages/*` reaching `@miragon/modeler-shell` fails ESLint and
+dependency-cruiser. The webview runs on `createCollaborativeModeler` (the tested contract path),
+passes the shell's fit insets as `freeRectInsets` (keyboard creation from the palette) and toggles
+the renderer's `eventStormingReadOnly` lock together with `shell.setReadOnly`. The web app does not
+use the shell yet. The VSIX ships `apps/vscode/THIRD_PARTY_NOTICES.md`, generated from the bundles
+(`npm run notices -w apps/vscode`; a unit test fails when it is stale).
+
+Reference implementation in this repo: tokens
+[`packages/renderer/src/theme/palette.ts`](packages/renderer/src/theme/palette.ts) · canvas
 colours [`packages/renderer/src/draw/styles.ts`](packages/renderer/src/draw/styles.ts) · in-canvas
 chrome [`packages/renderer/src/assets/event-storming.css`](packages/renderer/src/assets/event-storming.css)
 · app chrome + toast `apps/webapp/src/{style.css,toast.ts,main.ts}` · VS Code webview
-[`apps/vscode/src/webview/style.css`](apps/vscode/src/webview/style.css).
+[`apps/vscode/src/webview/`](apps/vscode/src/webview/).
 
 ## Code Style
 

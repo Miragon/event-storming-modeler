@@ -11,6 +11,11 @@
 
 export class Disposable {
   constructor(private readonly _dispose: () => void) {}
+  static from(...disposables: Array<{ dispose(): unknown }>): Disposable {
+    return new Disposable(() => {
+      for (const disposable of disposables) disposable.dispose();
+    });
+  }
   dispose(): void {
     this._dispose();
   }
@@ -24,6 +29,9 @@ export class EventEmitter<T> {
   };
   fire(data: T): void {
     for (const listener of [...this.listeners]) listener(data);
+  }
+  listenerCount(): number {
+    return this.listeners.size;
   }
   dispose(): void {
     this.listeners.clear();
@@ -53,16 +61,43 @@ export class CancellationTokenSource {
   }
 }
 
-export class Range {
+export class Position {
   constructor(
-    readonly start: unknown,
-    readonly end: unknown,
+    readonly line: number,
+    readonly character: number,
   ) {}
 }
 
+export class Range {
+  readonly start: Position;
+  readonly end: Position;
+  constructor(start: Position, end: Position);
+  constructor(startLine: number, startCharacter: number, endLine: number, endCharacter: number);
+  constructor(
+    startOrLine: Position | number,
+    endOrCharacter: Position | number,
+    endLine?: number,
+    endCharacter?: number,
+  ) {
+    if (typeof startOrLine === 'number' && typeof endOrCharacter === 'number') {
+      this.start = new Position(startOrLine, endOrCharacter);
+      this.end = new Position(endLine ?? startOrLine, endCharacter ?? endOrCharacter);
+    } else {
+      this.start = startOrLine as Position;
+      this.end = endOrCharacter as Position;
+    }
+  }
+}
+
+export interface RecordedEdit {
+  uri: unknown;
+  range: Range;
+  text: string;
+}
+
 export class WorkspaceEdit {
-  readonly edits: Array<{ uri: unknown; range: unknown; text: string }> = [];
-  replace(uri: unknown, range: unknown, text: string): void {
+  readonly edits: RecordedEdit[] = [];
+  replace(uri: unknown, range: Range, text: string): void {
     this.edits.push({ uri, range, text });
   }
 }
@@ -94,13 +129,82 @@ export class Uri {
   }
 }
 
-// The document-change bus the host subscribes to; tests fire it via `vscodeMock`.
-const docChangeEmitter = new EventEmitter<{ document: unknown }>();
+export enum DiagnosticSeverity {
+  Error = 0,
+  Warning = 1,
+  Information = 2,
+  Hint = 3,
+}
+
+export class Diagnostic {
+  source?: string;
+  constructor(
+    readonly range: Range,
+    readonly message: string,
+    readonly severity: DiagnosticSeverity = DiagnosticSeverity.Error,
+  ) {}
+}
+
+export enum ViewColumn {
+  Active = -1,
+  Beside = -2,
+}
+
+export enum ColorThemeKind {
+  Light = 1,
+  Dark = 2,
+  HighContrast = 3,
+  HighContrastLight = 4,
+}
+
+export class MockDiagnosticCollection {
+  private readonly entries = new Map<string, readonly Diagnostic[]>();
+  disposed = false;
+  constructor(readonly name: string) {}
+  set(uri: Uri, diagnostics: readonly Diagnostic[]): void {
+    this.entries.set(uri.toString(), diagnostics);
+  }
+  get(uri: Uri): readonly Diagnostic[] | undefined {
+    return this.entries.get(uri.toString());
+  }
+  has(uri: Uri): boolean {
+    return this.entries.has(uri.toString());
+  }
+  delete(uri: Uri): void {
+    this.entries.delete(uri.toString());
+  }
+  clear(): void {
+    this.entries.clear();
+  }
+  dispose(): void {
+    this.disposed = true;
+    this.entries.clear();
+  }
+}
+
+// The buses the host subscribes to; tests fire them via `vscodeMock`.
+const docChangeEmitter = new EventEmitter<{ document: unknown; contentChanges: unknown[] }>();
+const colorThemeEmitter = new EventEmitter<{ kind: number }>();
+const configurationEmitter = new EventEmitter<{ affectsConfiguration(section: string): boolean }>();
+
+const configuration = new Map<string, unknown>();
 
 export const workspace = {
   workspaceFolders: undefined as ReadonlyArray<{ uri: Uri }> | undefined,
-  onDidChangeTextDocument(listener: (e: { document: unknown }) => void): Disposable {
+  onDidChangeTextDocument(
+    listener: (e: { document: unknown; contentChanges: unknown[] }) => void,
+  ): Disposable {
     return docChangeEmitter.event(listener);
+  },
+  onDidChangeConfiguration(
+    listener: (e: { affectsConfiguration(section: string): boolean }) => void,
+  ): Disposable {
+    return configurationEmitter.event(listener);
+  },
+  getConfiguration(section?: string): { get<T>(key: string): T | undefined } {
+    return {
+      get: <T>(key: string) => configuration.get(section ? `${section}.${key}` : key) as T,
+    };
   },
   applyEdit(_edit: WorkspaceEdit): Promise<boolean> {
     return Promise.resolve(true);
@@ -128,8 +232,16 @@ interface RegisteredEditor {
 }
 
 const registeredEditors: RegisteredEditor[] = [];
+const registeredCommands = new Map<string, (...args: unknown[]) => unknown>();
+const executedCommands: unknown[][] = [];
+const diagnosticCollections: MockDiagnosticCollection[] = [];
 
 export const window = {
+  activeColorTheme: { kind: ColorThemeKind.Light as number },
+  activeTextEditor: undefined as { document: { uri: Uri } } | undefined,
+  onDidChangeActiveColorTheme(listener: (theme: { kind: number }) => void): Disposable {
+    return colorThemeEmitter.event(listener);
+  },
   showInformationMessage(_message: string, ..._items: string[]): Promise<string | undefined> {
     return Promise.resolve(undefined);
   },
@@ -146,11 +258,23 @@ export const window = {
 };
 
 export const commands = {
-  registerCommand(_command: string, _callback: (...args: unknown[]) => unknown): Disposable {
-    return new Disposable(() => {});
+  registerCommand(command: string, callback: (...args: unknown[]) => unknown): Disposable {
+    registeredCommands.set(command, callback);
+    return new Disposable(() => {
+      if (registeredCommands.get(command) === callback) registeredCommands.delete(command);
+    });
   },
-  executeCommand(_command: string, ..._rest: unknown[]): Promise<unknown> {
+  executeCommand(command: string, ...rest: unknown[]): Promise<unknown> {
+    executedCommands.push([command, ...rest]);
     return Promise.resolve(undefined);
+  },
+};
+
+export const languages = {
+  createDiagnosticCollection(name: string): MockDiagnosticCollection {
+    const collection = new MockDiagnosticCollection(name);
+    diagnosticCollections.push(collection);
+    return collection;
   },
 };
 
@@ -159,9 +283,21 @@ export const commands = {
  * (never from `'vscode'`) so the extension source stays typed against `@types/vscode`.
  */
 export const vscodeMock = {
-  /** Simulate an editor change event (echo or external edit) for the given document. */
-  fireDidChangeTextDocument(document: unknown): void {
-    docChangeEmitter.fire({ document });
+  /**
+   * Simulate an editor change event (echo or external edit) for the given document; pass no
+   * content changes for the event VS Code fires when only the dirty state changes (save).
+   */
+  fireDidChangeTextDocument(document: unknown, contentChanges: unknown[] = [{}]): void {
+    docChangeEmitter.fire({ document, contentChanges });
+  },
+  /** Switch the color theme the way VS Code does: the kind changes, then the event fires. */
+  setColorThemeKind(kind: ColorThemeKind): void {
+    window.activeColorTheme = { kind };
+    colorThemeEmitter.fire(window.activeColorTheme);
+  },
+  setConfiguration(key: string, value: unknown): void {
+    configuration.set(key, value);
+    configurationEmitter.fire({ affectsConfiguration: (section) => key.startsWith(section) });
   },
   /** The provider instance a `register(...)` call handed to `registerCustomEditorProvider`. */
   lastRegisteredProvider<T>(): T {
@@ -172,10 +308,34 @@ export const vscodeMock = {
   registeredEditors(): readonly RegisteredEditor[] {
     return registeredEditors;
   },
+  registeredCommandIds(): string[] {
+    return [...registeredCommands.keys()];
+  },
+  /** Every `vscode.commands.executeCommand` call, as `[command, ...args]`. */
+  executedCommands(): readonly unknown[][] {
+    return executedCommands;
+  },
+  /** Runs a command the way the Command Palette does (without arguments). */
+  runCommand(command: string, ...args: unknown[]): unknown {
+    const callback = registeredCommands.get(command);
+    if (!callback) throw new Error(`Command ${command} is not registered.`);
+    return callback(...args);
+  },
+  diagnosticCollections(): readonly MockDiagnosticCollection[] {
+    return diagnosticCollections;
+  },
   /** Reset shared state between tests. */
   reset(): void {
     registeredEditors.length = 0;
+    registeredCommands.clear();
+    executedCommands.length = 0;
+    diagnosticCollections.length = 0;
+    configuration.clear();
     docChangeEmitter.dispose();
+    colorThemeEmitter.dispose();
+    configurationEmitter.dispose();
+    window.activeColorTheme = { kind: ColorThemeKind.Light };
+    window.activeTextEditor = undefined;
     workspace.workspaceFolders = undefined;
   },
 };

@@ -1,30 +1,66 @@
 import * as vscode from 'vscode';
-import { getWebviewHtml } from './webviewHtml.js';
-import { exportImageToFile } from './exportImage.js';
-import type { HostToWebview, WebviewToHost } from './protocol.js';
+import {
+  connectThemeBridge,
+  currentAppearance,
+  renderWebviewHtml,
+} from '@miragon/modeler-shell/vscode/extension';
+import { BoardSession } from './BoardSession.js';
+import {
+  BOARD_VIEW_TYPE,
+  registerSideBySideCommands,
+  registerWebviewCommands,
+} from './commands.js';
+import { DIAGNOSTIC_COLLECTION_NAME } from './diagnostics.js';
+import type { HostToWebview, WebviewCommand } from './protocol.js';
+import { WEBVIEW_THEMES } from './themes.js';
 
 /**
  * CustomTextEditor for `.storm`. The document (Event Storming DSL text) remains the source of
  * truth — VS Code handles dirty state, saving, Git, diff, and file undo "for free". The webview
- * renders the board (diagram-js modeler) and mirrors graphical changes back into the document via
- * WorkspaceEdit.
+ * renders the board (diagram-js modeler inside the shared modeler shell) and mirrors graphical
+ * changes back into the document via WorkspaceEdit.
  */
 export class EventStormingEditorProvider implements vscode.CustomTextEditorProvider {
-  public static readonly viewType = 'eventStorming.boardEditor';
+  public static readonly viewType = BOARD_VIEW_TYPE;
 
   public static register(context: vscode.ExtensionContext): vscode.Disposable {
-    return vscode.window.registerCustomEditorProvider(
+    const provider = new EventStormingEditorProvider(context);
+    const registration = vscode.window.registerCustomEditorProvider(
       EventStormingEditorProvider.viewType,
-      new EventStormingEditorProvider(context),
+      provider,
       {
-        // Diagram editor: preserve state (zoom/selection) across tab switches.
+        // A hidden tab keeps document, view and selection (and reports 0 × 0 meanwhile).
         webviewOptions: { retainContextWhenHidden: true },
         supportsMultipleEditorsPerDocument: false,
       },
     );
+    return vscode.Disposable.from(
+      registration,
+      provider.diagnostics,
+      ...registerWebviewCommands((name) => provider.runCommand(name)),
+      ...registerSideBySideCommands(() => provider.activeDocumentUri()),
+    );
   }
 
+  private readonly diagnostics = vscode.languages.createDiagnosticCollection(
+    DIAGNOSTIC_COLLECTION_NAME,
+  );
+  private activePanel: vscode.WebviewPanel | undefined;
+  private readonly documentOfPanel = new WeakMap<vscode.WebviewPanel, vscode.Uri>();
+
   private constructor(private readonly context: vscode.ExtensionContext) {}
+
+  /** The document of the focused board, if a board editor has the focus. */
+  public activeDocumentUri(): vscode.Uri | undefined {
+    return this.activePanel ? this.documentOfPanel.get(this.activePanel) : undefined;
+  }
+
+  /** Forwards a Command Palette command to the focused board; false when none is focused. */
+  public runCommand(name: WebviewCommand): boolean {
+    if (!this.activePanel) return false;
+    void this.activePanel.webview.postMessage({ type: 'command', name } satisfies HostToWebview);
+    return true;
+  }
 
   public async resolveCustomTextEditor(
     document: vscode.TextDocument,
@@ -32,73 +68,34 @@ export class EventStormingEditorProvider implements vscode.CustomTextEditorProvi
     _token: vscode.CancellationToken,
   ): Promise<void> {
     const webview = webviewPanel.webview;
-    webview.options = {
-      enableScripts: true,
-      localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, 'dist')],
-    };
-    webview.html = getWebviewHtml(webview, this.context.extensionUri);
-
-    const post = (msg: HostToWebview): Thenable<boolean> => webview.postMessage(msg);
-
-    // Texts the webview itself produced — to suppress the echo (an own change comes back as
-    // onDidChangeTextDocument) and NOT reset the canvas. A SET (not a single value): for edits A,B
-    // in quick succession, EVERY echo must be suppressed, regardless of the order in which the
-    // change events arrive.
-    const suppressEcho = new Set<string>();
-
-    const changeSub = vscode.workspace.onDidChangeTextDocument((e) => {
-      if (e.document.uri.toString() !== document.uri.toString()) return;
-      const text = document.getText();
-      if (suppressEcho.has(text)) {
-        suppressEcho.delete(text);
-        return;
-      }
-      void post({ type: 'update', text });
+    const dist = vscode.Uri.joinPath(this.context.extensionUri, 'dist');
+    webview.options = { enableScripts: true, localResourceRoots: [dist] };
+    const asset = (file: string): string =>
+      webview.asWebviewUri(vscode.Uri.joinPath(dist, file)).toString();
+    webview.html = renderWebviewHtml({
+      cspSource: webview.cspSource,
+      scriptUri: asset('webview.js'),
+      styleUris: [asset('webview.css')],
+      title: 'Event Storming Board',
+      lang: 'en',
+      appearance: currentAppearance(vscode, { themes: WEBVIEW_THEMES }),
+      body: '<div id="app"></div>',
     });
 
-    const messageSub = webview.onDidReceiveMessage(async (msg: WebviewToHost) => {
-      switch (msg.type) {
-        case 'ready':
-          await post({ type: 'init', text: document.getText() });
-          break;
-        case 'edit':
-          await this.replaceWholeDocument(document, msg.text, suppressEcho);
-          break;
-        case 'export':
-          await exportImageToFile(document.uri, msg.format, msg.data);
-          break;
-        case 'info':
-          void vscode.window.showInformationMessage(msg.message);
-          break;
-        case 'error':
-          void vscode.window.showErrorMessage(msg.message);
-          break;
-      }
+    const session = new BoardSession(document, webviewPanel, this.diagnostics);
+    this.documentOfPanel.set(webviewPanel, document.uri);
+    const themeBridge = connectThemeBridge(vscode, webviewPanel, { themes: WEBVIEW_THEMES });
+    if (webviewPanel.active) this.activePanel = webviewPanel;
+    const viewState = webviewPanel.onDidChangeViewState(() => {
+      if (webviewPanel.active) this.activePanel = webviewPanel;
+      else if (this.activePanel === webviewPanel) this.activePanel = undefined;
     });
 
     webviewPanel.onDidDispose(() => {
-      changeSub.dispose();
-      messageSub.dispose();
+      viewState.dispose();
+      themeBridge.dispose();
+      session.dispose();
+      if (this.activePanel === webviewPanel) this.activePanel = undefined;
     });
-  }
-
-  private async replaceWholeDocument(
-    document: vscode.TextDocument,
-    text: string,
-    suppressEcho: Set<string>,
-  ): Promise<void> {
-    if (document.getText() === text) return;
-    // Register first (synchronously, before applyEdit), so the resulting change event is reliably
-    // recognized as an echo. Only add when a write actually happens (not a no-op above) -> no
-    // orphaned set entries.
-    suppressEcho.add(text);
-    const edit = new vscode.WorkspaceEdit();
-    const fullRange = new vscode.Range(
-      document.positionAt(0),
-      document.positionAt(document.getText().length),
-    );
-    edit.replace(document.uri, fullRange, text);
-    const ok = await vscode.workspace.applyEdit(edit);
-    if (!ok) suppressEcho.delete(text); // write failed (e.g. read-only) -> no echo
   }
 }

@@ -44,7 +44,12 @@ const { svg } = await viewer.saveSVG();
 - **Embeddable viewer & modeler** on diagram-js — palette, context pad, move/connect, inline
   labels, undo/redo, free canvas (no grid, no axes — just stickies on a timeline).
 - **Lossless `.storm` DSL round-trip** and a deterministic JSON model.
-- **VS Code extension** — a custom editor for `.storm` files.
+- **VS Code extension** — a custom editor for `.storm` files in the shared Miragon modeler chrome
+  ([`@miragon/modeler-shell`](https://www.npmjs.com/package/@miragon/modeler-shell)):
+  menu, palette, zoom panel, problems pill; undo and redo through the VS Code document.
+- **Collaborative-modeler contract** — the renderer implements
+  [`@miragon/modeler-api`](https://www.npmjs.com/package/@miragon/modeler-api)
+  (`createCollaborativeModeler`, `createCollaborativeViewer`).
 - **Web app** — an Excalidraw-style editor with URL sharing and PNG/SVG picture export.
 - **Strict DOM-free core** (model, DSL, transforms) — usable in any JavaScript runtime.
 - **Self-hosted fonts** — no CDN, offline-capable.
@@ -77,8 +82,8 @@ accepts an optional `(color #hex)` override.
 | Copy / paste               | `Ctrl/Cmd+C`, `Ctrl/Cmd+V` — paste attaches to the cursor; click places, `Esc` cancels                                                                                                           |
 | Duplicate (in place)       | `Ctrl/Cmd+D`                                                                                                                                                                                     |
 | Nudge selection            | Arrow keys (`Shift` = coarse)                                                                                                                                                                    |
-| Undo / redo                | `Ctrl/Cmd+Z` / `Ctrl/Cmd+Shift+Z`                                                                                                                                                                |
-| Zoom                       | `Ctrl/Cmd` + `+` / `-` / `0` (fit), controls bottom-right                                                                                                                                        |
+| Undo / redo                | `Ctrl/Cmd+Z` / `Ctrl/Cmd+Shift+Z` (in VS Code the document's own undo)                                                                                                                           |
+| Zoom                       | `Ctrl/Cmd` + `+` / `-`; `Ctrl/Cmd+0` fits in the web app and sets 100% in VS Code, where `Shift+1` fits; controls bottom-right                                                                   |
 | Edit label                 | Double-click a sticky (`Cmd/Ctrl+Enter` saves)                                                                                                                                                   |
 | Format a note              | Bold/italic/bullets via the floating toolbar or `Cmd/Ctrl+B` / `Cmd/Ctrl+I`, text alignment via the toolbar's align buttons; stored as a tiny Markdown subset in the label                       |
 | Append sticky              | Context pad `+` drags a blank sticky; pick the type in the popup that opens, then label it                                                                                                       |
@@ -207,6 +212,16 @@ import '@fontsource-variable/geist/wght.css';
 ```
 
 Without a font the fallback chain degrades cleanly to system sans.
+
+## Design tokens
+
+The renderer CSS (`@miragon/event-storming-renderer/assets/event-storming.css`) carries the Miragon
+design-system tokens (`--cd-*`) and their mapping onto diagram-js, vendored unchanged from the
+`miragon-brand:modeler-tool-design` skill into
+[`packages/renderer/src/theme/`](packages/renderer/src/theme/). The tokens sit in the cascade layer
+`event-storming-tokens`, so a host page's own `--cd-*` tokens win. The diagram-js mapping
+(`--bio-*` and the `.djs-parent` variables) applies page-wide, so every diagram-js or bpmn-js canvas
+on the same page takes the Miragon roles too. The canvas is drawn light; exports are always light.
 
 ## Acknowledgements
 

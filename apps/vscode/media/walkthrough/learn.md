@@ -31,13 +31,17 @@ stickies into a story.
 ## Editing a board
 
 - **Add and connect** — use the palette and context pad to place stickies and draw arrows between
-  them.
+  them. From the keyboard: Tab to the palette, choose with the arrow keys, press Enter.
 - **Move and rename** — drag a sticky anywhere on the free canvas, or click its label to rename.
-- **Undo and redo** — `Ctrl/Cmd+Z` and `Ctrl/Cmd+Shift+Z`.
-- **Export** — the menu in the top-right corner fits the view and exports the board to SVG or PNG.
+- **Undo and redo** — `Ctrl/Cmd+Z` and `Ctrl/Cmd+Shift+Z`, like any change to the file.
+- **Zoom and fit** — the zoom panel in the bottom-right corner, or `Ctrl/Cmd` + `+`, `-`, `0` and
+  `Shift+1` to fit.
+- **Export** — the menu in the top-left corner exports the board as PNG or SVG; so do the commands
+  **Event Storming: Export as PNG** and **Export as SVG**.
+- **Keyboard shortcuts** — the menu's **Keyboard shortcuts…** lists them all.
 
-The text file and the canvas stay in sync: open the `.storm` text in a split view and watch your
-edits re-render live.
+The text file and the canvas stay in sync: **Open Source to the Side** opens the `.storm` text in
+a split view, and your edits re-render live in both directions.
 
 New to the concept? Start with [eventstorming.com](https://www.eventstorming.com) and Alberto
 Brandolini's book [Introducing EventStorming](https://leanpub.com/introducing_eventstorming).

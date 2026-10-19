@@ -34,10 +34,13 @@ const HOTSPOT_ROTATION_DEG = -3;
 /** Class of the small kind caption at a sticky's bottom (selector contract for tests/e2e). */
 export const KIND_CAPTION_CLASS = 'event-storming-kind-caption';
 
-/** Caption typography: small and light so it never competes with the user's label. */
+/**
+ * Caption typography: small and light so it never competes with the user's label. The colour is
+ * the label's — a grey would fall below 4.5:1 on the hotspot fill; the weight sets it apart.
+ */
 const CAPTION_FONT_SIZE = 9;
 const CAPTION_FONT_WEIGHT = 300;
-const CAPTION_FILL = '#606060';
+const CAPTION_FILL = COLORS.stickyText;
 /** Caption baseline sits this many px above the sticky's bottom edge. */
 const CAPTION_BOTTOM_OFFSET = 7;
 

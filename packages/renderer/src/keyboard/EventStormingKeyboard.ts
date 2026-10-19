@@ -1,4 +1,5 @@
 import type Canvas from 'diagram-js/lib/core/Canvas';
+import type ElementRegistry from 'diagram-js/lib/core/ElementRegistry';
 import type CommandStack from 'diagram-js/lib/command/CommandStack';
 import type EventBus from 'diagram-js/lib/core/EventBus';
 import type Create from 'diagram-js/lib/features/create/Create';
@@ -9,7 +10,9 @@ import type Modeling from 'diagram-js/lib/features/modeling/Modeling';
 import type { Element } from 'diagram-js/lib/model/Types';
 import type EventStormingCopyPaste from '../modeling/EventStormingCopyPaste.js';
 import type EventStormingElementFactory from '../model/EventStormingElementFactory.js';
+import type EventStormingReadOnly from '../read-only/EventStormingReadOnly.js';
 import { STICKY_STYLES } from '../draw/styles.js';
+import { isEventStormingConnection, isEventStormingShape } from '../model/di-types.js';
 
 /** Arrow-key nudge in diagram px (Shift = coarse). */
 const NUDGE_STEP = 2;
@@ -22,13 +25,23 @@ const ARROW_DELTAS: Record<string, { x: number; y: number }> = {
   arrowdown: { x: 0, y: 1 },
 };
 
+export interface EventStormingKeyboardConfig {
+  /**
+   * Bind Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z and Cmd/Ctrl+Y to the canvas command stack (default true).
+   * A host that owns the history (the VS Code document) passes false so the keys reach it.
+   */
+  undoRedoKeys?: boolean | undefined;
+}
+
 /**
- * Minimal keyboard binding on the canvas container: undo/redo, delete, copy/paste/duplicate,
- * arrow-key nudge of the selection, plus the single-key tools E (domain event), C (command) and
- * L (lasso). Deliberately a DOM listener (no diagram-js keyboard-service binding needed).
+ * Minimal keyboard binding: undo/redo, select all, delete, copy/paste/duplicate, arrow-key nudge
+ * of the selection, plus the single-key tools E (domain event), C (command) and L (lasso).
+ * Deliberately a DOM listener (no diagram-js keyboard-service binding needed). Under the
+ * read-only lock only select all, copy and the lasso stay.
  */
 export default class EventStormingKeyboard {
   static $inject = [
+    'config.eventStormingKeyboard',
     'canvas',
     'commandStack',
     'selection',
@@ -39,9 +52,12 @@ export default class EventStormingKeyboard {
     'mouse',
     'lassoTool',
     'eventBus',
+    'elementRegistry',
+    'eventStormingReadOnly',
   ];
 
   constructor(
+    config: EventStormingKeyboardConfig | undefined,
     canvas: Canvas,
     commandStack: CommandStack,
     selection: Selection,
@@ -52,30 +68,62 @@ export default class EventStormingKeyboard {
     mouse: Mouse,
     lassoTool: LassoTool,
     eventBus: EventBus,
+    elementRegistry?: ElementRegistry,
+    readOnly?: Pick<EventStormingReadOnly, 'isReadOnly'>,
   ) {
     const container = canvas.getContainer();
-    if (!container.hasAttribute('tabindex')) container.setAttribute('tabindex', '0');
+    const undoRedoKeys = config?.undoRedoKeys ?? true;
 
     // Bind on the DOCUMENT (not the canvas container): single-key tools (E/C/L) must work
     // without the canvas having focus first — same trade-off bpmn-js makes for its keyboard.
     const onKeydown = (e: KeyboardEvent) => {
+      // Someone closer to the target (menu, palette, a host's own chrome) already handled it.
+      if (e.defaultPrevented) return;
+      if (!isCanvasTarget(e.target, container)) return;
       // If the user is currently typing in an input field, do NOT intercept: inline label editing
       // (EventStormingLabelEditing) attaches its <textarea> to the canvas container, and the
       // web-app chrome has its own fields. Without the guard, Backspace/Delete would delete the
       // selected element (instead of a character) and Cmd+Z would reset the diagram.
       if (isEditableTarget(e.target)) return;
 
+      if (handleReadingKey(e)) return;
+      if (readOnly?.isReadOnly()) return;
+      handleEditingKey(e);
+    };
+
+    /** Keys that read the board: select all, copy, lasso. They stay under the read-only lock. */
+    const handleReadingKey = (e: KeyboardEvent): boolean => {
       const cmd = e.ctrlKey || e.metaKey;
       const key = e.key.toLowerCase();
-
-      if (cmd && key === 'z' && !e.shiftKey) {
+      if (cmd && key === 'a' && !e.shiftKey && !e.altKey) {
         e.preventDefault();
-        commandStack.undo();
-      } else if ((cmd && key === 'z' && e.shiftKey) || (cmd && key === 'y')) {
-        e.preventDefault();
-        commandStack.redo();
+        const all = (elementRegistry?.getAll() ?? []).filter(
+          (element) => isEventStormingShape(element) || isEventStormingConnection(element),
+        );
+        selection.select(all as Element[]);
       } else if (cmd && key === 'c') {
         if (copyPaste.copy()) e.preventDefault();
+      } else if (!cmd && !e.altKey && key === 'l') {
+        e.preventDefault();
+        const lastMove = mouse.getLastMoveEvent();
+        lassoTool.activateSelection((lastMove ?? e) as MouseEvent, !!lastMove);
+      } else {
+        return false;
+      }
+      return true;
+    };
+
+    const handleEditingKey = (e: KeyboardEvent): void => {
+      const cmd = e.ctrlKey || e.metaKey;
+      const key = e.key.toLowerCase();
+      const isUndo = cmd && key === 'z' && !e.shiftKey;
+      const isRedo = (cmd && key === 'z' && e.shiftKey) || (cmd && key === 'y');
+
+      if (isUndo || isRedo) {
+        if (!undoRedoKeys) return;
+        e.preventDefault();
+        if (isUndo) commandStack.undo();
+        else commandStack.redo();
       } else if (cmd && key === 'v') {
         if (copyPaste.paste()) e.preventDefault();
       } else if (cmd && key === 'd') {
@@ -98,10 +146,6 @@ export default class EventStormingKeyboard {
               : factory.createNew('command', STICKY_STYLES.command.label);
           create.start(lastMove, shape as unknown as Element);
         }
-      } else if (!cmd && !e.altKey && key === 'l') {
-        e.preventDefault();
-        const lastMove = mouse.getLastMoveEvent();
-        lassoTool.activateSelection((lastMove ?? e) as MouseEvent, !!lastMove);
       } else if (key in ARROW_DELTAS && !cmd) {
         const sel = selection.get() as Element[];
         if (sel.length) {
@@ -116,6 +160,14 @@ export default class EventStormingKeyboard {
     document.addEventListener('keydown', onKeydown);
     eventBus.on('diagram.destroy', () => document.removeEventListener('keydown', onKeydown));
   }
+}
+
+function isCanvasTarget(target: EventTarget | null, container: HTMLElement): boolean {
+  if (!(target instanceof Node)) return false;
+  // Body/html as target means nothing is focused — the single-key tools must work right away.
+  return (
+    container.contains(target) || target === document.body || target === document.documentElement
+  );
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {
