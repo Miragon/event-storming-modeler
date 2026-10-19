@@ -126,9 +126,12 @@ describe('texts that used to reject after the previous board was cleared', () =>
     expect(modeler.diagram.get<CommandStack>('commandStack').canUndo()).toBe(true);
   });
 
-  it('a number that overflows to Infinity stays in the text as an unread line', async () => {
+  it.each([
+    ['overflows to Infinity', '9'.repeat(400)],
+    ['lies beyond what SVG can draw', '9'.repeat(39)],
+  ])('a number that %s stays in the text as an unread line', async (_, number) => {
     const modeler = editor();
-    const line = `event Big [${'9'.repeat(400)}, 0]`;
+    const line = `event Big [${number}, 0]`;
     const { warnings } = await modeler.importText(`title T\n${line}\nevent Ok [0, 0]\n`);
     expect(warnings).toHaveLength(1);
     expect(ids(modeler)).toEqual(['event_ok']);

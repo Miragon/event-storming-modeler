@@ -79,8 +79,8 @@ level big-picture|process|design
 - The label is everything between the keyword and the coordinate tuple, trimmed. It may contain
   spaces, punctuation and parentheses.
 - Coordinates are optional. Missing ⇒ `[0, 0]` (written back explicitly). A tuple that is present
-  but malformed (`[` without a readable pair) rejects the line into `rawPassthrough` rather than
-  swallowing it into the label.
+  but malformed (`[` without a readable pair, or a number beyond ±1e38) rejects the line into
+  `rawPassthrough` rather than swallowing it into the label.
 - Suffixes are only looked up **after** the tuple, and in this extraction order: `(on …)` first
   (its host name runs to the final `)`, so it may itself contain other suffix-looking text), then
   `(id …)`, `(align …)`, `(size …)`, `(color …)`.
@@ -141,7 +141,7 @@ note <Text> [x, y] (color …) (size <w>x<h>) (align <h> <v>) (on <Host Label>)
 
 - `(size …)` — positive numbers, board pixels. Absent = the note auto-sizes to its text (minimum
   180 × 110). The serializer writes no spaces around the `x`; the parser tolerates them. A malformed
-  or non-positive size is a diagnostic and is ignored.
+  or non-positive size, or one beyond 1e38, is a diagnostic and is ignored.
 - `(align …)` — `left|center|right` then `top|middle|bottom`, both words always together. The
   serializer emits the suffix only when at least one axis differs from the default `left top`, so
   unaligned boards stay byte-identical. `(align left top)` and no suffix are the same board.
@@ -250,13 +250,13 @@ Diagnostics from the line scan come first, then attachment diagnostics, then arr
 
 | Message                                                                 | Cause                                                                                                                                                 |
 | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Line could not be interpreted (kept losslessly in rawPassthrough)`     | unknown `style`/`level` value, malformed coordinates (also a number of 309 or more digits, which overflows), a `line` with < 2 points, an empty label |
+| `Line could not be interpreted (kept losslessly in rawPassthrough)`     | unknown `style`/`level` value, malformed coordinates (also a number beyond ±1e38, too large for the canvas), a `line` with < 2 points, an empty label |
 | `Id: could not read "…"`                                                | `(id …)` outside `A-Za-z0-9_-`                                                                                                                        |
 | `Id: "…" is already taken — the element got a fresh id`                 | duplicate explicit id                                                                                                                                 |
 | `Id: "…" is reserved for the board itself — the element got a fresh id` | `(id event-storming-root)` or an id starting with `__implicitroot`                                                                                    |
 | `Id: a note cannot be referenced` / `a drawing cannot be referenced`    | `(id …)` on a note or drawing                                                                                                                         |
 | `Size: a <kind> cannot be resized`                                      | `(size …)` on a non-note                                                                                                                              |
-| `Size: could not read "…"`                                              | malformed or non-positive `(size …)`                                                                                                                  |
+| `Size: could not read "…"`                                              | malformed, non-positive or beyond 1e38 `(size …)`                                                                                                     |
 | `Align: a <kind> cannot be aligned`                                     | `(align …)` on a non-note                                                                                                                             |
 | `Align: could not read "…"`                                             | unknown axis words in `(align …)`                                                                                                                     |
 | `Attachment: a <kind> cannot be pinned`                                 | `(on …)` on something other than actor/hotspot/note                                                                                                   |

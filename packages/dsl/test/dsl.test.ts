@@ -1599,27 +1599,46 @@ describe('ids the renderer reserves for the board itself', () => {
   );
 });
 
-describe('numbers that overflow to Infinity', () => {
-  const huge = '9'.repeat(400);
+describe('numbers the canvas cannot draw (beyond 1e38, or overflowing to Infinity)', () => {
+  const overflowing = '9'.repeat(400);
+  const beyondTheCanvas = `1${'0'.repeat(38)}1`;
 
-  it.each([[`event Big [${huge}, 0]`], [`note Big [0, ${huge}]`], [`line [[0, 0], [${huge}, 0]]`]])(
-    'keep %s losslessly in rawPassthrough with a diagnostic',
-    (line) => {
-      const { board, diagnostics } = parseDSLWithDiagnostics(`title T\n${line}\nevent Ok [0, 0]`);
-      expect(board.elements.map((e) => e.id)).toEqual(['event_ok']);
-      expect(board.rawPassthrough).toEqual([line]);
-      expect(diagnostics).toHaveLength(1);
-      expect(serializeDSL(board)).toContain(`${line}\n`);
+  it.each([
+    [`event Big [${overflowing}, 0]`],
+    [`note Big [0, ${overflowing}]`],
+    [`line [[0, 0], [${overflowing}, 0]]`],
+    [`event Big [${beyondTheCanvas}, 0]`],
+    [`note Big [0, -${beyondTheCanvas}]`],
+    [`line [[0, 0], [${beyondTheCanvas}, 0]]`],
+  ])('keep %s losslessly in rawPassthrough with a diagnostic', (line) => {
+    const { board, diagnostics } = parseDSLWithDiagnostics(`title T\n${line}\nevent Ok [0, 0]`);
+    expect(board.elements.map((e) => e.id)).toEqual(['event_ok']);
+    expect(board.rawPassthrough).toEqual([line]);
+    expect(diagnostics).toHaveLength(1);
+    expect(serializeDSL(board)).toContain(`${line}\n`);
+  });
+
+  it.each([overflowing, beyondTheCanvas])(
+    'report a note size of %s as unreadable and keep the note',
+    (width) => {
+      const { board, diagnostics } = parseDSLWithDiagnostics(
+        `title T\nnote Big [0, 0] (size ${width}x10)`,
+      );
+      expect(board.elements).toHaveLength(1);
+      expect(board.elements[0]).not.toHaveProperty('size');
+      expect(diagnostics[0]!.message).toMatch(/^Size: could not read/);
     },
   );
 
-  it('report an overflowing note size as unreadable and keep the note', () => {
+  it('still reads 1e38 itself, to a fixed point', () => {
+    const largest = `1${'0'.repeat(38)}`;
     const { board, diagnostics } = parseDSLWithDiagnostics(
-      `title T\nnote Big [0, 0] (size ${huge}x10)`,
+      `title T\nevent A [-${largest}, ${largest}]\nnote N [0, 0] (size ${largest}x10)`,
     );
-    expect(board.elements).toHaveLength(1);
-    expect(board.elements[0]).not.toHaveProperty('size');
-    expect(diagnostics[0]!.message).toMatch(/^Size: could not read/);
+    expect(diagnostics).toHaveLength(0);
+    expect(board.elements[0]?.position).toEqual({ x: -1e38, y: 1e38 });
+    const once = serializeDSL(board);
+    expect(serializeDSL(parseDSL(once))).toBe(once);
   });
 });
 

@@ -11,11 +11,19 @@ export interface ParsedCoords {
 const COORDS_RE = /\[\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\]/;
 
 /**
- * A pair the board can hold. A digit run of 309 or more overflows to Infinity, which the board
- * schema rejects — such a tuple is unreadable like `1.2.3`, so its line stays in rawPassthrough.
+ * The canvas places shapes with 32-bit SVG transforms, which overflow near 3.4e38 and would make
+ * an import throw half-way; 1e38 leaves room for a corner half a note's size beyond its centre.
+ * A larger number (a digit run of 309 or more even overflows to Infinity) is unreadable like
+ * `1.2.3`, so its line stays in rawPassthrough.
  */
-function finitePair(a: number, b: number): boolean {
-  return Number.isFinite(a) && Number.isFinite(b);
+const LARGEST_DRAWABLE_NUMBER = 1e38;
+
+function isDrawable(value: number): boolean {
+  return Math.abs(value) <= LARGEST_DRAWABLE_NUMBER;
+}
+
+function drawablePair(a: number, b: number): boolean {
+  return isDrawable(a) && isDrawable(b);
 }
 
 /** Order stays raw (a, b). */
@@ -24,7 +32,7 @@ export function parseCoords(line: string): ParsedCoords | null {
   if (!m) return null;
   const a = Number(m[1]);
   const b = Number(m[2]);
-  if (!finitePair(a, b)) return null;
+  if (!drawablePair(a, b)) return null;
   return { a, b };
 }
 
@@ -40,7 +48,7 @@ export function splitAtCoords(
   if (!m) return null;
   const a = Number(m[1]);
   const b = Number(m[2]);
-  if (!finitePair(a, b)) return null;
+  if (!drawablePair(a, b)) return null;
   return {
     name: line.slice(0, m.index).trim(),
     coords: { a, b },
@@ -61,7 +69,7 @@ export function parseMultiCoords(line: string): { tuples: ParsedCoords[]; rest: 
   while ((t = inner.exec(m[1]!))) {
     const a = Number(t[1]);
     const b = Number(t[2]);
-    if (!finitePair(a, b)) return null;
+    if (!drawablePair(a, b)) return null;
     tuples.push({ a, b });
   }
   if (!tuples.length) return null;
@@ -167,8 +175,8 @@ export function parseSize(line: string): {
   if (m) {
     const width = Number(m[1]);
     const height = Number(m[2]);
-    // Non-positive, NaN (`1.2.3`) or overflowing to Infinity falls through to the malformed branch.
-    if (width > 0 && height > 0 && Number.isFinite(width) && Number.isFinite(height)) {
+    // Non-positive, NaN (`1.2.3`) or beyond the canvas falls through to the malformed branch.
+    if (width > 0 && height > 0 && isDrawable(width) && isDrawable(height)) {
       return { size: { width, height }, rest: line.replace(SIZE_RE, ' ') };
     }
   }

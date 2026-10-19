@@ -99,9 +99,9 @@ const viewer = createCollaborativeViewer(); // meta.editable: false, never chang
 
 - `importText` resolves for every `.storm` text: the DSL keeps every line it cannot read in
   `rawPassthrough` (with a diagnostic, returned as a `warning`), gives a sticky that claims a
-  reserved id (`event-storming-root`, `__implicitroot…`) a fresh one, and reads a number that
-  overflows to Infinity as an unreadable line. A board passed to `diagram.importMap` that uses a
-  reserved id rejects before the canvas changes.
+  reserved id (`event-storming-root`, `__implicitroot…`) a fresh one, and reads a coordinate or
+  size beyond ±1e38 (more than the canvas's SVG transforms hold) as an unreadable line. A board
+  passed to `diagram.importMap` that uses a reserved id rejects before the canvas changes.
 - `onContentChanged` fires for every command-stack change, undo and redo included (also the
   workshop level), never for imports, view options (type captions) or the viewport.
 - `getViewState()` / `setViewState()` read and set the diagram-js viewbox (`x`, `y`, `width`,
