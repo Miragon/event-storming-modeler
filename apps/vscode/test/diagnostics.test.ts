@@ -24,7 +24,7 @@ describe('boardDiagnostics', () => {
     const [diagnostic] = boardDiagnostics(ONE_PROBLEM);
 
     expect(diagnostic).toMatchObject({
-      message: 'Arrow: "Missing" not found',
+      message: "This arrow points to “Missing”, which isn't on the board.",
       severity: DiagnosticSeverity.Warning,
       source: 'event-storming',
       range: { start: { line: 2, character: 2 }, end: { line: 2, character: 17 } },

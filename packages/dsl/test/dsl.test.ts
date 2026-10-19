@@ -645,7 +645,7 @@ hotspot Double payment? [640, 280] (on Order Placed)`;
     );
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.line).toBe(3);
-    expect(diagnostics[0]!.message).toContain('may only attach to host stickies');
+    expect(diagnostics[0]!.message).toContain('is pinned to an event, a command');
     expect(board.elements.find((e) => e.elementType === 'hotspot')).not.toHaveProperty(
       'attachedTo',
     );
@@ -657,7 +657,7 @@ hotspot Double payment? [640, 280] (on Order Placed)`;
     );
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.line).toBe(3);
-    expect(diagnostics[0]!.message).toContain('only actor/hotspot');
+    expect(diagnostics[0]!.message).toContain('Only an actor, a hotspot or a note takes (on …)');
     const once = serializeDSL(board);
     expect(once).toContain('event B [10, 10]');
     expect(once).not.toContain('(on');
@@ -788,7 +788,7 @@ note Needs sign-off [990, 360] (on #cmd_approve_2)`;
     );
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.line).toBe(3);
-    expect(diagnostics[0]!.message).toContain('may only attach to host stickies');
+    expect(diagnostics[0]!.message).toContain('is pinned to an event, a command');
     expect(board.elements.find((e) => e.elementType === 'note')).not.toHaveProperty('attachedTo');
   });
 
@@ -813,7 +813,7 @@ note Needs sign-off [990, 360] (on #cmd_approve_2)`;
     );
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.line).toBe(2);
-    expect(diagnostics[0]!.message).toContain('only actor/hotspot/note');
+    expect(diagnostics[0]!.message).toContain('Only an actor, a hotspot or a note takes (on …)');
     expect(board.elements.find((e) => e.elementType === 'drawing')).toBeDefined();
     const once = serializeDSL(board);
     expect(once).toContain('line [[100, 100], [200, 150]] (dashed)');
@@ -1035,7 +1035,7 @@ actor Manager [250, 280] (on #cmd_approve_2)`;
     );
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.line).toBe(4);
-    expect(diagnostics[0]!.message).toContain('"#ghost" not found');
+    expect(diagnostics[0]!.message).toContain("“#ghost”, which isn't on the board");
     expect(board.edges).toHaveLength(0);
     expect(board.rawPassthrough).toContain('A -> #ghost');
     const once = serializeDSL(board);
@@ -1048,7 +1048,7 @@ actor Manager [250, 280] (on #cmd_approve_2)`;
     );
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.line).toBe(3);
-    expect(diagnostics[0]!.message).toContain('"#ghost" not found');
+    expect(diagnostics[0]!.message).toBe("There's no “#ghost” on the board to pin this to.");
     expect(board.elements.find((e) => e.elementType === 'actor')).not.toHaveProperty('attachedTo');
   });
 
@@ -1057,7 +1057,7 @@ actor Manager [250, 280] (on #cmd_approve_2)`;
       'title T\nevent A [0, 0]\nnote N [80, 80]\nA -> #note_n',
     );
     expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]!.message).toContain('arrows may only connect stickies');
+    expect(diagnostics[0]!.message).toContain('an arrow only connects stickies');
     expect(board.edges).toHaveLength(0);
     expect(board.rawPassthrough).toContain('A -> #note_n');
     const once = serializeDSL(board);
@@ -1069,7 +1069,7 @@ actor Manager [250, 280] (on #cmd_approve_2)`;
       'title T\nnote N [80, 80]\nactor A [10, 10] (on #note_n)',
     );
     expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]!.message).toContain('may only attach to host stickies');
+    expect(diagnostics[0]!.message).toContain('is pinned to an event, a command');
     expect(board.elements.find((e) => e.elementType === 'actor')).not.toHaveProperty('attachedTo');
   });
 
@@ -1078,7 +1078,7 @@ actor Manager [250, 280] (on #cmd_approve_2)`;
     const { board, diagnostics } = parseDSLWithDiagnostics(src);
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.line).toBe(3);
-    expect(diagnostics[0]!.message).toContain('only sticky kinds support');
+    expect(diagnostics[0]!.message).toContain('Only a sticky takes (id …)');
     const notes = board.elements.filter((e) => e.elementType === 'note');
     expect(notes[0]!.label).toBe('use (id x) sparingly');
     expect(notes[1]!.id).toBe('note_kickoff');
@@ -1094,7 +1094,7 @@ actor Manager [250, 280] (on #cmd_approve_2)`;
       'title T\nline [[100, 100], [200, 150]] (dashed) (id d1)',
     );
     expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]!.message).toContain('only sticky kinds support');
+    expect(diagnostics[0]!.message).toContain('Only a sticky takes (id …)');
     expect(board.elements[0]!.id).toBe('draw_line');
     const once = serializeDSL(board);
     expect(once).toContain('line [[100, 100], [200, 150]] (dashed)');
@@ -1216,7 +1216,7 @@ describe('note size (project extension: `(size …)`)', () => {
     const { board, diagnostics } = parseDSLWithDiagnostics('title T\nevent A [0, 0] (size 100x50)');
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.line).toBe(2);
-    expect(diagnostics[0]!.message).toContain('only notes support');
+    expect(diagnostics[0]!.message).toContain('Only a note takes');
     expect(board.elements[0]).toMatchObject({ elementType: 'event', label: 'A' });
     const once = serializeDSL(board);
     expect(once).toContain('event A [0, 0]');
@@ -1229,7 +1229,7 @@ describe('note size (project extension: `(size …)`)', () => {
       'title T\nline [[100, 100], [200, 150]] (dashed) (size 10x10)',
     );
     expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]!.message).toContain('only notes support');
+    expect(diagnostics[0]!.message).toContain('Only a note takes');
     expect(board.elements.find((e) => e.elementType === 'drawing')).toBeDefined();
     const once = serializeDSL(board);
     expect(once).toContain('line [[100, 100], [200, 150]] (dashed)');
@@ -1243,7 +1243,7 @@ describe('note size (project extension: `(size …)`)', () => {
     const { board, diagnostics } = parseDSLWithDiagnostics(src);
     // Exactly ONE finding: the size suffix on the hotspot — the names stay untouched.
     expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]!.message).toContain('only notes support');
+    expect(diagnostics[0]!.message).toContain('Only a note takes');
     expect(board.elements.find((e) => e.elementType === 'event')?.label).toBe('Pay (size 1x1) now');
     expect(board.elements.find((e) => e.elementType === 'hotspot')).toMatchObject({
       attachedTo: 'event_pay_size_1x1_now',
@@ -1359,7 +1359,7 @@ describe('note alignment (project extension: `(align …)`)', () => {
     );
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.line).toBe(2);
-    expect(diagnostics[0]!.message).toContain('only notes support');
+    expect(diagnostics[0]!.message).toContain('Only a note takes');
     expect(board.elements[0]).toMatchObject({ elementType: 'event', label: 'A' });
     const once = serializeDSL(board);
     expect(once).toContain('event A [0, 0]');
@@ -1372,7 +1372,7 @@ describe('note alignment (project extension: `(align …)`)', () => {
       'title T\nline [[100, 100], [200, 150]] (dashed) (align center top)',
     );
     expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]!.message).toContain('only notes support');
+    expect(diagnostics[0]!.message).toContain('Only a note takes');
     expect(board.elements.find((e) => e.elementType === 'drawing')).toBeDefined();
     const once = serializeDSL(board);
     expect(once).toContain('line [[100, 100], [200, 150]] (dashed)');
@@ -1593,7 +1593,7 @@ describe('ids the renderer reserves for the board itself', () => {
       );
       expect(board.elements.map((e) => e.id)).toEqual(['event_foo', 'event_bar']);
       expect(diagnostics.map((d) => d.message)).toContain(
-        `Id: "${reserved}" is reserved for the board itself — the element got a fresh id`,
+        `The id “${reserved}” belongs to the board itself, so this sticky got a new id.`,
       );
     },
   );
@@ -1626,7 +1626,7 @@ describe('numbers the canvas cannot draw (beyond 1e38, or overflowing to Infinit
       );
       expect(board.elements).toHaveLength(1);
       expect(board.elements[0]).not.toHaveProperty('size');
-      expect(diagnostics[0]!.message).toMatch(/^Size: could not read/);
+      expect(diagnostics[0]!.message).toMatch(/^Couldn't read the size/);
     },
   );
 
@@ -1717,5 +1717,59 @@ describe('every text parses (fuzz)', () => {
     const once = serializeDSL(parseDSL('title T\n/* open\nevent Foo [0, 0]\n'));
     expect(once).toBe('title T\n/* open\nevent Foo [0, 0]\n');
     expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+});
+
+describe('diagnostic wording (guide §2)', () => {
+  // Every finding a parse can report, each from one line.
+  const BROKEN = [
+    'title T',
+    'event Order Placed [0, 0]',
+    'note Text [0, 300]',
+    'event A [abc, 20]',
+    'event B [0, 100] (id has space!)',
+    'event C [0, 200] (id event-storming-root)',
+    'event D [0, 300] (id event_order_placed)',
+    'command E [200, 0] (on Order Placed)',
+    'command F [200, 100] (size 2x2)',
+    'command G [200, 200] (align center middle)',
+    'note H [400, 0] (align sideways)',
+    'note I [400, 100] (size 0x0)',
+    'note J [400, 200] (id note_j)',
+    'line [[0, 0], [10, 10]] (on Order Placed) (size 2x2) (align center) (id d1)',
+    'actor K [600, 0] (on Nowhere)',
+    'actor L [600, 100] (on Text)',
+    'Order Placed -> Nowhere',
+    'Missing -> Order Placed',
+  ].join('\n');
+
+  it('speaks to the reader: no em dash, typographic quotes, whole sentences', () => {
+    const { diagnostics } = parseDSLWithDiagnostics(BROKEN);
+    expect(diagnostics.length).toBeGreaterThanOrEqual(15);
+    for (const { message } of diagnostics) {
+      expect(message).not.toMatch(/—|"|rawPassthrough/);
+      expect(message).toMatch(/^[A-Z“].*\.$/);
+    }
+  });
+
+  it('names what it could not read and keeps the line', () => {
+    const { diagnostics } = parseDSLWithDiagnostics('title T\nevent A [abc, 20]');
+    expect(diagnostics).toEqual([
+      {
+        line: 2,
+        message: "Couldn't read this line. It stays in the file unchanged.",
+        text: 'event A [abc, 20]',
+      },
+    ]);
+  });
+
+  it('says which end of an arrow is missing', () => {
+    const { diagnostics } = parseDSLWithDiagnostics(
+      'title T\nevent A [0, 0]\nA -> Nowhere\nGhost -> A',
+    );
+    expect(diagnostics.map((d) => d.message)).toEqual([
+      "This arrow points to “Nowhere”, which isn't on the board.",
+      "This arrow starts at “Ghost”, which isn't on the board.",
+    ]);
   });
 });

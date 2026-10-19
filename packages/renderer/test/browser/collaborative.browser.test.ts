@@ -104,7 +104,7 @@ describe('texts that used to reject after the previous board was cleared', () =>
       const { warnings } = await modeler.importText(
         `title Broken\nevent Foo [0, 0] (id ${reserved})\nevent Bar [200, 0]\n`,
       );
-      expect(warnings.join('\n')).toMatch(/reserved for the board itself/);
+      expect(warnings.join('\n')).toMatch(/belongs to the board itself/);
       expect(ids(modeler)).toEqual(['event_bar', 'event_foo']);
       expect(modeler.diagram.get<CommandStack>('commandStack').canUndo()).toBe(false);
     },
