@@ -2,12 +2,15 @@ import './zod-jitless.js';
 import '@fontsource-variable/geist/wght.css';
 import '@fontsource-variable/geist-mono/wght.css';
 import {
+  boardMenu,
   createCollaborativeModeler,
+  createShortcutsDialog,
   type BoardBounds,
+  type BoardLevels,
   type CollaborativeEventStormingModeler,
   type EventStormingReadOnly,
+  type TypeCaptions,
 } from '@miragon/event-storming-renderer';
-import './style.css';
 import '@miragon/modeler-shell/shell.css';
 import type { ShellHandle } from '@miragon/modeler-shell';
 import { INVALID_STATUS_DELAY_MS } from '@miragon/modeler-shell/core';
@@ -24,8 +27,6 @@ import {
 import type { HostToWebview, WebviewCommand, WebviewToHost } from '../protocol.js';
 import { WEBVIEW_THEMES } from '../themes.js';
 import { blobToBase64, svgToPng } from './io.js';
-import { boardMenu, type BoardLevels, type TypeCaptions } from './menu.js';
-import { createShortcutsDialog } from './shortcutsDialog.js';
 import { readTypeCaptionsVisible, writeTypeCaptionsVisible } from './state.js';
 
 interface VsCodeApi {
@@ -84,8 +85,10 @@ const shell = mountVsCodeShell(app, {
     levels,
     typeCaptions,
     onTypeCaptionsToggled: (visible) => writeTypeCaptionsVisible(vscode, visible),
-    exportPng: () => void exportPng(),
-    exportSvg: () => void exportSvg(),
+    exports: {
+      png: { onSelect: () => void exportPng() },
+      svg: { onSelect: () => void exportSvg() },
+    },
     showKeyboardShortcuts: () => shortcutsDialog.open(),
   }),
   problems: { onActivate: () => post({ type: 'showProblems' }) },
