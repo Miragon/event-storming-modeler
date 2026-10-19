@@ -20,6 +20,12 @@ const TYPE_ORDER: Record<string, number> = {
   drawing: 0,
 };
 
+/**
+ * diagram-js reads its zoom back rounded to three decimals: a fit below 0.0005 would read back as
+ * zoom 0 and a NaN viewbox. A board wider than about 2000 viewports shows its centre at this zoom.
+ */
+const SMALLEST_FIT_ZOOM = 0.001;
+
 type BoardRoot = Root & { businessObject?: RootBusinessObject };
 
 /**
@@ -144,7 +150,7 @@ export default class EventStormingImporter {
     }
     const scale = this.boardBounds.isEmpty()
       ? 1
-      : Math.min(width / bounds.width, height / bounds.height, 1);
+      : Math.max(Math.min(width / bounds.width, height / bounds.height, 1), SMALLEST_FIT_ZOOM);
     this.canvas.viewbox({
       x: bounds.x + bounds.width / 2 - width / 2 / scale,
       y: bounds.y + bounds.height / 2 - height / 2 / scale,

@@ -105,7 +105,8 @@ const viewer = createCollaborativeViewer(); // meta.editable: false, never chang
 - `onContentChanged` fires for every command-stack change, undo and redo included (also the
   workshop level), never for imports, view options (type captions) or the viewport.
 - `getViewState()` / `setViewState()` read and set the diagram-js viewbox (`x`, `y`, `width`,
-  `height`); an import fits the board.
+  `height`); an import fits the board, never above 100% and never below 0.1% (a board too wide to
+  show whole at 0.1% is centred there instead).
 - `elements` lists the stickies with their ids and labels, reveals (selects and scrolls to) one
   and reports the selection. Sticky ids survive a save and a re-open: the DSL writes `(id …)`
   back for every sticky whose id the parser would not derive again from its label at that line (one

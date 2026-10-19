@@ -267,6 +267,23 @@ describe('the view after an import (guide §5.9)', () => {
     expect(x + width / 2).toBeCloseTo(0, 5);
     expect(y + height / 2).toBeCloseTo(0, 5);
   });
+
+  it.each([
+    ['a note too large to show whole', 'note Huge [10, 10] (size 100000000x100000000)'],
+    ['stickies too far apart to show together', 'event A [0, 0]\nevent B [5000000, 0]'],
+    [
+      'stickies at both ends of the drawable range',
+      `event A [-1${'0'.repeat(38)}, 0]\nevent B [1${'0'.repeat(38)}, 0]`,
+    ],
+  ])('keeps a readable view for %s, at the smallest zoom', async (_, lines) => {
+    const modeler = editor();
+    await modeler.importText(`title Wide\n${lines}\n`);
+    const fitted = modeler.getViewState();
+    expect(fitted).toBeDefined();
+    expect(modeler.diagram.get<Canvas>('canvas').zoom()).toBeCloseTo(0.001, 6);
+    await modeler.importText(`title Wide\n${lines}\n`);
+    expect(modeler.getViewState()).toEqual(fitted);
+  });
 });
 
 describe('the `style dark` directive (guide §10.7)', () => {
