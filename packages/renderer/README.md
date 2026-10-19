@@ -148,7 +148,7 @@ Part of the [Event Storming Modeler](https://github.com/Miragon/event-storming-m
 
 MIT
 
-The tool icons of the palette (`square-dashed-mouse-pointer`, `spline`) and the icons of the
+The tool icons of the palette (`square-dashed-mouse-pointer`, and for Draw `spline` with a straight segment) and the icons of the
 context pad and the note toolbar (`plus`, `arrow-right`, `replace`, `line-style`, `palette`,
 `pencil`, `trash`, `bold`, `italic`, `list`, `text-align-*`, `align-vertical-justify-*`) are copied
 from [Lucide](https://lucide.dev) (`lucide-static` 1.59.0):

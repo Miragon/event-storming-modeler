@@ -36,13 +36,15 @@ const LUCIDE_SQUARE_DASHED_MOUSE_POINTER =
   '<path d="M21 9v2"/>' +
   '<path d="M3 14v1"/>';
 
-const LUCIDE_SPLINE =
+// Lucide's spline with a straight segment between its end points (the shell's line-segment): the
+// curve read as a telephone receiver at 20px.
+const LINE_SEGMENT =
   '<circle cx="19" cy="5" r="2"/>' +
   '<circle cx="5" cy="19" r="2"/>' +
-  '<path d="M5 17A12 12 0 0 1 17 5"/>';
+  '<path d="M6.5 17.5 17.5 6.5"/>';
 
 export const PALETTE_ICONS: Record<string, string> = {
-  draw: toolIcon(LUCIDE_SPLINE),
+  draw: toolIcon(LINE_SEGMENT),
   lasso: toolIcon(LUCIDE_SQUARE_DASHED_MOUSE_POINTER),
   note: stickySquare(NOTE_STYLE.fill, NOTE_STYLE.stroke),
 };

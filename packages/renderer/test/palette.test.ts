@@ -141,7 +141,7 @@ describe('EventStormingPaletteProvider: titles and shortcuts', () => {
       expect(html).toContain('aria-hidden="true"');
     }
     expect(entries['lasso-tool']!.html).toContain('M12.034 12.681');
-    expect(entries['draw-tool']!.html).toContain('M5 17A12 12 0 0 1 17 5');
+    expect(entries['draw-tool']!.html).toContain('M6.5 17.5 17.5 6.5');
   });
 });
 
