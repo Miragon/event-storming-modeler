@@ -247,9 +247,14 @@ describe('EventStormingLabelEditing: an import while the editor is open', () => 
       importHarness();
     editing.activate(elements.get('event_order_placed')!);
     field()!.value = 'Order Confirmed';
+    expect(editing.openEdit()).toEqual({
+      elementId: 'event_order_placed',
+      value: 'Order Confirmed',
+    });
 
     editing.suspend();
     expect(field()).toBeNull();
+    expect(editing.openEdit()).toBeUndefined();
     elements.set('event_order_placed', sticky('Order Placed'));
     fire('canvas.viewbox.changing');
     editing.resumeAfterImport();
@@ -257,6 +262,10 @@ describe('EventStormingLabelEditing: an import while the editor is open', () => 
 
     await settle();
     expect(field()!.value).toBe('Order Confirmed');
+    expect(editing.openEdit()).toEqual({
+      elementId: 'event_order_placed',
+      value: 'Order Confirmed',
+    });
     expect(updateLabel).toEqual([]);
     field()!.dispatchEvent(new Event('blur'));
     expect(updateLabel).toEqual([[elements.get('event_order_placed'), 'Order Confirmed']]);

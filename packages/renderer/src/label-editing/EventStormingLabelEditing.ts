@@ -485,6 +485,13 @@ export default class EventStormingLabelEditing {
   cancel(): void {
     this.active?.cleanup();
   }
+
+  /** The edit open right now (its element and the uncommitted text), for hosts and tests. */
+  openEdit(): { elementId: string; value: string } | undefined {
+    if (!this.active) return undefined;
+    const { elementId, value } = this.active.snapshot();
+    return { elementId, value };
+  }
 }
 
 /**
