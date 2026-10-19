@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.0](https://github.com/Miragon/event-storming-modeler/compare/dsl-v0.2.2...dsl-v0.3.0) (2026-10-19)
+
+
+### Features
+
+* implement the modeler-api contract and mount the modeler shell in VS Code ([#38](https://github.com/Miragon/event-storming-modeler/issues/38)) ([b15f652](https://github.com/Miragon/event-storming-modeler/commit/b15f6520949705d14ec054ed5df9548d6d2a5d22))
+* **webapp:** move the web app onto the shared modeler shell's web chrome ([#39](https://github.com/Miragon/event-storming-modeler/issues/39)) ([03e9792](https://github.com/Miragon/event-storming-modeler/commit/03e979247fc84111a03b111d6ff260f2db558bb2))
+
 ## [0.2.2](https://github.com/Miragon/event-storming-modeler/compare/dsl-v0.2.1...dsl-v0.2.2) (2026-09-22)
 
 

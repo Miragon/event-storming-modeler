@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.4.0](https://github.com/Miragon/event-storming-modeler/compare/webapp-v0.3.0...webapp-v0.4.0) (2026-10-19)
+
+
+### Features
+
+* **webapp:** move the web app onto the shared modeler shell's web chrome ([#39](https://github.com/Miragon/event-storming-modeler/issues/39)) ([03e9792](https://github.com/Miragon/event-storming-modeler/commit/03e979247fc84111a03b111d6ff260f2db558bb2))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @miragon/event-storming-dsl bumped from 0.2.2 to 0.3.0
+    * @miragon/event-storming-renderer bumped from 0.2.2 to 0.3.0
+
 ## [0.3.0](https://github.com/Miragon/event-storming-modeler/compare/webapp-v0.2.2...webapp-v0.3.0) (2026-10-08)
 
 

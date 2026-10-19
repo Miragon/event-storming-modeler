@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.3.0](https://github.com/Miragon/event-storming-modeler/compare/renderer-v0.2.2...renderer-v0.3.0) (2026-10-19)
+
+
+### Features
+
+* implement the modeler-api contract and mount the modeler shell in VS Code ([#38](https://github.com/Miragon/event-storming-modeler/issues/38)) ([b15f652](https://github.com/Miragon/event-storming-modeler/commit/b15f6520949705d14ec054ed5df9548d6d2a5d22))
+* **webapp:** move the web app onto the shared modeler shell's web chrome ([#39](https://github.com/Miragon/event-storming-modeler/issues/39)) ([03e9792](https://github.com/Miragon/event-storming-modeler/commit/03e979247fc84111a03b111d6ff260f2db558bb2))
+
+
+### Bug Fixes
+
+* **vscode:** keep the webview chrome light in dark VS Code themes ([#35](https://github.com/Miragon/event-storming-modeler/issues/35)) ([438e913](https://github.com/Miragon/event-storming-modeler/commit/438e9135d30bdff70b22377784a53b4cdfa0c02f))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @miragon/event-storming-dsl bumped from 0.2.2 to 0.3.0
+
 ## [0.2.2](https://github.com/Miragon/event-storming-modeler/compare/renderer-v0.2.1...renderer-v0.2.2) (2026-09-22)
 
 
