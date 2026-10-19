@@ -94,7 +94,7 @@ export default class EventStormingImporter {
       const host = shapeById.get(attachedTo);
       if (!host || !isHostSticky(host)) {
         warnings.push({
-          message: `Element ${el.id}: attachedTo host "${attachedTo}" missing.`,
+          message: `“${el.id}” is pinned to “${attachedTo}”, which isn't on the board or can't hold a pin. It stays unpinned.`,
           elementId: el.id,
         });
         continue;
@@ -106,7 +106,10 @@ export default class EventStormingImporter {
       const source = shapeById.get(edge.from);
       const target = shapeById.get(edge.to);
       if (!source || !target) {
-        warnings.push({ message: `Edge ${edge.id}: endpoint missing.`, elementId: edge.id });
+        warnings.push({
+          message: `The arrow “${edge.id}” has an end that isn't on the board, so it was left out.`,
+          elementId: edge.id,
+        });
         continue;
       }
       const conn = this.factory.createArrow(edge, source, target);

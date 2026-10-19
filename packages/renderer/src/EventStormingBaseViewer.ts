@@ -134,7 +134,11 @@ export abstract class EventStormingBaseViewer {
     const { warnings } = await this.importMap(board);
     return {
       warnings: [
-        ...diagnostics.map((d) => ({ message: `Line ${d.line}: ${d.message} — "${d.text}"` })),
+        ...diagnostics.map((d) => ({
+          message: `Line ${d.line}: ${d.message}`,
+          line: d.line,
+          source: d.text,
+        })),
         ...warnings,
       ],
     };

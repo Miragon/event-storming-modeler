@@ -111,6 +111,7 @@ export type {
   StickyKind,
 } from './model/di-types.js';
 export type { ImportWarning, RootBusinessObject } from './io/index.js';
+export { importWarningText } from './io/index.js';
 
 // Icons (Material Icons, Apache-2.0) – reusable for consumers' buttons/chrome.
 export {

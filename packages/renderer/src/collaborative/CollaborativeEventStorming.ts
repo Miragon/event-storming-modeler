@@ -13,6 +13,7 @@ import type EventBus from 'diagram-js/lib/core/EventBus';
 import type Selection from 'diagram-js/lib/features/selection/Selection';
 import { Modeler } from '../Modeler.js';
 import { NavigatedViewer } from '../NavigatedViewer.js';
+import { importWarningText } from '../io/index.js';
 import type { EventStormingViewerOptions } from '../EventStormingBaseViewer.js';
 import { isSticky, type EventStormingShape } from '../model/di-types.js';
 import type { FreeRectInsets } from '../palette/EventStormingPaletteProvider.js';
@@ -138,7 +139,7 @@ function collaborative(
       importsRunning += 1;
       try {
         const { warnings } = await diagram.importDSL(text);
-        return { warnings: warnings.map((warning) => warning.message) };
+        return { warnings: warnings.map(importWarningText) };
       } finally {
         importsRunning -= 1;
       }

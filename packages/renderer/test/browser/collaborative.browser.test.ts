@@ -133,7 +133,9 @@ describe('texts that used to reject after the previous board was cleared', () =>
     const modeler = editor();
     const line = `event Big [${number}, 0]`;
     const { warnings } = await modeler.importText(`title T\n${line}\nevent Ok [0, 0]\n`);
-    expect(warnings).toHaveLength(1);
+    expect(warnings).toEqual([
+      `Line 2: Couldn't read this line. It stays in the file unchanged. (“${line}”)`,
+    ]);
     expect(ids(modeler)).toEqual(['event_ok']);
     expect(modeler.exportText()).toContain(`${line}\n`);
   });
