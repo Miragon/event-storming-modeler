@@ -113,7 +113,7 @@ export type {
 export type { ImportWarning, RootBusinessObject } from './io/index.js';
 export { importWarningText } from './io/index.js';
 
-// Icons (Material Icons, Apache-2.0) – reusable for consumers' buttons/chrome.
+// Icons (Material Icons, Apache-2.0), deprecated: the chrome's icons come from the modeler shell.
 export {
   iconMarkup,
   ICON_UNDO,
