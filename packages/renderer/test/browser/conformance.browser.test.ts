@@ -60,6 +60,11 @@ function addDomainEvent(modeler: CollaborativeModeler): void {
     );
 }
 
+function typedHalfway(fragment: string, typedSoFar: string): string {
+  if (!orderCheckout.includes(fragment)) throw new Error(`the fixture lost "${fragment}"`);
+  return orderCheckout.replace(fragment, typedSoFar);
+}
+
 function toggleLevel(modeler: CollaborativeModeler): void {
   const modeling = diagramOf(modeler).get<EventStormingModeling>('eventStormingModeling');
   modeling.setLevel(modeling.getLevel() === 'design' ? 'process' : 'design');
@@ -90,10 +95,17 @@ const harness: ConformanceHarness = {
   redo: (modeler) => diagramOf(modeler).get<CommandStack>('commandStack').redo(),
   settle: () => new Promise((resolve) => setTimeout(resolve, 30)),
   // damaged forms the DSL meets while a peer types, on top of the probes the kit derives
-  probeTexts: [orderCheckout.replace(/\[(\d+), (\d+)\]/, '[$1,'), 'event Unclosed [10'],
+  probeTexts: [
+    typedHalfway('[40, 200]', '[40,'),
+    typedHalfway('[660, 320]', '[660,'),
+    typedHalfway('Order Placed [660, 320]', 'Order Placed [660, 320] (id event_'),
+    typedHalfway('(size 240x120)', '(size 240x'),
+    'event Unclosed [10',
+  ],
   openInteraction(modeler) {
     const diagram = diagramOf(modeler);
     const sticky = diagram.get<ElementRegistry>('elementRegistry').get('event_order_placed');
+    if (!sticky) throw new Error('the imported board has no sticky event_order_placed to edit');
     diagram
       .get<EventStormingLabelEditing>('eventStormingLabelEditing')
       .activate(sticky as EventStormingShape);
@@ -120,10 +132,22 @@ const failOnSkip = {
   },
 };
 
+const ID_COLLISION_CASE =
+  'elements (when present, recommended): ids created on two peers at the same time do not collide';
+
 const advisories: string[] = [];
+const completedCases = new Set<string>();
+
+// A filtered run (`-t`, `.only`) skips cases, so only the advisories of cases that ran are due.
+function recordingTest(name: string, run: () => Promise<void>): void {
+  test(name, async () => {
+    await run();
+    completedCases.add(name.replace(/^conformance: /, ''));
+  });
+}
 
 describe('Event Storming implements the collaborative-modeler contract', () => {
-  registerConformance(harness, test, {
+  registerConformance(harness, recordingTest, {
     ...failOnSkip,
     onAdvisory(caseName, advice) {
       advisories.push(`${caseName}: ${advice}`);
@@ -135,10 +159,13 @@ describe('Event Storming implements the collaborative-modeler contract', () => {
   // RECOMMENDATION of contract 1.1 (a candidate law for 2.0). The exact list fails on any other
   // advisory, and once this one is fixed, so the note cannot go stale.
   afterAll(() => {
-    expect(advisories).toEqual([
-      expect.stringMatching(
-        /^elements \(when present, recommended\): ids created on two peers.*'event_1'/,
-      ),
-    ]);
+    const expected = completedCases.has(ID_COLLISION_CASE)
+      ? [
+          expect.stringMatching(
+            /^elements \(when present, recommended\): ids created on two peers.*'event_1'/,
+          ),
+        ]
+      : [];
+    expect(advisories).toEqual(expected);
   });
 });
