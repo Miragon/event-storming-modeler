@@ -16,7 +16,9 @@ export interface SvgBounds {
  */
 export function saveSVG(canvas: Canvas, bounds?: SvgBounds): { svg: string } {
   const container = canvas.getContainer();
-  const source = container.querySelector('svg');
+  // The canvas's own <svg> is a child of the container; the icons of a palette that a host's
+  // chrome moved in front of it are <svg>s as well, only deeper down.
+  const source = container.querySelector(':scope > svg');
   if (!source) throw new Error('No SVG found in the canvas container.');
 
   const clone = source.cloneNode(true) as SVGSVGElement;

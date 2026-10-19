@@ -287,7 +287,9 @@ test.describe('VS Code webview: protocol and chrome', () => {
     const svg = await waitForPosted(page, 'export');
     expect(svg.format).toBe('svg');
     expect(typeof svg.data).toBe('string');
-    expect(String(svg.data).length).toBeGreaterThan(0);
+    // The board itself, not a palette icon (the chrome moves the palette in front of the canvas).
+    expect(String(svg.data)).toContain('data-element-id="event_order_placed"');
+    expect(String(svg.data)).not.toContain('event-storming-palette-svg');
 
     const dropdown = await openMenu(page);
     await dropdown.locator('[data-menu-id="export-png"]').click();
