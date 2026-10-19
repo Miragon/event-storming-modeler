@@ -57,8 +57,9 @@ package sources (no build needed):
 | `vscode-webview` | the VS Code webview inside the shell's VS Code stub (`e2e/webview/`) | 5190 (`E2E_WEBVIEW_PORT`) |
 
 The `vscode-webview` project runs `@miragon/modeler-shell`'s conformance kit (geometry, ARIA, keys,
-appearance, cleanup; only the legend and inspector checks skip, Event Storming has neither) and the
-webview's own protocol and chrome specs. Run one project with
+keyboard creation, the read-only lock of an invalid file, appearance, cleanup; the harness declares
+the legend and the inspector `absent`, since Event Storming has neither, and any skip fails the
+suite) and the webview's own protocol and chrome specs. Run one project with
 `npm run test:e2e -- --project=vscode-webview`. Locally an already running server on a port is
 reused, so pick free ports (`E2E_PORT=5387 E2E_WEBVIEW_PORT=5397 npm run test:e2e`) when another
 app occupies 5180 or 5190.
