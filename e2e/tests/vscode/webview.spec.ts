@@ -361,6 +361,41 @@ test.describe('VS Code webview: protocol and chrome', () => {
     expect(painted).toMatchObject({ shadow: 'none', edge: painted.kontur, ring: '3px' });
   });
 
+  // Under forced colours the panel's edge is CanvasText and the Close ring Highlight, as on the
+  // shell's own popups. Chromium and the tokens' forced-colours block already paint both; this
+  // fails once the dialog opts out (forced-color-adjust: none) with colours of its own.
+  test('the keyboard shortcuts dialog follows forced colours', async ({ page }) => {
+    await page.emulateMedia({ forcedColors: 'active' });
+    await openWebview(page);
+    await page.locator('[data-chrome="menu"]').focus();
+    await page.keyboard.press('ArrowUp');
+    await expect(page.locator('[data-menu-id="keyboard-shortcuts"]')).toBeFocused();
+    await page.keyboard.press('Enter');
+    const dialog = page.locator('.cd-shell dialog.event-storming-shortcuts');
+    await expect(dialog.getByRole('button', { name: 'Close' })).toBeFocused();
+
+    const painted = await page.evaluate(() => {
+      const system = (name: string): string => {
+        const probe = document.createElement('span');
+        probe.style.color = name;
+        document.body.append(probe);
+        const color = getComputedStyle(probe).color;
+        probe.remove();
+        return color;
+      };
+      const panel = getComputedStyle(document.querySelector('dialog.event-storming-shortcuts')!);
+      const close = getComputedStyle(document.querySelector('.event-storming-shortcuts-close')!);
+      return {
+        edge: panel.borderTopColor,
+        ring: close.outlineColor,
+        canvasText: system('CanvasText'),
+        highlight: system('Highlight'),
+      };
+    });
+    expect(painted.canvasText).not.toBe(painted.highlight);
+    expect(painted).toMatchObject({ edge: painted.canvasText, ring: painted.highlight });
+  });
+
   test('palette entries name their tool and expose its key', async ({ page }) => {
     await openWebview(page);
     const entries = [
