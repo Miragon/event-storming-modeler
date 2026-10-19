@@ -6,7 +6,7 @@
  *  - Host -> webview: `problems` with the diagnostics summary for the problems pill.
  *  - Host -> webview: `command` when a Command Palette command targets the active board.
  *  - Webview -> host: `edit` after every graphical change (serialized DSL) -> WorkspaceEdit.
- *  - Webview -> host: `export` (SVG text or Base64 PNG) -> save dialog + write file.
+ *  - Webview -> host: `export` (SVG or JSON text, Base64 PNG) -> save dialog + write file.
  *  - Webview -> host: `showProblems` (pill) and `insertExample` (empty-file hint).
  *
  * Echo protection: the host suppresses re-import when a document change exactly matches the DSL
@@ -16,7 +16,11 @@
  */
 
 /** Board actions that exist both in the webview menu and as Command Palette commands. */
-export type WebviewCommand = 'fitView' | 'exportPng' | 'exportSvg';
+export type WebviewCommand =
+  'fitView' | 'exportPng' | 'exportSvg' | 'exportPngTransparent' | 'exportJson';
+
+/** What an export carries: SVG and JSON as text, the PNGs in Base64. */
+export type ExportFormat = 'svg' | 'png' | 'png-transparent' | 'json';
 
 export type HostToWebview =
   /** Initial population after `ready`. */
@@ -32,8 +36,8 @@ export type WebviewToHost =
   | { type: 'ready' }
   /** Graphical change -> apply to the document as a WorkspaceEdit. */
   | { type: 'edit'; text: string }
-  /** Trigger an image export (SVG = text, PNG = Base64). */
-  | { type: 'export'; format: 'svg' | 'png'; data: string }
+  /** Trigger an export (SVG and JSON = text, PNG = Base64). */
+  | { type: 'export'; format: ExportFormat; data: string }
   | { type: 'error'; message: string }
   /** The problems pill was activated -> open the Problems view. */
   | { type: 'showProblems' }

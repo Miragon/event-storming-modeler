@@ -71,7 +71,8 @@ export interface BoardExport {
 
 /**
  * The exports a host offers, in the guide's order: PNG first (the more frequent target), then
- * SVG, then the variants, then further formats. Only PNG and SVG are in every host.
+ * SVG, then the variants, then further formats. Both hosts offer PNG, SVG, the transparent PNG and
+ * JSON (guide §5.2: one Export group); only the web app adds .storm, which in VS Code is the file.
  */
 export interface BoardExports {
   readonly png: BoardExport;

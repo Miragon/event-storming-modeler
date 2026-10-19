@@ -50,19 +50,21 @@ earlier events sit to the left of later ones — and arrows connect the stickies
   canvas keeps its view and selection. Only the lines that changed are rewritten, so a text editor
   open beside the board keeps its cursor.
 - **Menu** (top left): the workshop **Level** and **Type captions** (the caption on each sticky),
-  **Export as PNG** and **Export as SVG** (as a picture), and **Keyboard shortcuts…**.
+  **Export as PNG**, **Export as SVG**, **Export as PNG (4×, transparent)** (for slides) and
+  **Export as JSON**, the same exports as the web app, and **Keyboard shortcuts…**.
 - **Zoom** (bottom right): zoom out, the current zoom (click for 100%), zoom in and fit. With the
   board focused, `Ctrl/Cmd` + `+`, `-` and `0` zoom the canvas (not the window), `Shift+1` fits.
 - **Problems.** Lines the parser cannot fully use (an arrow to a missing sticky, an unreadable
-  line) are kept in the file and listed in the **Problems** view; the pill at the bottom left
-  counts them and opens that view.
+  line) are kept in the file and listed in the **Problems** view in plain words ("This arrow points
+  to “Nowhere”, which isn't on the board."); the pill at the bottom left counts them and opens that
+  view.
 - **Stable sticky ids.** A sticky you create or rename on the canvas keeps its id in the text
   (`(id event_3)`), so a reload, a peer or a tool that links to it finds the same sticky. Two
   people who each add a sticky at the same time (on two branches, say) can both get `event_1`;
   after the merge the second sticky gets a new id, and a link to it then finds the first.
 - **Commands** (Command Palette or the `…` menu of the editor title, while a board is focused):
-  **Event Storming: Fit to View**, **Export as PNG**, **Export as SVG**, and **Open Source to the
-  Side** / **Open Board to the Side**.
+  **Event Storming: Fit to View**, **Export as PNG**, **Export as SVG**, **Export as PNG (4×,
+  Transparent)**, **Export as JSON**, and **Open Source to the Side** / **Open Board to the Side**.
 - **Empty board:** a hint in the middle offers **Insert example**, which adds the order-checkout
   example as one undoable edit and keeps the title and comments already in the file.
 - **Light canvas in every theme.** The board stays light under dark color themes (high contrast is

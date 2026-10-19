@@ -85,9 +85,12 @@ const shell = mountVsCodeShell(app, {
     levels,
     typeCaptions,
     onTypeCaptionsToggled: (visible) => writeTypeCaptionsVisible(vscode, visible),
+    // The web app's Export group without its .storm export: here the file already is the .storm.
     exports: {
       png: { onSelect: () => void exportPng() },
       svg: { onSelect: () => void exportSvg() },
+      transparentPng: { onSelect: () => void exportPngTransparent() },
+      json: { onSelect: () => exportJson() },
     },
     showKeyboardShortcuts: () => shortcutsDialog.open(),
   }),
@@ -244,6 +247,26 @@ async function exportPng(): Promise<void> {
   }
 }
 
+/** Four times the size, without the paper (slides, documents), as in the web app. */
+async function exportPngTransparent(): Promise<void> {
+  try {
+    const { svg } = await withoutSelection(() => modeler.saveSVG());
+    const png = await svgToPng(svg, 4, true);
+    post({ type: 'export', format: 'png-transparent', data: await blobToBase64(png) });
+  } catch (error) {
+    post({ type: 'error', message: `Could not export the board as PNG: ${messageOf(error)}` });
+  }
+}
+
+/** The board's JSON in its own element order, as the web app exports it. */
+function exportJson(): void {
+  try {
+    post({ type: 'export', format: 'json', data: JSON.stringify(modeler.exportMap(), null, 2) });
+  } catch (error) {
+    post({ type: 'error', message: `Could not export the board as JSON: ${messageOf(error)}` });
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Messages from the extension host
 // ---------------------------------------------------------------------------
@@ -252,6 +275,8 @@ const COMMANDS: Readonly<Record<WebviewCommand, () => void>> = {
   fitView: () => viewport.fit(),
   exportPng: () => void exportPng(),
   exportSvg: () => void exportSvg(),
+  exportPngTransparent: () => void exportPngTransparent(),
+  exportJson: () => exportJson(),
 };
 
 function isHostMessage(data: unknown): data is HostToWebview {

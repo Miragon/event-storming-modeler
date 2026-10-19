@@ -29,6 +29,37 @@ describe('EventStormingEditorProvider — export', () => {
     expect(Buffer.from(writeFile.mock.calls[0]![1]).toString()).toBe('png!');
   });
 
+  it.each([
+    [
+      'png-transparent',
+      '/boards/checkout-transparent@4x.png',
+      'PNG image',
+      'Export as PNG (4×, transparent)',
+    ],
+    ['json', '/boards/checkout.json', 'JSON board', 'Export as JSON'],
+  ] as const)(
+    'exports %s beside the board as the web app names it',
+    async (format, path, filter, title) => {
+      const showSaveDialog = vi
+        .spyOn(window, 'showSaveDialog')
+        .mockResolvedValue(Uri.parse(`file:${path}`));
+      const writeFile = vi.spyOn(workspace.fs, 'writeFile');
+      const h = await openBoard(fakeDocument('/boards/checkout.storm', 'title A\n'));
+      const data = format === 'json' ? '{"config":{}}' : Buffer.from('png!').toString('base64');
+
+      await h.receive({ type: 'export', format, data });
+
+      expect(showSaveDialog.mock.calls[0]![0]).toMatchObject({
+        title,
+        defaultUri: expect.objectContaining({ path }),
+        filters: { [filter]: [path.slice(path.lastIndexOf('.') + 1)] },
+      });
+      expect(Buffer.from(writeFile.mock.calls[0]![1]).toString()).toBe(
+        format === 'json' ? '{"config":{}}' : 'png!',
+      );
+    },
+  );
+
   it('notifies with the file name and a reveal action labelled like the platform', async () => {
     vi.spyOn(window, 'showSaveDialog').mockResolvedValue(target);
     const reveal = revealFileLabel(process.platform);

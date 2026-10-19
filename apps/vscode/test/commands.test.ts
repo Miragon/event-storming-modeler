@@ -23,6 +23,8 @@ describe('board commands', () => {
         'eventStorming.fitView',
         'eventStorming.exportPng',
         'eventStorming.exportSvg',
+        'eventStorming.exportPngTransparent',
+        'eventStorming.exportJson',
       ]),
     );
   });
