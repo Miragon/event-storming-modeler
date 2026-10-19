@@ -324,6 +324,43 @@ test.describe('VS Code webview: protocol and chrome', () => {
     }
   });
 
+  // Guide §6 and §8: under high contrast the dialog trades its shadow for a --cd-ui-kontur edge
+  // and its focus ring grows to 3px; the shell's own contrast rules match only its classes.
+  test('the keyboard shortcuts dialog follows high contrast', async ({ page }) => {
+    await openWebview(page);
+    await page.evaluate(() => window.__modelerShellVsCodeStub!.setColorThemeKind(3));
+    await expect(page.locator('html')).toHaveAttribute('data-cd-kontrast', 'hoch');
+    // opened by keyboard, so the focus ring on Close is the :focus-visible one
+    await page.locator('[data-chrome="menu"]').focus();
+    await page.keyboard.press('ArrowUp');
+    await expect(page.locator('[data-menu-id="keyboard-shortcuts"]')).toBeFocused();
+    await page.keyboard.press('Enter');
+    const dialog = page.locator('.cd-shell dialog.event-storming-shortcuts');
+    await expect(dialog.getByRole('button', { name: 'Close' })).toBeFocused();
+
+    const painted = await page.evaluate(() => {
+      const role = (name: string): string => {
+        const probe = document.createElement('span');
+        probe.style.color = `var(${name})`;
+        document.querySelector('.cd-shell')!.append(probe);
+        const color = getComputedStyle(probe).color;
+        probe.remove();
+        return color;
+      };
+      const panel = getComputedStyle(document.querySelector('dialog.event-storming-shortcuts')!);
+      const close = getComputedStyle(document.querySelector('.event-storming-shortcuts-close')!);
+      return {
+        shadow: panel.boxShadow,
+        edge: panel.borderTopColor,
+        kontur: role('--cd-ui-kontur'),
+        linie: role('--cd-ui-linie'),
+        ring: close.outlineWidth,
+      };
+    });
+    expect(painted.kontur).not.toBe(painted.linie);
+    expect(painted).toMatchObject({ shadow: 'none', edge: painted.kontur, ring: '3px' });
+  });
+
   test('palette entries name their tool and expose its key', async ({ page }) => {
     await openWebview(page);
     const entries = [

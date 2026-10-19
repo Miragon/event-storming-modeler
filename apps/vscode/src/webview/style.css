@@ -122,9 +122,12 @@
   margin-left: 6px;
 }
 
-/* High contrast (guide §5.3, §8): no shadow, a 3px focus ring; forced colours keep the edge. The
-   shell applies these rules only to its own classes, so the modeler's dialog repeats them. */
+/* High contrast (guide §6, §8): no shadow but a --cd-ui-kontur edge, and a 3px focus ring; forced
+   colours draw the edge in CanvasText and the ring in Highlight. The shell applies these rules
+   only to its own classes, so the modeler's dialog repeats them (modeler-shell API.md, "Modeler
+   dialogs"). */
 :root[data-cd-kontrast='hoch'] .event-storming-shortcuts {
+  border-color: var(--cd-ui-kontur);
   box-shadow: none;
 }
 
@@ -135,5 +138,9 @@
 @media (forced-colors: active) {
   .event-storming-shortcuts {
     border-color: CanvasText;
+  }
+
+  .event-storming-shortcuts-close:focus-visible {
+    outline-color: Highlight;
   }
 }
