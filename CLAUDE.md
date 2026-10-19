@@ -39,8 +39,9 @@ portless service install` — see [`CONTRIBUTING.md`](CONTRIBUTING.md)). `npm ru
   for plain Vite on `:5180`. · `npm run dev:vscode`
 - `npm test` — Vitest · `npm run typecheck` · `npm run lint` (ESLint + typecheck)
 - `npm run test:browser` — Vitest in Chromium (renderer integration, the `@miragon/modeler-api`
-  conformance kit) · `npm run test:e2e` — Playwright, two projects: `webapp` and `vscode-webview`
-  (the webview inside the shell's VS Code stub, incl. the shell conformance kit); one project with
+  conformance kit) · `npm run test:e2e` — Playwright, two projects: `webapp` (the web app, incl.
+  the shell conformance kit on the `web` host) and `vscode-webview` (the webview inside the shell's
+  VS Code stub, incl. the kit on the `ide` host); one project with
   `npm run test:e2e -- --project=vscode-webview`, other ports via `E2E_PORT` /
   `E2E_WEBVIEW_PORT` (default 5180 / 5190)
 - `npm run format` — Prettier · `npm run depcruise` — check the module graph
@@ -132,26 +133,39 @@ away from the shell) and [`apps/vscode/test/tokens.sync.test.ts`](apps/vscode/te
 light colours in its SVG attributes (`draw/styles.ts`), never a `var()`. The DSL's `style dark`
 stays in the board config for the round-trip, but nothing renders it (guide §10.7).
 
-**VS Code chrome = `@miragon/modeler-shell`.** The webview
+**Chrome = `@miragon/modeler-shell`, in both apps.** The VS Code webview
 ([`apps/vscode/src/webview/main.ts`](apps/vscode/src/webview/main.ts)) mounts the shared Miragon
-modeler chrome (menu, palette skin, chrome tooltip, zoom panel and keys, fit, problems pill, status
-box, empty-file hint, theme bridge, key interception); the extension host uses the shell's webview
-HTML/CSP and theme bridge. Stylesheet order there: fonts, the renderer, `./style.css` (modeler-owned
-content only, `--cd-ui-*` roles only, never `var(--vscode-*)`), `@miragon/modeler-shell/shell.css`
-last. The renderer's own palette rules apply only to `.djs-palette:not([data-chrome='palette'])`,
-so a shell-skinned palette wears the shell's look alone. **Renderers never import the shell** — only
+modeler chrome on the `ide` host (menu, palette skin, chrome tooltip, zoom panel and keys, fit,
+problems pill, status box, empty-file hint, theme bridge, key interception); the extension host
+uses the shell's webview HTML/CSP and theme bridge. The web app
+([`apps/webapp/src/main.ts`](apps/webapp/src/main.ts)) mounts it on the `web` host: the same chrome
+plus the web column (File group, "Share" as primary action, legal line, toasts, problems list,
+start screen, page-wide drop zone); its `index.html` stays `data-cd-theme="light"` and the Vite
+config writes the shell's `webHeadMarkup` (light only: one theme-color and the contrast line).
+Stylesheet order in both: fonts, the renderer (tokens, diagram-js, canvas mapping and the shortcuts
+dialog), `@miragon/modeler-shell/shell.css` last; neither app has a stylesheet of its own. Both take
+the board's menu entries (Level, Type captions, the exports, "Keyboard shortcuts…") and the
+shortcuts dialog from the renderer (`boardMenu`, `createShortcutsDialog`,
+[`packages/renderer/src/board-menu/`](packages/renderer/src/board-menu/)), which mirrors the
+shell's types structurally; a sync test in apps/vscode pins the mirror against the shell. The
+renderer's own palette rules apply only to `.djs-palette:not([data-chrome='palette'])`, so a
+shell-skinned palette wears the shell's look alone. **Renderers never import the shell** — only
 the apps (and `e2e/`) do; `packages/*` reaching `@miragon/modeler-shell` fails ESLint and
-dependency-cruiser. The webview runs on `createCollaborativeModeler` (the tested contract path),
-passes the shell's fit insets as `freeRectInsets` (keyboard creation from the palette) and toggles
-the renderer's `eventStormingReadOnly` lock together with `shell.setReadOnly`. The web app does not
-use the shell yet. The VSIX ships `apps/vscode/THIRD_PARTY_NOTICES.md`, generated from the bundles
-(`npm run notices -w apps/vscode`; a unit test fails when it is stale).
+dependency-cruiser. Both pass the shell's fit insets as `freeRectInsets` (keyboard creation from
+the palette); the webview runs on `createCollaborativeModeler` (the tested contract path) and
+toggles the renderer's `eventStormingReadOnly` lock together with `shell.setReadOnly`, the web app
+keeps the canvas's undo keys and replaces a board with an undo toast instead of a confirmation. The
+VSIX ships `apps/vscode/THIRD_PARTY_NOTICES.md`, generated from the bundles
+(`npm run notices -w apps/vscode`; a unit test fails when it is stale); the web bundle keeps the
+shell's Lucide/Feather legal comment.
 
 Reference implementation in this repo: tokens
 [`packages/renderer/src/theme/palette.ts`](packages/renderer/src/theme/palette.ts) · canvas
 colours [`packages/renderer/src/draw/styles.ts`](packages/renderer/src/draw/styles.ts) · in-canvas
 chrome [`packages/renderer/src/assets/event-storming.css`](packages/renderer/src/assets/event-storming.css)
-· app chrome + toast `apps/webapp/src/{style.css,toast.ts,main.ts}` · VS Code webview
+· board menu and shortcuts dialog
+[`packages/renderer/src/board-menu/`](packages/renderer/src/board-menu/) · web app
+[`apps/webapp/src/main.ts`](apps/webapp/src/main.ts) · VS Code webview
 [`apps/vscode/src/webview/`](apps/vscode/src/webview/).
 
 ## Code Style
