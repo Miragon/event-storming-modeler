@@ -31,13 +31,16 @@ Enforced twice — ESLint (`no-restricted-imports`/`no-restricted-globals`) **an
 
 ## Commands
 
-- `npm run build` — all packages · `npm run build:webapp` · `npm run build:vscode`
+- `npm run build` — all packages · `npm run build:webapp` (then `npm run check:build -w apps/webapp`
+  checks the mode markup and the shell's licence comment in `dist`, as CI does) ·
+  `npm run build:vscode`
 - `npm run dev:webapp` (alias: `npm run dev`) serves the webapp via [Portless](https://portless.sh)
   at a per-worktree `https://<branch>.event-storming.localhost` URL (Portless-derived from the git
   worktree; config in [`apps/webapp/portless.json`](apps/webapp/portless.json); one-time `npx
 portless service install` — see [`CONTRIBUTING.md`](CONTRIBUTING.md)). `npm run dev:webapp:plain`
   for plain Vite on `:5180`. · `npm run dev:vscode`
-- `npm test` — Vitest · `npm run typecheck` · `npm run lint` (ESLint + typecheck)
+- `npm test` — Vitest · `npm run typecheck` (also `apps/webapp/vite.config.ts`, through
+  `apps/webapp/tsconfig.config.json`) · `npm run lint` (ESLint + typecheck)
 - `npm run test:browser` — Vitest in Chromium (renderer integration, the `@miragon/modeler-api`
   conformance kit) · `npm run test:e2e` — Playwright, two projects: `webapp` (the web app, incl.
   the shell conformance kit on the `web` host) and `vscode-webview` (the webview inside the shell's
