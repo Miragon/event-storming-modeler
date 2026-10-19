@@ -2,24 +2,30 @@ import type { ProblemItem } from '@miragon/modeler-shell';
 import type { ImportWarning } from '@miragon/event-storming-renderer';
 
 /** The renderer writes a parser finding as `Line 12: <message>`; the line is the row's place. */
-const LINE_PREFIX = /^Line (\d+): /;
+const LINE_PREFIX = /^Line \d+: /;
+
+/** "Line 12 · Order Placed -> Nowhere": the line, and what stands on it. */
+function lineLocation(line: number, source: string | undefined): string {
+  const text = source?.trim();
+  return text ? `Line ${line} · ${text}` : `Line ${line}`;
+}
 
 /**
- * Import warnings as rows of the problems list (guide §5.10): the message, its line below it, and
- * the element a click on the row selects where the board still has it.
+ * Import warnings as rows of the problems list (guide §5.10): the message, its line and source
+ * below it, and the element a click on the row selects where the board still has it.
  */
 export function problemItems(
   warnings: readonly ImportWarning[],
   hasElement: (id: string) => boolean,
 ): ProblemItem[] {
   return warnings.map((warning) => {
-    const line = LINE_PREFIX.exec(warning.message);
     const elementId =
       warning.elementId && hasElement(warning.elementId) ? warning.elementId : undefined;
+    const line = warning.line;
     return {
       severity: 'warning',
-      message: line ? warning.message.slice(line[0].length) : warning.message,
-      ...(line ? { location: `Line ${line[1]}` } : {}),
+      message: line === undefined ? warning.message : warning.message.replace(LINE_PREFIX, ''),
+      ...(line === undefined ? {} : { location: lineLocation(line, warning.source) }),
       ...(elementId ? { elementId } : {}),
     };
   });

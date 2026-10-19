@@ -16,6 +16,9 @@ import { waitForViewer } from './support/viewer.js';
 const describeSkips = (skips: readonly ShellSkip[]): string =>
   skips.map((skip) => `${skip.hook}: ${skip.reason}`).join('; ');
 
+/** The example with two lines the parser cannot take: two text rows in the problems list. */
+const BOARD_WITH_FINDINGS = `${EXAMPLE_BOARD}\nevent Broken [abc, 20]\nOrder Placed -> Nowhere\n`;
+
 /** Pages that start every visit without a stored preference (type captions, appearance). */
 const freshPages = new WeakSet<Page>();
 
@@ -45,31 +48,15 @@ test.describe('web app: shell conformance', () => {
       async destroy(page) {
         await page.evaluate(() => window.__eventStormingApp?.destroy());
       },
-      absent: ['legend', 'inspector', 'invalid'],
+      // The web app's problems come from the parser and name lines, never elements (a JSON board
+      // with a dangling pin is refused before the import), so no row of its list selects.
+      absent: ['legend', 'inspector', 'invalid', 'problemSelection'],
       show: {
-        // The web app's imports carry no element ids today (the parser reports lines), so the
-        // pill gets one finding with a line and one on a sticky of the example, as rows of both
-        // kinds look in the list.
+        // A link to a board with findings, loaded fresh: the import the user started reports them
+        // to the pill and its list, as the app's real path does.
         async problems(page) {
-          await page.evaluate(() =>
-            window.__eventStormingApp?.shell.setProblems({
-              count: 2,
-              errors: 0,
-              items: [
-                {
-                  severity: 'warning',
-                  message: 'Line could not be interpreted — “event B [abc, 20]”',
-                  location: 'Line 3',
-                },
-                {
-                  severity: 'warning',
-                  message: 'Attachment: “#nowhere” not found',
-                  location: '“Order Placed”',
-                  elementId: 'event_order_placed',
-                },
-              ],
-            }),
-          );
+          await page.goto(`/?problems#mz=${await encodeMapCompressed(BOARD_WITH_FINDINGS)}`);
+          await waitForViewer(page);
         },
         async status(page) {
           await page.evaluate(() => {

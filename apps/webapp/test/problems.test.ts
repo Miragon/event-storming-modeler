@@ -2,26 +2,37 @@ import { describe, expect, it } from 'vitest';
 import { importWarningsText, problemItems } from '../src/problems.js';
 
 describe('problemItems', () => {
-  it('turns a parser finding’s line into the row’s place', () => {
+  it('turns a parser finding’s line and source into the row’s place', () => {
     const items = problemItems(
-      [{ message: 'Line 3: Line could not be interpreted — "event B [abc, 20]"' }],
+      [
+        {
+          message: "Line 3: Couldn't read this line. It stays in the file unchanged.",
+          line: 3,
+          source: 'event B [abc, 20]',
+        },
+        { message: 'Line 9: A drawing can’t be resized.', line: 9 },
+      ],
       () => true,
     );
 
     expect(items).toEqual([
       {
         severity: 'warning',
-        message: 'Line could not be interpreted — "event B [abc, 20]"',
-        location: 'Line 3',
+        message: "Couldn't read this line. It stays in the file unchanged.",
+        location: 'Line 3 · event B [abc, 20]',
       },
+      { severity: 'warning', message: 'A drawing can’t be resized.', location: 'Line 9' },
     ]);
   });
 
   it('keeps an element only while the board has it, so a click on the row can select it', () => {
     const items = problemItems(
       [
-        { message: 'Element actor_a: attachedTo host "x" missing.', elementId: 'actor_a' },
-        { message: 'Edge arrow_1: endpoint missing.', elementId: 'arrow_1' },
+        { message: '“actor_a” is pinned to “x”, which isn’t on the board.', elementId: 'actor_a' },
+        {
+          message: 'The arrow “arrow_1” has an end that isn’t on the board.',
+          elementId: 'arrow_1',
+        },
       ],
       (id) => id === 'actor_a',
     );

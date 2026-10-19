@@ -8,19 +8,21 @@ import '@miragon/modeler-shell/shell.css';
 import {
   Modeler,
   boardMenu,
-  commandKeyLabel,
   createShortcutsDialog,
+  importWarningText,
   type BoardBounds,
   type BoardLevels,
   type ImportWarning,
   type TypeCaptions,
 } from '@miragon/event-storming-renderer';
-import { createEmptyBoard, serializeBoard } from '@miragon/event-storming-schema-model';
+import { createEmptyBoard } from '@miragon/event-storming-schema-model';
 import {
   TEXT_FIELD_SELECTOR,
+  commandKeyLabel,
   defaultMessages,
   detectPlatform,
   formatNumber,
+  isUndoRedoKey,
   mountShell,
   problemSummary,
   type ToastHandle,
@@ -59,6 +61,7 @@ interface CanvasLike {
   scrollToElement(element: DiagramElement): void;
 }
 
+const APP_NAME = 'Event Storming Modeler';
 const BOARD_NAME = 'Event Storming board';
 const NEW_BOARD_TITLE = 'New board';
 const REPOSITORY_URL = 'https://github.com/Miragon/event-storming-modeler';
@@ -83,6 +86,7 @@ const modeler = new Modeler({
 });
 modeler.get('canvas');
 const registry = modeler.get<ElementRegistryLike>('elementRegistry');
+const commandStack = modeler.get<{ canUndo(): boolean }>('commandStack');
 const selection = modeler.get<SelectionLike>('selection');
 const canvas = modeler.get<CanvasLike>('canvas');
 const boardBounds = modeler.get<BoardBounds>('boardBounds');
@@ -129,12 +133,13 @@ const shell = mountShell(app, {
   }),
   problems: { onSelectItem: (item) => selectElement(item.elementId) },
   emptyState: {
-    title: 'Event Storming Modeler',
+    title: APP_NAME,
     text: 'Start a new diagram, or explore the example.',
     komet: '/miragon-komet-blau.svg',
     onNewDiagram: () => void newDiagram(),
     onShowExample: () => void showExample(),
-    dropHint: 'Or drop a .storm or .json file here',
+    // The same types the reject toast names (the accept list's extensions).
+    dropHint: 'Or drop a .storm, .json, or .txt file here',
   },
   dropZone: {
     accept: BOARD_FILE_TYPES,
@@ -180,7 +185,8 @@ function boardIsEmpty(): boolean {
 function reportWarnings(warnings: readonly ImportWarning[], announce: boolean): void {
   const items = problemItems(warnings, (id) => registry.get(id) !== undefined);
   shell.setProblems(problemSummary(items));
-  for (const warning of warnings) console.warn(`[event-storming-import] ${warning.message}`);
+  for (const warning of warnings)
+    console.warn(`[event-storming-import] ${importWarningText(warning)}`);
   if (!announce || items.length === 0) return;
   const pill = shell.messages.problems(items.length, formatNumber(items.length, shell.lang));
   shell.toast({ status: 'warning', text: importWarningsText(items.length, pill) });
@@ -196,37 +202,54 @@ async function openDocument(load: BoardLoad, announce: boolean): Promise<void> {
   }
   shell.setEmptyState(false);
   shell.menu.refresh();
+  updateDocumentTitle();
   reportWarnings(warnings, announce);
 }
 
-let replaceUndo: ToastHandle | undefined;
+/** The board's title in the tab (guide §5.4: the web app's title names the file), else the app. */
+function updateDocumentTitle(): void {
+  const title = shell.isEmptyStateShown() ? undefined : boardTitle()?.trim();
+  document.title = title && title !== NEW_BOARD_TITLE ? `${title} · ${APP_NAME}` : APP_NAME;
+}
+
+interface ReplaceUndo {
+  readonly toast: ToastHandle;
+  run(): void;
+}
+
+let replaceUndo: ReplaceUndo | undefined;
 
 /** An undo offer would bring back the replaced board and silently drop what came after it. */
 function withdrawReplaceUndo(): void {
-  replaceUndo?.dismiss();
+  replaceUndo?.toast.dismiss();
   replaceUndo = undefined;
 }
 
 /**
  * Replacing a board clears the canvas history, so instead of asking first (guide §9) every
- * replacement keeps the previous board as text and offers it back: "Board replaced · Undo".
+ * replacement keeps the previous board as text and offers it back: "Board replaced · Undo", and
+ * Cmd/Ctrl+Z while the canvas has nothing else to undo (the toast's button is far down the tab order).
  */
 async function replaceBoard(load: BoardLoad): Promise<void> {
   const previous = boardIsEmpty() ? undefined : modeler.exportDSL();
   await openDocument(load, true);
   withdrawReplaceUndo();
   if (previous === undefined || previous === modeler.exportDSL()) return;
-  const offer = shell.toast({
-    status: 'info',
-    text: 'Board replaced',
-    action: {
-      label: 'Undo',
-      onSelect: () => {
-        if (replaceUndo === offer) replaceUndo = undefined;
-        void openDocument(importText(previous), false);
-      },
+  const undo = (): void => {
+    if (replaceUndo === offer) replaceUndo = undefined;
+    void openDocument(importText(previous), false);
+  };
+  const offer: ReplaceUndo = {
+    toast: shell.toast({
+      status: 'info',
+      text: 'Board replaced',
+      action: { label: 'Undo', onSelect: undo },
+    }),
+    run: () => {
+      offer.toast.dismiss();
+      undo();
     },
-  });
+  };
   replaceUndo = offer;
 }
 
@@ -346,8 +369,10 @@ async function exportPicture(kind: Extract<DownloadKind, 'png' | 'png-transparen
 function exportBoardText(kind: Extract<DownloadKind, 'json' | 'storm'>): void {
   const fileName = boardFileName(boardTitle(), kind);
   try {
+    // The board's own order, not serializeBoard's canonical one: the importer stacks stickies in
+    // array order, so a sorted export would reopen with overlapping stickies swapped.
     if (kind === 'json') {
-      downloadText(serializeBoard(modeler.exportMap()), fileName, 'application/json');
+      downloadText(JSON.stringify(modeler.exportMap(), null, 2), fileName, 'application/json');
     } else downloadText(modeler.exportDSL(), fileName, 'text/plain;charset=utf-8');
     announceExport(fileName);
   } catch (error) {
@@ -357,29 +382,51 @@ function exportBoardText(kind: Extract<DownloadKind, 'json' | 'storm'>): void {
 }
 
 // ---------------------------------------------------------------------------
-// The web app's own keys: Cmd/Ctrl+O opens a file, Cmd/Ctrl+S exports the .storm file
+// The web app's own keys: Cmd/Ctrl+O opens a file, Cmd/Ctrl+S exports the .storm file,
+// Cmd/Ctrl+Z takes back a replaced board
 // ---------------------------------------------------------------------------
 
+function isInTextField(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    (target.matches(TEXT_FIELD_SELECTOR) || target.isContentEditable)
+  );
+}
+
+function modalOpen(): boolean {
+  return document.querySelector('dialog:modal') !== null;
+}
+
+/** The canvas has nothing to undo after a replacement (the import cleared it): Cmd/Ctrl+Z takes the board back. */
+function onUndoReplaceKey(event: KeyboardEvent): void {
+  const offer = replaceUndo;
+  if (!offer || event.shiftKey || event.isComposing || !isUndoRedoKey(event)) return;
+  // Cmd/Ctrl+Y is redo; the typed letter decides (QWERTZ swaps the keys), as in isUndoRedoKey.
+  const ascii = event.key.length === 1 && event.key.charCodeAt(0) < 0x80;
+  if ((ascii ? event.key.toLowerCase() : event.code === 'KeyZ' ? 'z' : '') !== 'z') return;
+  if (isInTextField(event.target) || modalOpen() || commandStack.canUndo()) return;
+  event.preventDefault();
+  if (!event.repeat) offer.run();
+}
+
 function onAppKey(event: KeyboardEvent): void {
-  if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
+  if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+  onUndoReplaceKey(event);
+  if (event.shiftKey) return;
   const key = event.key.toLowerCase();
   if ((key !== 'o' && key !== 's') || event.isComposing) return;
-  if (document.querySelector('dialog:modal')) return;
-  // Never the browser's "Open file" or "Save page as" instead.
+  // Never the browser's "Open file" or "Save page as" instead, also not over a dialog.
   event.preventDefault();
-  if (event.repeat) return;
+  if (event.repeat || modalOpen()) return;
   if (key === 'o') {
     pickFile();
     return;
   }
+  // The start screen has no board yet to save (guide §8: only the card and the legal line).
+  if (shell.isEmptyStateShown()) return;
   // A label being typed belongs in the file: leaving the field commits it.
   const active = document.activeElement;
-  if (
-    active instanceof HTMLElement &&
-    (active.matches(TEXT_FIELD_SELECTOR) || active.isContentEditable)
-  ) {
-    active.blur();
-  }
+  if (active instanceof HTMLElement && isInTextField(active)) active.blur();
   exportBoardText('storm');
 }
 
@@ -416,6 +463,7 @@ modeler.on<{ trigger?: string }>('commandStack.changed', (event) => {
     withdrawReplaceUndo();
   }
   shell.menu.refresh(); // the level is undoable
+  updateDocumentTitle();
   onModelChanged();
 });
 
@@ -447,6 +495,7 @@ else {
   await modeler.importMap(createEmptyBoard(NEW_BOARD_TITLE));
   viewport.afterImport(); // an empty board at 100 %
   shell.setEmptyState(true);
+  updateDocumentTitle();
   if (brokenLink) shell.toast({ status: 'danger', text: BROKEN_LINK_TEXT });
 }
 

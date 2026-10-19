@@ -75,7 +75,8 @@ test.describe('webapp: the shell web chrome and the app behind it', () => {
     await expect(startScreen(page).getByRole('heading', { level: 1 })).toHaveText(
       'Event Storming Modeler',
     );
-    await expect(startScreen(page)).toContainText('Or drop a .storm or .json file here');
+    await expect(startScreen(page)).toContainText('Or drop a .storm, .json, or .txt file here');
+    await expect(page).toHaveTitle('Event Storming Modeler');
     for (const island of ['menu', 'primary', 'palette', 'zoom']) {
       await expect(page.locator(`[data-chrome="${island}"]`)).toBeHidden();
     }
@@ -106,8 +107,8 @@ test.describe('webapp: the shell web chrome and the app behind it', () => {
 
     await expect(startScreen(page)).toBeVisible();
     await expect(toast(page, 'Check that you copied the whole link.')).toHaveAttribute(
-      'role',
-      'alert',
+      'data-status',
+      'danger',
     );
   });
 
@@ -152,7 +153,9 @@ test.describe('webapp: the shell web chrome and the app behind it', () => {
 
     await page.locator('[data-chrome="primary"]').click();
 
-    await expect(toast(page, 'Link copied')).toHaveAttribute('role', 'status');
+    await expect(toast(page, 'Link copied')).toHaveAttribute('data-status', 'success');
+    // Screen readers hear it through the shell's polite live region.
+    await expect(page.locator('.cd-shell-live [role="status"]')).toHaveText('Link copied');
     const copied = await page.evaluate(() => navigator.clipboard.readText());
     expect(copied).toMatch(/\/#mz=[\w-]+$/);
     expect(copied).toBe(page.url());
@@ -176,7 +179,7 @@ test.describe('webapp: the shell web chrome and the app behind it', () => {
 
     await expect(
       toast(page, "Couldn't copy the link. Copy it from the address bar instead."),
-    ).toHaveAttribute('role', 'alert');
+    ).toHaveAttribute('data-status', 'danger');
     expect(new URL(page.url()).hash).toMatch(/^#mz=/);
   });
 
@@ -234,10 +237,18 @@ test.describe('webapp: the shell web chrome and the app behind it', () => {
     await pill.click();
     const list = page.locator('[data-chrome="problems-popover"]');
     await expect(list).toBeVisible();
-    await expect(list.locator('.cd-shell-problem-location')).toHaveText(['Line 3', 'Line 4']);
-    await expect(list.locator('.cd-shell-problem-message').first()).toContainText(
-      'Line could not be interpreted',
-    );
+    await expect(list.locator('.cd-shell-problem-location')).toHaveText([
+      'Line 3 · event B [abc, 20]',
+      'Line 4 · A -> Nowhere',
+    ]);
+    await expect(list.locator('.cd-shell-problem-message')).toHaveText([
+      "Couldn't read this line. It stays in the file unchanged.",
+      "This arrow points to “Nowhere”, which isn't on the board.",
+    ]);
+    // Text rows take the focus too, so the keyboard reads the whole list (WCAG 2.1.1).
+    await expect(list.locator('.cd-shell-problem').first()).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(list.locator('.cd-shell-problem').nth(1)).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(list).toBeHidden();
     await expect(pill).toBeFocused();
@@ -257,7 +268,7 @@ test.describe('webapp: the shell web chrome and the app behind it', () => {
 
     await expect(
       toast(page, "Couldn't read “bad.json”. Check that it contains a valid Event Storming board."),
-    ).toHaveAttribute('role', 'alert');
+    ).toHaveAttribute('data-status', 'danger');
     expect(await exportDSL(page)).toBe(before);
   });
 
@@ -312,6 +323,36 @@ test.describe('webapp: the shell web chrome and the app behind it', () => {
     expect(json.config.title).toBe('Order Checkout');
   });
 
+  test('a JSON export opens again as the same board, overlapping stickies in their order', async ({
+    page,
+  }) => {
+    // Zeta lies under Alpha; an export sorted by id would swap them.
+    const overlapping = 'title Overlap\nevent Zeta [300, 300]\nevent Alpha [330, 320]';
+    await openLink(page, overlapping);
+    const before = await exportDSL(page);
+    const dropdown = await openMenu(page);
+    const download = page.waitForEvent('download');
+    await dropdown.locator('[data-menu-id="export-json"]').click();
+    const stream = await (await download).createReadStream();
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) chunks.push(chunk as Buffer);
+
+    await fileInput(page).setInputFiles({
+      name: 'overlap.json',
+      mimeType: 'application/json',
+      buffer: Buffer.concat(chunks),
+    });
+
+    await expect(toast(page, 'Exported overlap.json.')).toBeVisible();
+    await expect.poll(() => exportDSL(page)).toBe(before);
+    // Nothing changed, so there is nothing to undo.
+    await expect(toast(page, 'Board replaced')).toHaveCount(0);
+    expect((await exportBoard(page)).elements.map((element) => element.id)).toEqual([
+      'event_zeta',
+      'event_alpha',
+    ]);
+  });
+
   test('Cmd/Ctrl+O opens the file picker and Cmd/Ctrl+S exports the .storm file', async ({
     page,
   }) => {
@@ -326,6 +367,79 @@ test.describe('webapp: the shell web chrome and the app behind it', () => {
     const download = page.waitForEvent('download');
     await page.keyboard.press('ControlOrMeta+S');
     expect((await download).suggestedFilename()).toBe('order-checkout.storm');
+  });
+
+  test('Cmd/Ctrl+S saves nothing on the start screen, and never reaches the browser', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await waitForViewer(page);
+    const downloads: string[] = [];
+    page.on('download', (download) => downloads.push(download.suggestedFilename()));
+    const prevented = page.evaluate(
+      () =>
+        new Promise<boolean>((resolve) =>
+          window.addEventListener('keydown', (event) => {
+            if (event.key.toLowerCase() === 's') resolve(event.defaultPrevented);
+          }),
+        ),
+    );
+
+    await page.keyboard.press('ControlOrMeta+S');
+
+    expect(await prevented).toBe(true);
+    await page.waitForTimeout(300);
+    expect(downloads).toEqual([]);
+    await expect(page.locator('[data-chrome="toasts"] .cd-shell-toast')).toHaveCount(0);
+    await expect(startScreen(page)).toBeVisible();
+  });
+
+  test('the start screen opens a file from its hint, without the hidden menu', async ({ page }) => {
+    await page.goto('/');
+    await waitForViewer(page);
+    const open = startScreen(page).getByRole('button', { name: 'Open a file…' });
+    await expect(open).toHaveAttribute('aria-keyshortcuts', /^(Meta|Control)\+O$/);
+
+    const chooser = page.waitForEvent('filechooser');
+    await open.click();
+    await (
+      await chooser
+    ).setFiles({
+      name: 'checkout.storm',
+      mimeType: 'text/plain',
+      buffer: Buffer.from(EXAMPLE_BOARD),
+    });
+
+    await expect(startScreen(page)).toBeHidden();
+    await expect.poll(async () => (await exportBoard(page)).config.title).toBe('Order Checkout');
+  });
+
+  test('Cmd/Ctrl+Z takes back a replaced board while the canvas has nothing to undo', async ({
+    page,
+  }) => {
+    await openLink(page, EXAMPLE_BOARD);
+    const example = await exportDSL(page);
+    await (await openMenu(page)).locator('[data-menu-id="new-diagram"]').click();
+    await expect.poll(async () => (await exportBoard(page)).elements.length).toBe(0);
+    await expect(toast(page, 'Board replaced')).toBeVisible();
+
+    await page.locator('.cd-shell-canvas svg[tabindex]').focus();
+    await page.keyboard.press('ControlOrMeta+Z');
+
+    await expect.poll(() => exportDSL(page)).toBe(example);
+    await expect(toast(page, 'Board replaced')).toBeHidden();
+  });
+
+  test('the tab names the board, and the app alone on the start screen', async ({ page }) => {
+    await page.goto('/');
+    await waitForViewer(page);
+    await expect(page).toHaveTitle('Event Storming Modeler');
+
+    await openExample(page);
+    await expect(page).toHaveTitle('Order Checkout · Event Storming Modeler');
+
+    await (await openMenu(page)).locator('[data-menu-id="new-diagram"]').click();
+    await expect(page).toHaveTitle('Event Storming Modeler');
   });
 
   test('the shortcuts dialog lists the file keys first and returns the focus', async ({ page }) => {
