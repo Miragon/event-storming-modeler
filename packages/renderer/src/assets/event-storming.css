@@ -320,23 +320,6 @@
   background: var(--cd-ui-linie);
 }
 
-.event-storming-container.drag-over::after {
-  content: 'Drop event storming board here (.storm · .json · .txt)';
-  position: absolute;
-  inset: 12px;
-  z-index: 200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px dashed var(--cd-ui-interaktion);
-  border-radius: var(--cd-radius-lg);
-  background: var(--cd-ui-hover);
-  color: var(--cd-ui-text);
-  font-size: 15px;
-  font-weight: 600;
-  pointer-events: none;
-}
-
 /* Sticky color picker (bpmn.io style): compact 3x3 grid of small color squares, no text — a
    popover on the canvas layer, below the palette (guide §5.13). Positioned absolutely WITHIN
    .event-storming-container (relative reference). */
@@ -393,5 +376,152 @@
   .event-storming-container .event-storming-note-toolbar,
   .event-storming-container .event-storming-color-picker {
     border-color: CanvasText;
+  }
+}
+
+/* The "Keyboard shortcuts…" dialog (board-menu/ShortcutsDialog.ts, guide §5.4, §8): a modal
+   <dialog> in the chrome's root, the same in the web app and the VS Code webview. Every colour is
+   a --cd-ui-* role, so it follows the mode with the chrome; the key chips are the <kbd> chips the
+   chrome's stylesheet draws in its own document (guide §5.6). */
+.event-storming-shortcuts {
+  box-sizing: border-box;
+  width: min(560px, 100cqw - 32px);
+  max-width: none;
+  max-height: calc(100cqh - 32px);
+  margin: auto;
+  padding: 0;
+  overflow: hidden;
+  color: var(--cd-ui-text);
+  background: var(--cd-ui-flaeche-hoch);
+  border: 1px solid var(--cd-ui-linie);
+  border-radius: var(--cd-radius-md);
+  box-shadow: var(--cd-shadow-3);
+}
+
+.event-storming-shortcuts[open] {
+  display: flex;
+}
+
+.event-storming-shortcuts::backdrop {
+  background: var(--cd-ui-backdrop);
+  backdrop-filter: blur(3px) grayscale(1);
+}
+
+.event-storming-shortcuts-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.event-storming-shortcuts-header {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 16px 8px 24px;
+}
+
+.event-storming-shortcuts-title {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.event-storming-shortcuts-close {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--cd-ui-text);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  border-radius: var(--cd-radius-sm);
+}
+
+.event-storming-shortcuts-close:hover {
+  color: var(--cd-ui-interaktion);
+  background: var(--cd-ui-hover);
+}
+
+.event-storming-shortcuts-close:focus-visible {
+  outline: 2px solid var(--cd-ui-fokus);
+  outline-offset: 2px;
+}
+
+.event-storming-shortcuts-close svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.event-storming-shortcuts-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  padding: 8px 24px 24px;
+  overflow: auto;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.event-storming-shortcuts-group-title {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cd-ui-text-leise);
+}
+
+.event-storming-shortcuts-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.event-storming-shortcuts-table tr + tr {
+  border-top: 1px solid var(--cd-ui-linie);
+}
+
+.event-storming-shortcuts-action {
+  padding: 6px 12px 6px 0;
+  font-weight: 400;
+  text-align: left;
+}
+
+.event-storming-shortcuts-keys {
+  padding: 6px 0;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.event-storming-shortcuts-key + .event-storming-shortcuts-key {
+  margin-left: 6px;
+}
+
+/* High contrast (guide §6, §8): no shadow but a --cd-ui-kontur edge, and a 3px focus ring; forced
+   colours draw the edge in CanvasText and the ring in Highlight. The chrome applies these rules
+   only to its own classes, so the board's dialog repeats them (modeler-shell API.md, "Modeler
+   dialogs"). */
+:root[data-cd-kontrast='hoch'] .event-storming-shortcuts {
+  border-color: var(--cd-ui-kontur);
+  box-shadow: none;
+}
+
+:root[data-cd-kontrast='hoch'] .event-storming-shortcuts-close:focus-visible {
+  outline-width: 3px;
+}
+
+@media (forced-colors: active) {
+  .event-storming-shortcuts {
+    border-color: CanvasText;
+  }
+
+  .event-storming-shortcuts-close:focus-visible {
+    outline-color: Highlight;
   }
 }
