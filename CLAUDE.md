@@ -116,7 +116,7 @@ https://raw.githubusercontent.com/Miragon/corporate-identity/main/plugins/mirago
 Install once: `/plugin marketplace add Miragon/corporate-identity` then
 `/plugin install miragon-brand@miragon`.
 
-The design-system files are vendored **unchanged** from that skill (design system 1.12.0) into
+The design-system files are vendored **unchanged** from that skill (design system 1.13.0) into
 [`packages/renderer/src/theme/`](packages/renderer/src/theme/): `cd-tokens.generated.css`,
 `cd-tokens.generated.json` and `cd-canvas.css`. The two CSS files carry one extra first line, the
 vendoring header; the JSON is byte-identical. Never edit or reformat them (Prettier-ignored, marked
