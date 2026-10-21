@@ -19,6 +19,7 @@ const screenshotDirectory = fileURLToPath(
 const fixtureFile = new URL('smoke.storm', import.meta.url);
 const vsceCli = createRequire(import.meta.url).resolve('@vscode/vsce/vsce');
 const requestedVsCodeVersion = process.env.VSCODE_SMOKE_VERSION;
+const keepVsCodeProfile = process.env.VSCODE_SMOKE_KEEP === '1';
 
 let workDirectory: string | undefined;
 let packagedExtension = '';
@@ -84,6 +85,7 @@ it(
       themes: WEBVIEW_THEMES,
       name: 'event-storming',
       screenshotDir: screenshotDirectory,
+      keepTemporaryFiles: keepVsCodeProfile,
       ...(requestedVsCodeVersion ? { vscodeVersion: requestedVsCodeVersion } : {}),
       log: (line) => console.log(`[vscode-smoke] ${line}`),
     });
