@@ -177,7 +177,7 @@ export function serializeDSL(board: EventStormingBoard): string {
 
 /**
  * The stickies whose line carries `(id …)`: those referenced as `#id`, plus every sticky whose id
- * the parser would not allocate again at its line — one created on the canvas (`event_3`),
+ * the parser would not allocate again at its line — one created on the canvas (`event_k3x9q2ab`),
  * renamed after its id was derived from the old label, or declared with an explicit id. Hosts
  * anchor todos, presence and deep links to these ids, so they must survive a save and re-open.
  * Replays the parser's allocation in emit order; an id equal to the allocated one stays implicit,

@@ -105,8 +105,8 @@ Charset `[A-Za-z0-9_-]+` — deliberately tight so an id can never collide with 
 - The serializer writes `(id …)` **only** when the id would not come back without it: the
   element's serialized name is shared by two or more stickies, it literally starts with `#`, or the
   id differs from the one the parser would allocate at that line. The last case covers a sticky
-  created on the canvas (`event_3`), a renamed one (it keeps the id derived from its old label) and
-  any explicit id you chose. That way every sticky keeps its id across a save and a re-open, and
+  created on the canvas (a random id such as `event_k3x9q2ab`), a renamed one (it keeps the id
+  derived from its old label) and any explicit id you chose. That way every sticky keeps its id across a save and a re-open, and
   tools that anchor todos or links to it keep finding it. An explicit id equal to the auto-allocated
   one is dropped on the next serialize.
 - `event-storming-root` and ids starting with `__implicitroot` are reserved for the board itself: a

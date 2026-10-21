@@ -1530,12 +1530,20 @@ describe('stable sticky ids across a save and re-open (`(id …)` write-back)', 
       ...board,
       elements: [
         ...board.elements,
-        { id: 'event_1', elementType: 'event', label: 'Domain Event', position: { x: 200, y: 0 } },
+        {
+          id: 'event_k3x9q2ab',
+          elementType: 'event',
+          label: 'Domain Event',
+          position: { x: 200, y: 0 },
+        },
       ],
     } as typeof board;
     const text = serializeDSL(created);
-    expect(text).toContain('event Domain Event [200, 0] (id event_1)\n');
-    expect(parseDSL(text).elements.map((e) => e.id)).toEqual(['event_order_placed', 'event_1']);
+    expect(text).toContain('event Domain Event [200, 0] (id event_k3x9q2ab)\n');
+    expect(parseDSL(text).elements.map((e) => e.id)).toEqual([
+      'event_order_placed',
+      'event_k3x9q2ab',
+    ]);
     expect(serializeDSL(parseDSL(text))).toBe(text);
   });
 
