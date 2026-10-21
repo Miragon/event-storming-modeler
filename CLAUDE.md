@@ -49,7 +49,7 @@ portless service install` — see [`CONTRIBUTING.md`](CONTRIBUTING.md)). `npm ru
   `E2E_WEBVIEW_PORT` (default 5180 / 5190)
 - `npm run format` — Prettier · `npm run depcruise` — check the module graph
 
-Requirements: Node ≥ 22.13, npm. Build packages before running tests (workspace deps resolve to
+Requirements: Node ≥ 22.22.2, npm. Build packages before running tests (workspace deps resolve to
 `dist`). The Husky pre-commit hook runs **only** lint-staged + `npm run lint` (ESLint + type-check) —
 **not** tests/build/depcruise; run `npm test` yourself before pushing.
 
