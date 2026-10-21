@@ -28,6 +28,11 @@ const SMALLEST_FIT_ZOOM = 0.001;
 
 type BoardRoot = Root & { businessObject?: RootBusinessObject };
 
+export interface EventStormingImporterConfig {
+  /** Fit the board into the view after every import (default true). */
+  fitOnImport?: boolean | undefined;
+}
+
 /**
  * Bridges the EventStormingBoard model into the diagram-js canvas. Deliberately bypasses the
  * commandStack (import path): no undo, no dirty.
@@ -40,6 +45,7 @@ export default class EventStormingImporter {
     'boardBounds',
     'eventBus',
     'elementRegistry',
+    'config.eventStormingImporter',
   ];
 
   constructor(
@@ -49,6 +55,7 @@ export default class EventStormingImporter {
     private readonly boardBounds: BoardBounds,
     private readonly eventBus: EventBus,
     private readonly elementRegistry: ElementRegistry,
+    private readonly config?: EventStormingImporterConfig,
   ) {}
 
   import(board: EventStormingBoard): ImportWarning[] {
@@ -117,7 +124,7 @@ export default class EventStormingImporter {
       this.canvas.addConnection(conn, root, drawings.length);
     }
 
-    this.fitToContent();
+    if (this.config?.fitOnImport !== false) this.fitToContent();
     this.eventBus.fire('import.render.done', { warnings });
     return warnings;
   }

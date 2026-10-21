@@ -12,7 +12,11 @@ import type EventStormingExporter from './io/EventStormingExporter.js';
 import type BoardBounds from './board-bounds/BoardBounds.js';
 import type EventStormingLabelEditing from './label-editing/EventStormingLabelEditing.js';
 import { ROOT_ID, type ImportWarning } from './io/types.js';
-import type { FreeRectInsets } from './palette/EventStormingPaletteProvider.js';
+import {
+  resolveFreeArea,
+  type FreeArea,
+  type FreeRectInsets,
+} from './palette/EventStormingPaletteProvider.js';
 
 export interface EventStormingViewerOptions {
   /** Host element. If missing, a detached <div> is created (can be attached later via attachTo). */
@@ -27,11 +31,23 @@ export interface EventStormingViewerOptions {
    */
   undoRedoKeys?: boolean | undefined;
   /**
-   * The margins of the container that chrome covers (palette row, zoom panel). An element created
-   * from the palette with Enter or Space lands in the centre of what is left (guide §5.5); without
-   * it, in the centre of the container.
+   * Where the host's chrome leaves the canvas free (palette row, zoom panel), as the margins it
+   * covers (`{ insets }`) or the free centre in diagram coordinates (`{ center }`). An element
+   * created from the palette with Enter or Space lands in that centre (guide §5.5); without it, in
+   * the centre of the container. The modeler-api name.
+   */
+  freeArea?: FreeArea | undefined;
+  /**
+   * @deprecated Pass `freeArea: { insets }` instead. Accepted until the next minor release;
+   * `freeArea` wins when both are given.
    */
   freeRectInsets?: (() => FreeRectInsets) | undefined;
+  /**
+   * Fit the board into the view after every import (default true). A host whose chrome fits the
+   * content itself (the modeler shell's viewport, into the free area) passes false and sets the
+   * view after the import.
+   */
+  fitOnImport?: boolean | undefined;
 }
 
 export type EventCallback<T = unknown> = (event: T) => void;
@@ -86,7 +102,8 @@ export abstract class EventStormingBaseViewer {
         canvas: { container: this._container },
         modules,
         eventStormingKeyboard: { undoRedoKeys: this._options.undoRedoKeys ?? true },
-        eventStormingPalette: { freeRectInsets: this._options.freeRectInsets },
+        eventStormingPalette: { freeArea: resolveFreeArea(this._options) },
+        eventStormingImporter: { fitOnImport: this._options.fitOnImport ?? true },
       });
     }
     return this._diagram;

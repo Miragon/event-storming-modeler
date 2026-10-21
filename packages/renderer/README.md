@@ -47,8 +47,18 @@ freeform drawings on an unbounded canvas.
 | `container`         | a detached `<div>` | Host element; without one, mount later with `attachTo(host)` |
 | `width`, `height`   | `100%`, `600px`    | Container size (`100%` high when a `container` is given)     |
 | `additionalModules` | `[]`               | diagram-js modules appended after the renderer's own         |
+| `fitOnImport`       | `true`             | Fit the board into the view after every import               |
 | `undoRedoKeys`      | `true`             | `Modeler` only: bind Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z and Ctrl+Y |
-| `freeRectInsets`    | none               | `Modeler` only: `() => ({ top, right, bottom, left })` in px |
+| `freeArea`          | none               | `Modeler` only: the part of the canvas no chrome covers      |
+
+`freeArea` is `{ insets: () => ({ top, right, bottom, left }) }`, the margins in px that the
+chrome covers, or `{ center: () => ({ x, y }) }`, the free centre in diagram coordinates
+(`undefined` while there is none). `freeArea`, `fitOnImport` and `undoRedoKeys` are the names of
+the [`@miragon/modeler-api`](https://www.npmjs.com/package/@miragon/modeler-api) factory options
+(contract 1.2), the same for every Miragon renderer. `freeRectInsets: () => insets`, the earlier
+name of `freeArea: { insets }`, is deprecated and still accepted until the next minor release;
+given both, `freeArea` wins. Pass `fitOnImport: false` when the host sets the view after every
+import itself.
 
 Pass `undoRedoKeys: false` when the host owns the history, as the VS Code extension does: the keys
 then reach the host untouched and the host undoes the document, while copy, paste, delete, the
@@ -64,8 +74,9 @@ largest zoom that shows all of it, never above 100%; an empty board shows at 100
 typed when an import arrives is reopened on the same element afterwards, with the typed text.
 
 Enter or Space on a creating palette entry (a click without a pointer, `detail` 0) places the
-element in the centre of the container minus `freeRectInsets` (the margins a host's chrome covers),
-24px down and right while that spot is taken, selects it and opens its label editor.
+element in the centre of `freeArea` (the container minus the margins a host's chrome covers, or the
+centre the host names; without it the container's centre), 24px down and right while that spot is
+taken, selects it and opens its label editor.
 
 `eventStormingReadOnly` locks every edit while a host cannot save from the canvas (an invalid file
 in an IDE): `diagram.get('eventStormingReadOnly').setReadOnly(true)` vetoes moves, resizes,
@@ -120,7 +131,9 @@ const viewer = createCollaborativeViewer(); // meta.editable: false, never chang
   `<prefix>_<8 characters of [0-9a-z]>`, such as `(id event_k3x9q2ab)`, so two peers that each add
   one at the same time do not pick the same id. Ids already in a text are read as they are.
 - `diagram` is the wrapped `Modeler` or `NavigatedViewer`, for everything outside the contract.
-  `createCollaborativeModeler` accepts `additionalModules`, `undoRedoKeys` and `freeRectInsets`.
+  `createCollaborativeModeler` and `createCollaborativeViewer` accept the same options:
+  `additionalModules`, `fitOnImport`, and for the modeler `undoRedoKeys` and `freeArea` (the
+  viewer ignores those two); the deprecated `freeRectInsets` still works for one minor release.
 - After `destroy()`, `exportText()` returns the last state and `importText()` rejects.
 
 #### Migrating a host

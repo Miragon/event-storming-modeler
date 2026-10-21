@@ -34,8 +34,29 @@ export interface FreeRectInsets {
   left: number;
 }
 
+/**
+ * The part of the canvas no host chrome covers (modeler-api `FreeArea`): either the margins the
+ * chrome covers, or the free area's centre in diagram coordinates (`undefined` while there is
+ * none).
+ */
+export type FreeArea =
+  | { insets: () => FreeRectInsets; center?: never }
+  | { center: () => { x: number; y: number } | undefined; insets?: never };
+
 export interface EventStormingPaletteConfig {
+  freeArea?: FreeArea | undefined;
+  /** @deprecated Pass `freeArea: { insets }` instead; accepted until the next minor release. */
   freeRectInsets?: (() => FreeRectInsets) | undefined;
+}
+
+/** The free area of the options: the modeler-api name first, then the deprecated one. */
+export function resolveFreeArea(options: {
+  freeArea?: FreeArea | undefined;
+  freeRectInsets?: (() => FreeRectInsets) | undefined;
+}): FreeArea | undefined {
+  if (options.freeArea) return options.freeArea;
+  const insets = options.freeRectInsets;
+  return insets ? { insets } : undefined;
 }
 
 /** Guide §5.5: a keyboard-created element lands this far down-right of one already centred there. */
@@ -226,14 +247,7 @@ export default class EventStormingPaletteProvider implements PaletteProvider {
   private placeInFreeRect(shape: EventStormingShape): boolean {
     const { canvas, modeling, selection, elementRegistry } = this;
     if (!canvas || !modeling || !selection || !elementRegistry) return false;
-    const viewbox = canvas.viewbox();
-    const insets = this.config?.freeRectInsets?.() ?? { top: 0, right: 0, bottom: 0, left: 0 };
-    const freeWidth = Math.max(0, viewbox.outer.width - insets.left - insets.right);
-    const freeHeight = Math.max(0, viewbox.outer.height - insets.top - insets.bottom);
-    const centre = {
-      x: viewbox.x + (insets.left + freeWidth / 2) / viewbox.scale,
-      y: viewbox.y + (insets.top + freeHeight / 2) / viewbox.scale,
-    };
+    const centre = this.freeAreaCentre(canvas);
     const taken = (point: { x: number; y: number }) =>
       elementRegistry
         .filter(isEventStormingShape)
@@ -251,6 +265,21 @@ export default class EventStormingPaletteProvider implements PaletteProvider {
     canvas.focus();
     this.labelEditing?.activate(created as unknown as EventStormingShape);
     return true;
+  }
+
+  /** The centre of what the chrome leaves free, in diagram coordinates. */
+  private freeAreaCentre(canvas: Canvas): { x: number; y: number } {
+    const freeArea = this.config && resolveFreeArea(this.config);
+    const given = freeArea?.center?.();
+    if (given) return { x: given.x, y: given.y };
+    const viewbox = canvas.viewbox();
+    const insets = freeArea?.insets?.() ?? { top: 0, right: 0, bottom: 0, left: 0 };
+    const freeWidth = Math.max(0, viewbox.outer.width - insets.left - insets.right);
+    const freeHeight = Math.max(0, viewbox.outer.height - insets.top - insets.bottom);
+    return {
+      x: viewbox.x + (insets.left + freeWidth / 2) / viewbox.scale,
+      y: viewbox.y + (insets.top + freeHeight / 2) / viewbox.scale,
+    };
   }
 }
 

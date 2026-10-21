@@ -328,6 +328,76 @@ describe('the view after an import (guide §5.9)', () => {
   });
 });
 
+describe('the modeler-api factory options', () => {
+  it('fitOnImport: false keeps the view the host set, on the modeler and on the viewer', async () => {
+    for (const modeler of [
+      mount(createCollaborativeModeler({ fitOnImport: false })),
+      mount(createCollaborativeViewer({ fitOnImport: false })),
+    ]) {
+      await modeler.importText('title Small\nevent Only [0, 0]\n');
+      const view = { x: -2000, y: -1500, width: 800, height: 600 };
+      modeler.setViewState(view);
+      const set = modeler.getViewState();
+      await modeler.importText(orderCheckout);
+      expect(modeler.getViewState()).toEqual(set);
+    }
+  });
+
+  it('fitOnImport defaults to the fit', async () => {
+    const modeler = editor();
+    modeler.setViewState({ x: -2000, y: -1500, width: 800, height: 600 });
+    const moved = modeler.getViewState();
+    await modeler.importText(orderCheckout);
+    expect(modeler.getViewState()).not.toEqual(moved);
+  });
+
+  function keyboardCreateCentre(modeler: CollaborativeEventStormingModeler): {
+    x: number;
+    y: number;
+  } {
+    const before = new Set(ids(modeler));
+    const entry = modeler.diagram
+      .get<Canvas>('canvas')
+      .getContainer()
+      .querySelector<HTMLElement>('.djs-palette [data-action="create.event"]')!;
+    entry.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }));
+    const id = ids(modeler).find((candidate) => !before.has(candidate))!;
+    const shape = modeler.diagram.get<ElementRegistry>('elementRegistry').get(id) as Shape;
+    return { x: shape.x + shape.width / 2, y: shape.y + shape.height / 2 };
+  }
+
+  it('freeArea: { center } places a keyboard-created sticky there', async () => {
+    const modeler = mount(
+      createCollaborativeModeler({ freeArea: { center: () => ({ x: 300, y: 200 }) } }),
+    );
+    await modeler.importText('title Empty\n');
+    expect(keyboardCreateCentre(modeler)).toEqual({ x: 300, y: 200 });
+  });
+
+  it('freeArea: { insets } and the deprecated freeRectInsets place it alike, freeArea first', async () => {
+    const insets = () => ({ top: 200, right: 0, bottom: 0, left: 300 });
+    const ignored = () => ({ top: 0, right: 300, bottom: 200, left: 0 });
+    const centres = [];
+    for (const options of [
+      { freeArea: { insets } },
+      { freeRectInsets: insets },
+      { freeArea: { insets }, freeRectInsets: ignored },
+    ]) {
+      const modeler = mount(createCollaborativeModeler(options));
+      await modeler.importText('title Empty\n');
+      centres.push(keyboardCreateCentre(modeler));
+    }
+    expect(centres[1]).toEqual(centres[0]);
+    expect(centres[2]).toEqual(centres[0]);
+    const plain = mount(createCollaborativeModeler());
+    await plain.importText('title Empty\n');
+    const centre = keyboardCreateCentre(plain);
+    const scale = plain.diagram.get<Canvas>('canvas').zoom();
+    expect(centres[0]!.x - centre.x).toBeCloseTo(150 / scale, 5);
+    expect(centres[0]!.y - centre.y).toBeCloseTo(100 / scale, 5);
+  });
+});
+
 describe('the `style dark` directive (guide §10.7)', () => {
   it('survives the round trip and paints nothing', async () => {
     const modeler = editor();

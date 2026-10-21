@@ -16,17 +16,33 @@ import { NavigatedViewer } from '../NavigatedViewer.js';
 import { importWarningText } from '../io/index.js';
 import type { EventStormingViewerOptions } from '../EventStormingBaseViewer.js';
 import { isSticky, type EventStormingShape } from '../model/di-types.js';
-import type { FreeRectInsets } from '../palette/EventStormingPaletteProvider.js';
+import {
+  resolveFreeArea,
+  type FreeArea,
+  type FreeRectInsets,
+} from '../palette/EventStormingPaletteProvider.js';
 
 /** Stable notation id in `meta.notation` of the collaborative-modeler contract. */
 export const EVENT_STORMING_NOTATION = 'event-storming';
 
+/**
+ * The modeler-api factory options (`freeArea`, `fitOnImport`, `undoRedoKeys`) plus the renderer's
+ * own. The viewer takes the same object and ignores what only editing uses (`undoRedoKeys`,
+ * `freeArea`).
+ */
 export interface CollaborativeEventStormingOptions {
   /** Appended to the renderer's own modules (e.g. a host's chrome module). */
   additionalModules?: ModuleDeclaration[] | undefined;
+  /** See `EventStormingViewerOptions.freeArea`. */
+  freeArea?: FreeArea | undefined;
+  /** See `EventStormingViewerOptions.fitOnImport` (default true). */
+  fitOnImport?: boolean | undefined;
   /** See `EventStormingViewerOptions.undoRedoKeys` (default true). */
   undoRedoKeys?: boolean | undefined;
-  /** See `EventStormingViewerOptions.freeRectInsets`. */
+  /**
+   * @deprecated Pass `freeArea: { insets }` instead. Accepted until the next minor release;
+   * `freeArea` wins when both are given.
+   */
   freeRectInsets?: (() => FreeRectInsets) | undefined;
 }
 
@@ -58,7 +74,7 @@ export function createCollaborativeModeler(
     new Modeler({
       ...diagramOptions(options),
       undoRedoKeys: options.undoRedoKeys ?? true,
-      freeRectInsets: options.freeRectInsets,
+      freeArea: resolveFreeArea(options),
     }),
     true,
   );
@@ -66,15 +82,20 @@ export function createCollaborativeModeler(
 
 /** The read-only mount (`meta.editable: false`): imports, exports and reveals, never edits. */
 export function createCollaborativeViewer(
-  options: Omit<CollaborativeEventStormingOptions, 'undoRedoKeys' | 'freeRectInsets'> = {},
+  options: CollaborativeEventStormingOptions = {},
 ): CollaborativeEventStormingModeler {
   return collaborative(new NavigatedViewer(diagramOptions(options)), false);
 }
 
 function diagramOptions(
-  options: Pick<CollaborativeEventStormingOptions, 'additionalModules'>,
+  options: Pick<CollaborativeEventStormingOptions, 'additionalModules' | 'fitOnImport'>,
 ): EventStormingViewerOptions {
-  return { width: '100%', height: '100%', additionalModules: options.additionalModules ?? [] };
+  return {
+    width: '100%',
+    height: '100%',
+    additionalModules: options.additionalModules ?? [],
+    fitOnImport: options.fitOnImport ?? true,
+  };
 }
 
 function collaborative(

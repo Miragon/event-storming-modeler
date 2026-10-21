@@ -154,10 +154,11 @@ shell's types structurally; a sync test in apps/vscode pins the mirror against t
 renderer's own palette rules apply only to `.djs-palette:not([data-chrome='palette'])`, so a
 shell-skinned palette wears the shell's look alone. **Renderers never import the shell** — only
 the apps (and `e2e/`) do; `packages/*` reaching `@miragon/modeler-shell` fails ESLint and
-dependency-cruiser. Both pass the shell's fit insets as `freeRectInsets` (keyboard creation from
-the palette); the webview runs on `createCollaborativeModeler` (the tested contract path) and
-toggles the renderer's `eventStormingReadOnly` lock together with `shell.setReadOnly`, the web app
-keeps the canvas's undo keys and replaces a board with an undo toast instead of a confirmation. The
+dependency-cruiser. Both pass the shell's fit insets as `freeArea: { insets }` (the modeler-api
+factory option, for keyboard creation from the palette; `freeRectInsets` is its deprecated
+alias); the webview runs on `createCollaborativeModeler` (the tested contract path) and toggles
+the renderer's `eventStormingReadOnly` lock together with `shell.setReadOnly`, the web app keeps
+the canvas's undo keys and replaces a board with an undo toast instead of a confirmation. The
 VSIX ships `apps/vscode/THIRD_PARTY_NOTICES.md`, generated from the bundles
 (`npm run notices -w apps/vscode`; a unit test fails when it is stale); the web bundle keeps the
 shell's Lucide/Feather legal comment.
