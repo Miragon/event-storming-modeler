@@ -485,9 +485,15 @@ test.describe('VS Code webview: canvas', () => {
     await entry.focus();
     await page.keyboard.press('Enter');
 
-    // A sticky created on the canvas carries its id in the text, so a re-open (or a peer) finds it.
+    // A sticky created on the canvas carries its random id in the text, so a re-open (or a peer)
+    // finds it, and keeps it through a rename.
     const edit = await waitForPosted(page, 'edit');
-    expect(edit.text).toMatch(/^event Domain Event \[[-\d.]+, [-\d.]+\] \(id event_1\)$/m);
+    const text = String(edit.text);
+    const created = /^event Domain Event \[[-\d.]+, [-\d.]+\] \(id (event_[0-9a-z]{8})\)$/m.exec(
+      text,
+    );
+    expect(created, text).not.toBeNull();
+    const id = created![1]!;
     expect(countOf(await postedMessages(page), 'edit')).toBe(1);
     expect(await shapeCount(page)).toBe(1);
     await expect(page.locator('.cd-shell-canvas .djs-shape.selected')).toHaveCount(1);
@@ -497,7 +503,7 @@ test.describe('VS Code webview: canvas', () => {
     await page.keyboard.press('ControlOrMeta+Enter');
     await expect.poll(async () => countOf(await postedMessages(page), 'edit')).toBe(2);
     expect((await waitForPosted(page, 'edit')).text).toMatch(
-      /^event Order Placed \[[-\d.]+, [-\d.]+\] \(id event_1\)$/m,
+      new RegExp(`^event Order Placed \\[[-\\d.]+, [-\\d.]+\\] \\(id ${id}\\)$`, 'm'),
     );
   });
 

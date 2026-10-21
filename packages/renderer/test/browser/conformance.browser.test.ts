@@ -132,40 +132,18 @@ const failOnSkip = {
   },
 };
 
-const ID_COLLISION_CASE =
-  'elements (when present, recommended): ids created on two peers at the same time do not collide';
-
 const advisories: string[] = [];
-const completedCases = new Set<string>();
-
-// A filtered run (`-t`, `.only`) skips cases, so only the advisories of cases that ran are due.
-function recordingTest(name: string, run: () => Promise<void>): void {
-  test(name, async () => {
-    await run();
-    completedCases.add(name.replace(/^conformance: /, ''));
-  });
-}
 
 describe('Event Storming implements the collaborative-modeler contract', () => {
-  registerConformance(harness, recordingTest, {
+  registerConformance(harness, test, {
     ...failOnSkip,
     onAdvisory(caseName, advice) {
       advisories.push(`${caseName}: ${advice}`);
     },
   });
 
-  // Known and accepted for now: a new sticky takes the lowest free `event_<n>` of its own
-  // instance, so two peers that each add one both allocate 'event_1'. Collision-free ids are a
-  // RECOMMENDATION of contract 1.1 (a candidate law for 2.0). The exact list fails on any other
-  // advisory, and once this one is fixed, so the note cannot go stale.
+  // The renderer meets every recommendation, so any advisory is a regression to look at.
   afterAll(() => {
-    const expected = completedCases.has(ID_COLLISION_CASE)
-      ? [
-          expect.stringMatching(
-            /^elements \(when present, recommended\): ids created on two peers.*'event_1'/,
-          ),
-        ]
-      : [];
-    expect(advisories).toEqual(expected);
+    expect(advisories).toEqual([]);
   });
 });

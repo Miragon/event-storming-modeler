@@ -13,11 +13,12 @@ import {
   type EventStormingShape,
   type EventStormingShapeType,
 } from './di-types.js';
+import { randomIdSuffix } from './random-id.js';
 
 /**
- * Id prefixes matching the DSL parser's allocator (event_/cmd_/…) plus note/drawing — ids can
- * surface in the `.storm` text (`(id …)` suffix, `#id` references) once labels are duplicated,
- * so interactively created elements must not carry diagram-js `shape_N` ids.
+ * Id prefixes matching the DSL parser's allocator (event_/cmd_/…) plus note/drawing — a sticky's
+ * id surfaces in the `.storm` text (`(id …)` suffix, `#id` references), so interactively created
+ * elements must not carry diagram-js `shape_N` ids.
  */
 const ID_PREFIXES: Readonly<Record<EventStormingShapeType, string>> = {
   event: 'event',
@@ -62,14 +63,16 @@ export default class EventStormingElementFactory {
   }
 
   /**
-   * DSL-style id `<kind-prefix>_<n>` for interactively created elements, collision-checked
-   * against the elementRegistry. `reserved` covers ids handed out for the same batch before
-   * anything is placed (e.g. a multi-shape paste — the clones are not in the registry yet).
+   * Id `<kind-prefix>_<random>` for interactively created elements (`event_k3x9q2ab`): random,
+   * because peers editing one board each allocate on their own, and a counter would hand both the
+   * same `event_1` that the parser then gives to only one of them. Collision-checked against the
+   * elementRegistry; `reserved` covers ids handed out for the same batch before anything is
+   * placed (e.g. a multi-shape paste — the clones are not in the registry yet).
    */
   allocateId(type: EventStormingShapeType, reserved?: ReadonlySet<string>): string {
     const prefix = ID_PREFIXES[type];
-    for (let i = 1; ; i++) {
-      const id = `${prefix}_${i}`;
+    for (;;) {
+      const id = `${prefix}_${randomIdSuffix()}`;
       if (!this.elementRegistry.get(id) && !reserved?.has(id)) return id;
     }
   }

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import type ElementFactory from 'diagram-js/lib/core/ElementFactory';
 import type ElementRegistry from 'diagram-js/lib/core/ElementRegistry';
 import EventStormingElementFactory from '../src/model/EventStormingElementFactory.js';
@@ -15,6 +15,19 @@ function factory(existing: Array<{ id?: string; eventStormingLabel?: string }>) 
     get: (id: string) => existing.find((el) => el.id === id),
   } as unknown as ElementRegistry;
   return new EventStormingElementFactory(elementFactory, registry);
+}
+
+/** Makes the next allocations draw exactly these suffixes (8 alphabet characters each). */
+function drawSuffixes(...suffixes: string[]): void {
+  const alphabet = '0123456789abcdefghijklmnopqrstuvwxyz';
+  vi.spyOn(globalThis.crypto, 'getRandomValues').mockImplementation(
+    <T extends ArrayBufferView>(array: T) => {
+      const suffix = suffixes.shift() ?? '00000000';
+      const target = array as unknown as Uint8Array;
+      for (let i = 0; i < target.length; i++) target[i] = alphabet.indexOf(suffix[i] ?? '0');
+      return array;
+    },
+  );
 }
 
 function labels(existingLabels: string[]): Array<{ eventStormingLabel: string }> {
@@ -43,29 +56,59 @@ describe('EventStormingElementFactory.createNew: numbered default labels (UX)', 
   });
 });
 
-describe('EventStormingElementFactory: DSL-style ids for interactive creates', () => {
-  // Ids surface in the `.storm` text once labels are duplicated (`(id …)` / `#id`) — they must
-  // read like the DSL allocator's, not like diagram-js `shape_N`.
-  it('assigns `<kind-prefix>_<n>` per kind on createNew', () => {
-    expect(factory([]).createNew('event', 'Domain Event').id).toBe('event_1');
-    expect(factory([]).createNew('command', 'Command').id).toBe('cmd_1');
-    expect(factory([]).createNew('actor', 'Actor').id).toBe('actor_1');
-    expect(factory([]).createNew('aggregate', 'Aggregate').id).toBe('agg_1');
-    expect(factory([]).createNew('policy', 'Policy').id).toBe('policy_1');
-    expect(factory([]).createNew('readmodel', 'Read Model').id).toBe('read_1');
-    expect(factory([]).createNew('external', 'External System').id).toBe('ext_1');
-    expect(factory([]).createNew('hotspot', 'Hotspot').id).toBe('hot_1');
-    expect(factory([]).createNew('note', 'Note').id).toBe('note_1');
+describe('EventStormingElementFactory: random ids for interactive creates', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  // Ids surface in the `.storm` text as `(id …)` — they read like the DSL allocator's prefixes,
+  // not like diagram-js `shape_N`, and carry a random part so two peers never pick the same one.
+  it('assigns `<kind-prefix>_<8 random characters>` per kind on createNew', () => {
+    const expected: Array<[Parameters<ReturnType<typeof factory>['createNew']>[0], string]> = [
+      ['event', 'event'],
+      ['command', 'cmd'],
+      ['actor', 'actor'],
+      ['aggregate', 'agg'],
+      ['policy', 'policy'],
+      ['readmodel', 'read'],
+      ['external', 'ext'],
+      ['hotspot', 'hot'],
+      ['note', 'note'],
+    ];
+    for (const [kind, prefix] of expected) {
+      expect(factory([]).createNew(kind, 'Label').id, kind).toMatch(
+        new RegExp(`^${prefix}_[0-9a-z]{8}$`),
+      );
+    }
+  });
+
+  it('gives two instances over the same board different ids (peers creating at once)', () => {
+    const ids = new Set(
+      Array.from({ length: 200 }, () => factory([]).createNew('event', 'Domain Event').id),
+    );
+    expect(ids.size).toBe(200);
   });
 
   it('skips ids already present in the registry', () => {
-    const f = factory([{ id: 'agg_1' }, { id: 'agg_2' }]);
-    expect(f.createNew('aggregate', 'Aggregate').id).toBe('agg_3');
+    drawSuffixes('aaaaaaaa', 'bbbbbbbb');
+    const f = factory([{ id: 'agg_aaaaaaaa' }]);
+    expect(f.createNew('aggregate', 'Aggregate').id).toBe('agg_bbbbbbbb');
   });
 
   it('allocateId honors batch-reserved ids (multi-shape paste before placement)', () => {
-    const f = factory([{ id: 'event_1' }]);
-    expect(f.allocateId('event', new Set(['event_2', 'event_3']))).toBe('event_4');
+    drawSuffixes('aaaaaaaa', 'bbbbbbbb', 'cccccccc');
+    const f = factory([{ id: 'event_aaaaaaaa' }]);
+    expect(f.allocateId('event', new Set(['event_bbbbbbbb']))).toBe('event_cccccccc');
+  });
+
+  it('draws again for bytes that would favour the first characters of the alphabet', () => {
+    const bytes = [252, 255, 10, 11, 12, 13, 14, 15, 16, 17];
+    vi.spyOn(globalThis.crypto, 'getRandomValues').mockImplementation(
+      <T extends ArrayBufferView>(array: T) => {
+        const target = array as unknown as Uint8Array;
+        for (let i = 0; i < target.length; i++) target[i] = bytes.shift() ?? 0;
+        return array;
+      },
+    );
+    expect(factory([]).allocateId('event')).toBe('event_abcdefgh');
   });
 
   it('assigns a draw_ id to tool-drawn drawings, keeps explicit ids on import', () => {
@@ -73,7 +116,7 @@ describe('EventStormingElementFactory: DSL-style ids for interactive creates', (
       { x: 10, y: 10 },
       { x: 50, y: 40 },
     ];
-    expect(factory([]).drawingFromCanvasPoints(pts).id).toBe('draw_1');
+    expect(factory([]).drawingFromCanvasPoints(pts).id).toMatch(/^draw_[0-9a-z]{8}$/);
     expect(factory([]).drawingFromCanvasPoints(pts, { id: 'draw_sketch' }).id).toBe('draw_sketch');
   });
 });
@@ -108,9 +151,8 @@ describe('EventStormingElementFactory.createProvisional: blank append sticky', (
     expect(shape.height).toBe(STICKY_STYLES.event.height);
   });
 
-  it('allocates a DSL-style id like any interactive create', () => {
-    expect(factory([]).createProvisional().id).toBe('event_1');
-    expect(factory([{ id: 'event_1' }]).createProvisional().id).toBe('event_2');
+  it('allocates a random id like any interactive create', () => {
+    expect(factory([]).createProvisional().id).toMatch(/^event_[0-9a-z]{8}$/);
   });
 });
 
