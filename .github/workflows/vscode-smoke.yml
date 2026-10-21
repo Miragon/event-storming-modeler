@@ -50,13 +50,26 @@ jobs:
         with:
           path: ~/.cache/miragon-modeler-shell/vscode-test
           key: vscode-${{ runner.os }}-${{ runner.arch }}-${{ steps.version.outputs.value }}
+      # VSCODE_SMOKE_KEEP keeps each run's VS Code profile in TMPDIR, so the logs of a failed run
+      # (extension host, renderer, main process) can be uploaded below.
       - name: Smoke test in VS Code ${{ steps.version.outputs.value }}
-        run: xvfb-run -a npm run test:vscode
+        run: |
+          mkdir -p "$TMPDIR"
+          xvfb-run -a npm run test:vscode
         env:
           VSCODE_SMOKE_VERSION: ${{ steps.version.outputs.value }}
+          VSCODE_SMOKE_KEEP: '1'
+          TMPDIR: ${{ runner.temp }}/vscode-smoke
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: vscode-smoke-${{ matrix.vscode }}
           path: test-results/vscode-smoke/
+          retention-days: 7
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vscode-smoke-${{ matrix.vscode }}-logs
+          path: ${{ runner.temp }}/vscode-smoke/modeler-shell-vscode-*/user-data/logs/
+          if-no-files-found: ignore
           retention-days: 7
