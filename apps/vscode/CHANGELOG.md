@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.0](https://github.com/Miragon/event-storming-modeler/compare/vscode-v0.4.0...vscode-v0.5.0) (2026-10-21)
+
+
+### Features
+
+* give new stickies random ids and implement modeler-api contract 1.2 ([#41](https://github.com/Miragon/event-storming-modeler/issues/41)) ([6fe94e7](https://github.com/Miragon/event-storming-modeler/commit/6fe94e7adfe2df27f07658093ef4ac1c5c13e94b))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @miragon/event-storming-renderer bumped from 0.3.0 to 0.4.0
+
 ## [0.4.0](https://github.com/Miragon/event-storming-modeler/compare/vscode-v0.3.0...vscode-v0.4.0) (2026-10-19)
 
 
