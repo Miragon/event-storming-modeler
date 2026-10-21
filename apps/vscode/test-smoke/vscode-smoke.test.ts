@@ -31,6 +31,25 @@ function parseBoard(text: string): EventStormingBoard {
   return board;
 }
 
+// The driver takes the first read of the file that differs from the fixture. VS Code truncates the
+// file before it writes the new text, so that read can be empty or cut short, and an empty board
+// parses without a diagnostic: only the fixture's elements plus the new one, with all the arrows,
+// count as the saved board.
+function savedBoardParser(fixtureBoard: EventStormingBoard): (text: string) => EventStormingBoard {
+  const elements = fixtureBoard.elements.length + 1;
+  const arrows = fixtureBoard.edges.length;
+  return (text) => {
+    const board = parseBoard(text);
+    if (board.elements.length !== elements || board.edges.length !== arrows) {
+      throw new Error(
+        `${board.elements.length} elements and ${board.edges.length} arrows in ${text.length} characters, ` +
+          `expected ${elements} and ${arrows} (read while VS Code was still writing the file?)`,
+      );
+    }
+    return board;
+  };
+}
+
 // The release's packaging command (vsce runs vscode:prepublish, the production build), unpacked
 // outside the repository: VS Code then loads exactly what the VSIX ships, and a module missing
 // from the bundle cannot be found in a node_modules further up.
@@ -50,17 +69,18 @@ afterAll(async () => {
 });
 
 // The first run downloads VS Code: about 320 to 360 MB, 0.9 GB unpacked, kept in the OS cache.
+// One retry, in a fresh VS Code: the driver's save read can still race VS Code's write (see
+// savedBoardParser), and a slow runner can miss a theme switch now and then.
 it(
   'opens, edits, saves, undoes and themes a board in a real VS Code',
-  { timeout: 600_000 },
+  { timeout: 600_000, retry: 1 },
   async () => {
     const fixtureText = await readFile(fixtureFile, 'utf8');
-    const fixtureBoard = parseBoard(fixtureText);
 
     const result = await runVsCodeSmoke({
       extensionPath: packagedExtension,
       fixture: { fileName: 'smoke.storm', text: fixtureText },
-      parse: parseBoard,
+      parse: savedBoardParser(parseBoard(fixtureText)),
       themes: WEBVIEW_THEMES,
       name: 'event-storming',
       screenshotDir: screenshotDirectory,
@@ -70,7 +90,5 @@ it(
     console.log(formatVsCodeSmoke(result));
 
     expect(result.failures).toEqual([]);
-    const savedBoard = result.saved?.parsed as EventStormingBoard | undefined;
-    expect(savedBoard?.elements).toHaveLength(fixtureBoard.elements.length + 1);
   },
 );
