@@ -1,8 +1,12 @@
 import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 
-// Two projects so the default `npm test` stays fast and node-only, while the renderer
-// browser-integration layer runs opt-in in real Chromium via `npm run test:browser`.
+const sourceEntry = (packageName: string): string =>
+  new URL(`./packages/${packageName}/src/index.ts`, import.meta.url).pathname;
+
+// Separate projects so the default `npm test` stays fast and node-only, while the renderer
+// browser-integration layer runs opt-in in real Chromium via `npm run test:browser` and the
+// extension's smoke test opt-in in a real VS Code via `npm run test:vscode`.
 // jsdom can't provide SVGElement.getBBox() / getComputedTextLength(), which the renderer relies on.
 export default defineConfig({
   test: {
@@ -37,6 +41,21 @@ export default defineConfig({
             provider: playwright(),
             headless: true,
             instances: [{ browser: 'chromium' }],
+          },
+        },
+      },
+      {
+        // The packaged extension in a real VS Code (`npm run test:vscode`): it needs a display and
+        // downloads VS Code once, so it stays out of `npm test`. The parser check takes the package
+        // sources, as the extension's bundle does, so it needs no `npm run build` either.
+        test: {
+          name: 'vscode',
+          environment: 'node',
+          include: ['apps/vscode/test-smoke/**/*.test.ts'],
+          fileParallelism: false,
+          alias: {
+            '@miragon/event-storming-dsl': sourceEntry('dsl'),
+            '@miragon/event-storming-schema-model': sourceEntry('schema-model'),
           },
         },
       },

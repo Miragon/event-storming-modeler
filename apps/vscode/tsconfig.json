@@ -12,5 +12,5 @@
       "@miragon/event-storming-transforms": ["../../packages/transforms/src/index.ts"]
     }
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  "include": ["src/**/*.ts", "test/**/*.ts", "test-smoke/**/*.ts"]
 }

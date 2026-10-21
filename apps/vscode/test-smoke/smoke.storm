@@ -1,0 +1,11 @@
+title Smoke test
+actor Customer [80, 200]
+command Place Order [240, 200]
+aggregate Order [420, 190]
+event Order Placed [620, 200]
+policy When placed, ship it [800, 200]
+hotspot Paid twice on retry? [620, 400]
+Customer -> Place Order
+Place Order -> Order
+Order -> Order Placed
+Order Placed -> When placed, ship it
