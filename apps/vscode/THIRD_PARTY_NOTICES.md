@@ -271,7 +271,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @miragon/modeler-shell 0.2.2 (MIT)
+## @miragon/modeler-shell 0.3.0 (MIT)
 
 ```text
 MIT License
@@ -763,7 +763,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-## zod 4.6.6 (MIT)
+## zod 4.6.7 (MIT)
 
 ```text
 MIT License

@@ -1,0 +1,75 @@
+name: VS Code smoke
+
+# The packaged extension in a real VS Code (`npm run test:vscode`). A workflow of its own, so it
+# never delays or blocks the CI workflow: weekly, because a new VS Code release lands without a
+# commit here; on pull requests only where the extension itself changes (its sources, manifest,
+# bundling and dependency pins), since the stub-based e2e already covers the renderer; on demand.
+on:
+  pull_request:
+    paths:
+      - 'apps/vscode/**'
+      - '.github/workflows/vscode-smoke.yml'
+  schedule:
+    - cron: '41 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vscode-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  vscode-smoke:
+    name: vscode-smoke (${{ matrix.vscode }})
+    # Pinned rather than ubuntu-latest: VS Code needs the image's X server and GTK libraries, and a
+    # label migration should not break this job unnoticed.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # The floor of engines.vscode (VS Code 1.96 runs extensions on Node 20) and the newest stable.
+        vscode: [minimum, stable]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - id: version
+        name: Resolve the VS Code version
+        shell: bash
+        run: |
+          if [ "${{ matrix.vscode }}" = minimum ]; then
+            version="$(node -p 'require("./apps/vscode/package.json").engines.vscode.replace(/^\^/, "")')"
+          else
+            version="$(curl -fsS --retry 3 https://update.code.visualstudio.com/api/releases/stable | jq -r '.[0]')"
+          fi
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+      # The driver's default download folder on Linux; one VS Code version per key.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/miragon-modeler-shell/vscode-test
+          key: vscode-${{ runner.os }}-${{ runner.arch }}-${{ steps.version.outputs.value }}
+      # VSCODE_SMOKE_KEEP keeps each run's VS Code profile in TMPDIR, so the logs of a failed run
+      # (extension host, renderer, main process) can be uploaded below.
+      - name: Smoke test in VS Code ${{ steps.version.outputs.value }}
+        run: |
+          mkdir -p "$TMPDIR"
+          xvfb-run -a npm run test:vscode
+        env:
+          VSCODE_SMOKE_VERSION: ${{ steps.version.outputs.value }}
+          VSCODE_SMOKE_KEEP: '1'
+          TMPDIR: ${{ runner.temp }}/vscode-smoke
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vscode-smoke-${{ matrix.vscode }}
+          path: test-results/vscode-smoke/
+          retention-days: 7
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vscode-smoke-${{ matrix.vscode }}-logs
+          path: ${{ runner.temp }}/vscode-smoke/modeler-shell-vscode-*/user-data/logs/
+          if-no-files-found: ignore
+          retention-days: 7

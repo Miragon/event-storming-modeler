@@ -47,9 +47,21 @@ portless service install` — see [`CONTRIBUTING.md`](CONTRIBUTING.md)). `npm ru
   VS Code stub, incl. the kit on the `ide` host); one project with
   `npm run test:e2e -- --project=vscode-webview`, other ports via `E2E_PORT` /
   `E2E_WEBVIEW_PORT` (default 5180 / 5190)
+- `npm run test:vscode` — the packaged extension in a real VS Code (Vitest project `vscode`,
+  [`apps/vscode/test-smoke/`](apps/vscode/test-smoke/)): packs it as the release does
+  (`vsce package`, which runs `vscode:prepublish`), unpacks the VSIX outside the repo and runs the
+  shell's `runVsCodeSmoke` (open `smoke.storm`, palette edit, save, undo, the four default themes,
+  screenshots in the gitignored `test-results/vscode-smoke/`); no build needed, a VS Code window
+  opens for ~5 s, the first run downloads VS Code into the OS cache; `VSCODE_SMOKE_VERSION=1.96.0`
+  for another version, `VSCODE_SMOKE_KEEP=1` keeps VS Code's profile and logs. It retries once (the
+  driver's save read can race VS Code's write; a pass shows `(retry x1)`). In CI only
+  [`.github/workflows/vscode-smoke.yml`](.github/workflows/vscode-smoke.yml) runs it (weekly, on
+  PRs touching `apps/vscode/**`, on demand; `xvfb-run -a`, engines floor and newest stable;
+  screenshots and VS Code's logs as artifacts), never the CI workflow. Details in
+  [`CONTRIBUTING.md`](CONTRIBUTING.md).
 - `npm run format` — Prettier · `npm run depcruise` — check the module graph
 
-Requirements: Node ≥ 22.13, npm. Build packages before running tests (workspace deps resolve to
+Requirements: Node ≥ 22.22.2, npm. Build packages before running tests (workspace deps resolve to
 `dist`). The Husky pre-commit hook runs **only** lint-staged + `npm run lint` (ESLint + type-check) —
 **not** tests/build/depcruise; run `npm test` yourself before pushing.
 

@@ -255,7 +255,7 @@
     "@miragon/event-storming-dsl": "0.3.0",
     "@miragon/event-storming-renderer": "0.4.0",
     "@miragon/event-storming-schema-model": "0.2.1",
-    "@miragon/modeler-shell": "0.2.2",
+    "@miragon/modeler-shell": "0.3.0",
     "diagram-js": "15.28.1",
     "didi": "12.0.0",
     "tiny-svg": "4.1.4",
@@ -264,8 +264,10 @@
   "devDependencies": {
     "@types/node": "26.6.5",
     "@types/vscode": "1.96.0",
+    "@vscode/test-electron": "3.1.0",
     "@vscode/vsce": "4.0.0",
     "esbuild": "0.28.2",
+    "playwright-core": "1.64.1",
     "typescript": "6.0.3"
   }
 }
