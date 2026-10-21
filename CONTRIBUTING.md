@@ -57,13 +57,13 @@ package sources (no build needed):
 | `vscode-webview` | the VS Code webview inside the shell's VS Code stub (`e2e/webview/`) | 5190 (`E2E_WEBVIEW_PORT`) |
 
 Both projects run `@miragon/modeler-shell`'s conformance kit: `vscode-webview` on the `ide` host
-(geometry, ARIA, keys, keyboard creation, the read-only lock of an invalid file, appearance,
-cleanup), `webapp` on the `web` host (the same plus primary action, legal line, start screen,
-toasts, problems list and drop zone). The harnesses declare what Event Storming lacks `absent` (the
-legend and the inspector; in the web app also the invalid-file state), and any skip fails the
-suite. Next to the kit run the webview's protocol and chrome specs and the web app's own
-(`webapp-chrome.spec.ts`: share link, replace with undo, open, drop, exports, app keys). Run one
-project with
+(geometry, ARIA, keys, the focus hand-back after a pointer click on chrome, keyboard creation,
+the read-only lock of an invalid file, appearance, cleanup), `webapp` on the `web` host (the same
+plus primary action, legal line, start screen, toasts, problems list and drop zone). The harnesses
+declare what Event Storming lacks `absent` (the legend and the inspector; in the web app also the
+invalid-file state), and any skip fails the suite. Next to the kit run the webview's protocol and
+chrome specs and the web app's own (`webapp-chrome.spec.ts`: share link, replace with undo, open,
+drop, exports, app keys, Delete after a click on + or a palette entry). Run one project with
 `npm run test:e2e -- --project=vscode-webview`. Locally an already running server on a port is
 reused, so pick free ports (`E2E_PORT=5387 E2E_WEBVIEW_PORT=5397 npm run test:e2e`) when another
 app occupies 5180 or 5190.

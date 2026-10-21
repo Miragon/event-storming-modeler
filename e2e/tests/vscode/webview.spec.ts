@@ -476,6 +476,40 @@ test.describe('VS Code webview: canvas', () => {
     await expect(page.locator('[data-chrome="zoom"] [data-zoom="actual"]')).toHaveText('100%');
   });
 
+  // Guide §5.8 (modeler-shell 0.2.2): a pointer click on the chrome hands the keys back to the
+  // board, so Event Storming's own keys act at once; Enter leaves the focus on the control.
+  test('after a pointer click on + or a palette entry, Delete acts on the board', async ({
+    page,
+  }) => {
+    await openWebview(page);
+    const canvasHasFocus = () =>
+      page.evaluate(
+        () =>
+          document.activeElement instanceof SVGSVGElement &&
+          document.activeElement.closest('.event-storming-container') !== null,
+      );
+    const before = await shapeCount(page);
+    await page.locator('.djs-element.djs-shape[data-element-id="event_order_placed"]').click();
+    const zoomIn = page.locator('[data-chrome="zoom"] [data-zoom="in"]');
+    await zoomIn.click();
+    expect(await canvasHasFocus()).toBe(true);
+    await page.keyboard.press('Delete');
+    await expect.poll(() => shapeCount(page)).toBe(before - 1);
+
+    await zoomIn.focus();
+    await page.keyboard.press('Enter');
+    await expect(zoomIn).toBeFocused();
+
+    await page.locator('.djs-palette[data-chrome="palette"] [data-action="create.event"]').click();
+    const canvas = (await page.locator('.cd-shell-canvas').boundingBox())!;
+    await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height - 140);
+    await page.mouse.click(canvas.x + canvas.width / 2, canvas.y + canvas.height - 140);
+    await expect.poll(() => shapeCount(page)).toBe(before);
+    expect(await canvasHasFocus()).toBe(true);
+    await page.keyboard.press('Delete');
+    await expect.poll(() => shapeCount(page)).toBe(before - 1);
+  });
+
   // Guide §5.5: a keyboard user creates stickies too.
   test('Enter on a creating palette entry adds one selected sticky with its label editor', async ({
     page,
