@@ -116,12 +116,12 @@ in the webview's developer tools (**Developer: Open Webview Developer Tools** wh
 runs in VS Code). Keep `playwright-core` in `apps/vscode/package.json` at the root `playwright`
 version.
 
-The test retries once in a fresh VS Code; Vitest marks such a pass `(retry x1)`. The driver's save
-step (`@miragon/modeler-shell` 0.3.0) reads the file as soon as it differs from the fixture and can
-catch it while VS Code is still writing it: on Linux in about 1 of 20 runs (5 of 92 against VS Code
-1.143.0 in an Ubuntu 24.04 container), on macOS not yet seen. The save check then fails with
-`save: the saved text does not parse: 0 elements and 0 arrows in 0 characters, expected 7 and 4 …`.
-A failure that survives the retry is a real one.
+The test does not retry, so every failure is a real one. The driver's save step
+(`@miragon/modeler-shell` 0.3.1) reads the file only after the editor tab turned clean, which VS
+Code does once its write has finished, and only when two reads 100 ms apart agree. The parse check
+accepts only the fixture's board with one sticky more, since an empty or cut-short `.storm` file can
+parse without a diagnostic; anything else fails the save step with the counts it found
+(`save: the saved text does not parse: 6 elements and 0 arrows in 181 characters, expected 7 and 4 …`).
 
 **In CI.** [`.github/workflows/vscode-smoke.yml`](.github/workflows/vscode-smoke.yml) runs it on
 `ubuntu-24.04` under `xvfb-run -a` (VS Code needs an X server), against both the floor of
