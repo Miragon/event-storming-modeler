@@ -115,17 +115,18 @@ back, emptied first; paths in the log are the container's (`/work/…`). The fir
 image `modeler-shell-vscode-smoke:node<version>-<hash>` (about 0.9 GB, for the Node version that
 runs the command) and downloads VS Code's Linux build into the Docker volume
 `modeler-shell-vscode-cache`, both shared by every Miragon modeler on the machine; that takes about
-a minute. Later runs take 10 to 16 seconds (`npm ci` 3 to 5 s, the test 4 to 8 s). On Apple
-silicon the container runs VS Code's `linux-arm64` build, CI the `linux-x64` one. `docker volume rm
-modeler-shell-vscode-cache modeler-shell-npm-cache` starts over; the details are in the shell's
-README ([In Docker, without a window](https://github.com/Miragon/modeler-api/tree/main/packages/shell#in-docker-without-a-window)).
+a minute. Later runs take about 7 to 17 seconds, most of them under 10 (`npm ci` 2 to 7 s, the test
+4 to 8 s). On Apple silicon the container runs VS Code's `linux-arm64` build, CI the `linux-x64`
+one. `docker volume rm modeler-shell-vscode-cache modeler-shell-npm-cache` starts over; the details
+are in the shell's README
+([In Docker, without a window](https://github.com/Miragon/modeler-api/tree/main/packages/shell#in-docker-without-a-window)).
 
 Leave a few seconds between two runs, also in a loop (`sleep 3`). The command deletes and recreates
 `test-results/vscode-smoke/` before it starts the container, and within about a second of the last
 container's end Docker Desktop's file sharing can still hand the new container the deleted folder:
 the test passes, but copying its screenshots back fails
 (`cp: cannot create regular file '/results/./event-storming-light.png': No such file or directory`)
-and the command exits with 1 (modeler-shell 0.3.1, 2 of 5 runs started right after the last one).
+and the command exits with 1 (modeler-shell 0.3.1, 4 of 9 runs started right after the last one).
 
 **Locally, with a window (macOS).** `npm run test:vscode` runs the same test on the host, for
 watching VS Code go through it. `unzip` must be on the `PATH` (it is on macOS and Ubuntu).
