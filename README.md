@@ -199,11 +199,12 @@ Claude can then read, review, edit and generate `.storm` boards anywhere. Detail
 npm install
 npm run build        # build all packages
 npm test             # unit tests
+npm run test:vscode  # the packaged VS Code extension in a real VS Code (opens a window briefly)
 npm run dev:webapp   # run the web editor locally
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full inner loop, browser/e2e tests and the
-Portless dev URL setup.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full inner loop, browser/e2e tests, the VS Code
+smoke test (locally and in CI) and the Portless dev URL setup.
 
 ## Fonts
 
