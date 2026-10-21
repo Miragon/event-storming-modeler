@@ -62,7 +62,7 @@ const storedShellState = readShellState(vscode);
 const collaborative = createCollaborativeModeler({
   additionalModules: [shellModule],
   undoRedoKeys: false,
-  freeRectInsets: () => shell.fitInsets(),
+  freeArea: { insets: () => shell.fitInsets() },
 });
 const modeler = collaborative.diagram;
 modeler.get('canvas');

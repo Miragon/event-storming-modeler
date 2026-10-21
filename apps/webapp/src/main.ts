@@ -82,7 +82,7 @@ const modeler = new Modeler({
   height: '100%',
   additionalModules: [shellModule],
   // Where Enter or Space on a creating palette entry places the sticky (guide §5.5).
-  freeRectInsets: () => shell.fitInsets(),
+  freeArea: { insets: () => shell.fitInsets() },
 });
 modeler.get('canvas');
 const registry = modeler.get<ElementRegistryLike>('elementRegistry');
