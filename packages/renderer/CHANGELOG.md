@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/Miragon/event-storming-modeler/compare/renderer-v0.3.0...renderer-v0.4.0) (2026-10-21)
+
+
+### Features
+
+* give new stickies random ids and implement modeler-api contract 1.2 ([#41](https://github.com/Miragon/event-storming-modeler/issues/41)) ([6fe94e7](https://github.com/Miragon/event-storming-modeler/commit/6fe94e7adfe2df27f07658093ef4ac1c5c13e94b))
+
 ## [0.3.0](https://github.com/Miragon/event-storming-modeler/compare/renderer-v0.2.2...renderer-v0.3.0) (2026-10-19)
 
 
