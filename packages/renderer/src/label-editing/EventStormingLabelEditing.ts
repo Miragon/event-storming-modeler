@@ -121,7 +121,7 @@ export default class EventStormingLabelEditing {
 
   /**
    * Takes an open edit down WITHOUT committing it, for an import that replaces the board: its
-   * element is about to be removed, so a commit (the importer's viewbox change triggers one)
+   * element is about to be removed, so a commit (a blur or a click once the board is replaced)
    * would land on a detached shape and be wiped with the history. Hosts re-import remote states
    * while the user types; `resumeAfterImport` brings the editor back with the typed text.
    */
