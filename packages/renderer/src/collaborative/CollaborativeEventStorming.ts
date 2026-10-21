@@ -18,7 +18,8 @@ import { NavigatedViewer } from '../NavigatedViewer.js';
 import { importWarningText } from '../io/index.js';
 import type { EventStormingViewerOptions } from '../EventStormingBaseViewer.js';
 import { isSticky, type EventStormingShape } from '../model/di-types.js';
-import { resolveFreeArea, type FreeRectInsets } from '../palette/EventStormingPaletteProvider.js';
+import type { FreeRectInsets } from '../palette/EventStormingPaletteProvider.js';
+import { resolveFreeArea } from '../palette/index.js';
 
 /** Stable notation id in `meta.notation` of the collaborative-modeler contract. */
 export const EVENT_STORMING_NOTATION = 'event-storming';
