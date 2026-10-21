@@ -47,8 +47,18 @@ freeform drawings on an unbounded canvas.
 | `container`         | a detached `<div>` | Host element; without one, mount later with `attachTo(host)` |
 | `width`, `height`   | `100%`, `600px`    | Container size (`100%` high when a `container` is given)     |
 | `additionalModules` | `[]`               | diagram-js modules appended after the renderer's own         |
+| `fitOnImport`       | `true`             | Fit the board into the view after every import               |
 | `undoRedoKeys`      | `true`             | `Modeler` only: bind Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z and Ctrl+Y |
-| `freeRectInsets`    | none               | `Modeler` only: `() => ({ top, right, bottom, left })` in px |
+| `freeArea`          | none               | `Modeler` only: the part of the canvas no chrome covers      |
+
+`freeArea` is `{ insets: () => ({ top, right, bottom, left }) }`, the margins in px that the
+chrome covers, or `{ center: () => ({ x, y }) }`, the free centre in diagram coordinates
+(`undefined` while there is none). `freeArea`, `fitOnImport` and `undoRedoKeys` are the names of
+the [`@miragon/modeler-api`](https://www.npmjs.com/package/@miragon/modeler-api) factory options
+(contract 1.2), the same for every Miragon renderer. `freeRectInsets: () => insets`, the earlier
+name of `freeArea: { insets }`, is deprecated and still accepted until the next minor release;
+given both, `freeArea` wins. Pass `fitOnImport: false` when the host sets the view after every
+import itself.
 
 Pass `undoRedoKeys: false` when the host owns the history, as the VS Code extension does: the keys
 then reach the host untouched and the host undoes the document, while copy, paste, delete, the
@@ -64,8 +74,9 @@ largest zoom that shows all of it, never above 100%; an empty board shows at 100
 typed when an import arrives is reopened on the same element afterwards, with the typed text.
 
 Enter or Space on a creating palette entry (a click without a pointer, `detail` 0) places the
-element in the centre of the container minus `freeRectInsets` (the margins a host's chrome covers),
-24px down and right while that spot is taken, selects it and opens its label editor.
+element in the centre of `freeArea` (the container minus the margins a host's chrome covers, or the
+centre the host names; without it the container's centre), 24px down and right while that spot is
+taken, selects it and opens its label editor.
 
 `eventStormingReadOnly` locks every edit while a host cannot save from the canvas (an invalid file
 in an IDE): `diagram.get('eventStormingReadOnly').setReadOnly(true)` vetoes moves, resizes,
@@ -79,9 +90,9 @@ drawing keeps literal light colours in its SVG attributes, so exports look the s
 
 ### Collaborative hosts
 
-The package implements the collaborative-modeler contract of
+The package implements the collaborative-modeler contract 1.2 of
 [`@miragon/modeler-api`](https://www.npmjs.com/package/@miragon/modeler-api) (notation
-`event-storming`) and runs its conformance kit in CI:
+`event-storming`) and runs its conformance kit in CI, every case and no advisory:
 
 ```ts
 import {
@@ -107,18 +118,26 @@ const viewer = createCollaborativeViewer(); // meta.editable: false, never chang
 - `getViewState()` / `setViewState()` read and set the diagram-js viewbox (`x`, `y`, `width`,
   `height`); an import fits the board, never above 100% and never below 0.1% (a board too wide to
   show whole at 0.1% is centred there instead).
+- A view change never commits an open label editor: `setViewState`, a host's fit and the user's own
+  scroll or zoom leave it open with the typed text, and it moves with its element. A click or a
+  drag on the canvas, Cmd/Ctrl+Enter (Enter on an arrow label) or leaving the field commits it;
+  Escape discards it.
 - `elements` lists the stickies with their ids and labels, reveals (selects and scrolls to) one
   and reports the selection. Sticky ids survive a save and a re-open: the DSL writes `(id …)`
   back for every sticky whose id the parser would not derive again from its label at that line (one
   created on the canvas, a renamed one). Notes, drawings and arrows have no id in the text yet (theirs
   derive from their text or position), so they are not addressable.
-- New sticky ids are not collision-free across peers: a sticky created on the canvas takes the
-  lowest free `<prefix>_<n>` of its own instance, so two peers that each add one at the same time
-  both write `(id event_1)`. When their texts merge, the parser gives the second sticky a fresh id,
-  and whatever was linked to it points at the first. Contract 1.1 only recommends collision-free
-  ids; the conformance test accepts this as its one advisory.
+- `elements.bounds(id)` gives a sticky's box in board coordinates (`{ x, y, width, height }`, the
+  top-left corner and the size, which zoom and scroll leave alone), read from the live canvas: a
+  sticky created or moved in the session has its current box. Any other id gives `undefined`. The
+  viewer answers it too.
+- New sticky ids are random: a sticky created on the canvas (palette, keyboard, append, paste) gets
+  `<prefix>_<8 characters of [0-9a-z]>`, such as `(id event_k3x9q2ab)`, so two peers that each add
+  one at the same time do not pick the same id. Ids already in a text are read as they are.
 - `diagram` is the wrapped `Modeler` or `NavigatedViewer`, for everything outside the contract.
-  `createCollaborativeModeler` accepts `additionalModules`, `undoRedoKeys` and `freeRectInsets`.
+  `createCollaborativeModeler` and `createCollaborativeViewer` accept the same options:
+  `additionalModules`, `fitOnImport`, and for the modeler `undoRedoKeys` and `freeArea` (the
+  viewer ignores those two); the deprecated `freeRectInsets` still works for one minor release.
 - After `destroy()`, `exportText()` returns the last state and `importText()` rejects.
 
 #### Migrating a host

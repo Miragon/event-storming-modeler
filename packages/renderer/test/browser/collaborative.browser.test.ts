@@ -159,8 +159,47 @@ describe('the elements surface', () => {
     for (const id of ['note_checkout_flow_n_reviewed_with_the_team', 'draw_line', 'arrow_1']) {
       if (!registry.get(id)) continue;
       expect(modeler.elements.reveal(id)).toBe(false);
+      expect(modeler.elements.bounds(id)).toBeUndefined();
     }
     expect(modeler.elements.reveal('event_order_placed')).toBe(true);
+  });
+
+  // Hosts outline a peer's selection and place todo markers with it, so it is the sticky's box on
+  // the board (centre [660, 320]), whatever the zoom.
+  it('gives a sticky its box in board coordinates, live through a move and a zoom', async () => {
+    const modeler = editor();
+    await modeler.importText(orderCheckout);
+    const { width, height } = STICKY_STYLES.event;
+    expect(modeler.elements.bounds('event_order_placed')).toEqual({
+      x: 660 - width / 2,
+      y: 320 - height / 2,
+      width,
+      height,
+    });
+    const sticky = modeler.diagram
+      .get<ElementRegistry>('elementRegistry')
+      .get('event_order_placed') as Shape;
+    modeler.diagram.get<Modeling>('modeling').moveElements([sticky], { x: 40, y: -20 });
+    modeler.diagram.get<Canvas>('canvas').zoom(2.5);
+    expect(modeler.elements.bounds('event_order_placed')).toEqual({
+      x: 700 - width / 2,
+      y: 300 - height / 2,
+      width,
+      height,
+    });
+  });
+
+  it('gives the viewer the same boxes', async () => {
+    const modeler = viewer();
+    await modeler.importText(orderCheckout);
+    const { width, height } = STICKY_STYLES.event;
+    expect(modeler.elements.bounds('event_order_placed')).toEqual({
+      x: 660 - width / 2,
+      y: 320 - height / 2,
+      width,
+      height,
+    });
+    expect(modeler.elements.bounds('event_no_such_sticky')).toBeUndefined();
   });
 
   // Hosts anchor todos, presence and deep links to these ids: a peer that imports the export,
@@ -216,6 +255,46 @@ describe('a remote import while the user types a label', () => {
     expect(changes).toBe(1);
     expect(modeler.exportText()).toContain('event Order Confirmed [660, 320]');
     expect(modeler.exportText()).toContain('readmodel Order Summary [700, 120]');
+  });
+});
+
+describe("a host's view change while the user types a label (modeler-api L5)", () => {
+  it('neither commits nor closes the editor, which stays over its sticky', async () => {
+    const modeler = editor();
+    await modeler.importText(orderCheckout);
+    const canvas = modeler.diagram.get<Canvas>('canvas');
+    const sticky = modeler.diagram
+      .get<ElementRegistry>('elementRegistry')
+      .get('event_order_placed') as EventStormingShape;
+    modeler.diagram.get<EventStormingLabelEditing>('eventStormingLabelEditing').activate(sticky);
+    const field = () =>
+      document.querySelector<HTMLTextAreaElement>('textarea.event-storming-label-textarea');
+    const opened = field()!;
+    opened.value = 'Order Confirmed';
+    let changes = 0;
+    modeler.onContentChanged(() => (changes += 1));
+    const document_ = modeler.exportText();
+
+    modeler.setViewState({ x: 120, y: 80, width: 640, height: 480 });
+    canvas.zoom('fit-viewport');
+    canvas.scroll({ dx: 37, dy: -21 });
+    canvas.zoom(1.5);
+    await settle();
+
+    expect(changes).toBe(0);
+    expect(modeler.exportText()).toBe(document_);
+    expect(field()).toBe(opened);
+    expect(opened.value).toBe('Order Confirmed');
+    const fieldBox = opened.getBoundingClientRect();
+    const stickyBox = canvas.getGraphics(sticky).getBoundingClientRect();
+    expect(fieldBox.left + fieldBox.width / 2).toBeCloseTo(stickyBox.left + stickyBox.width / 2, 0);
+    expect(fieldBox.top + fieldBox.height / 2).toBeCloseTo(stickyBox.top + stickyBox.height / 2, 0);
+
+    opened.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }),
+    );
+    expect(changes).toBe(1);
+    expect(modeler.exportText()).toContain('event Order Confirmed [660, 320]');
   });
 });
 
@@ -285,6 +364,76 @@ describe('the view after an import (guide §5.9)', () => {
     expect(modeler.diagram.get<Canvas>('canvas').zoom()).toBeCloseTo(0.001, 6);
     await modeler.importText(`title Wide\n${lines}\n`);
     expect(modeler.getViewState()).toEqual(fitted);
+  });
+});
+
+describe('the modeler-api factory options', () => {
+  it('fitOnImport: false keeps the view the host set, on the modeler and on the viewer', async () => {
+    for (const modeler of [
+      mount(createCollaborativeModeler({ fitOnImport: false })),
+      mount(createCollaborativeViewer({ fitOnImport: false })),
+    ]) {
+      await modeler.importText('title Small\nevent Only [0, 0]\n');
+      const view = { x: -2000, y: -1500, width: 800, height: 600 };
+      modeler.setViewState(view);
+      const set = modeler.getViewState();
+      await modeler.importText(orderCheckout);
+      expect(modeler.getViewState()).toEqual(set);
+    }
+  });
+
+  it('fitOnImport defaults to the fit', async () => {
+    const modeler = editor();
+    modeler.setViewState({ x: -2000, y: -1500, width: 800, height: 600 });
+    const moved = modeler.getViewState();
+    await modeler.importText(orderCheckout);
+    expect(modeler.getViewState()).not.toEqual(moved);
+  });
+
+  function keyboardCreateCentre(modeler: CollaborativeEventStormingModeler): {
+    x: number;
+    y: number;
+  } {
+    const before = new Set(ids(modeler));
+    const entry = modeler.diagram
+      .get<Canvas>('canvas')
+      .getContainer()
+      .querySelector<HTMLElement>('.djs-palette [data-action="create.event"]')!;
+    entry.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }));
+    const id = ids(modeler).find((candidate) => !before.has(candidate))!;
+    const shape = modeler.diagram.get<ElementRegistry>('elementRegistry').get(id) as Shape;
+    return { x: shape.x + shape.width / 2, y: shape.y + shape.height / 2 };
+  }
+
+  it('freeArea: { center } places a keyboard-created sticky there', async () => {
+    const modeler = mount(
+      createCollaborativeModeler({ freeArea: { center: () => ({ x: 300, y: 200 }) } }),
+    );
+    await modeler.importText('title Empty\n');
+    expect(keyboardCreateCentre(modeler)).toEqual({ x: 300, y: 200 });
+  });
+
+  it('freeArea: { insets } and the deprecated freeRectInsets place it alike, freeArea first', async () => {
+    const insets = () => ({ top: 200, right: 0, bottom: 0, left: 300 });
+    const ignored = () => ({ top: 0, right: 300, bottom: 200, left: 0 });
+    const centres = [];
+    for (const options of [
+      { freeArea: { insets } },
+      { freeRectInsets: insets },
+      { freeArea: { insets }, freeRectInsets: ignored },
+    ]) {
+      const modeler = mount(createCollaborativeModeler(options));
+      await modeler.importText('title Empty\n');
+      centres.push(keyboardCreateCentre(modeler));
+    }
+    expect(centres[1]).toEqual(centres[0]);
+    expect(centres[2]).toEqual(centres[0]);
+    const plain = mount(createCollaborativeModeler());
+    await plain.importText('title Empty\n');
+    const centre = keyboardCreateCentre(plain);
+    const scale = plain.diagram.get<Canvas>('canvas').zoom();
+    expect(centres[0]!.x - centre.x).toBeCloseTo(150 / scale, 5);
+    expect(centres[0]!.y - centre.y).toBeCloseTo(100 / scale, 5);
   });
 });
 

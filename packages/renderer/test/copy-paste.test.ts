@@ -53,7 +53,7 @@ function harness(selected: Array<Record<string, unknown>>) {
 describe('EventStormingCopyPaste: clones keep the label, get fresh DSL-style ids', () => {
   // Duplicate labels are legal — the DSL disambiguates via `(id …)`/`#id`, so a paste keeps the
   // source label verbatim and only the (possibly DSL-visible) id is fresh.
-  it('keeps the sticky label verbatim and allocates a `<kind-prefix>_<n>` id', () => {
+  it('keeps the sticky label verbatim and allocates a fresh `<kind-prefix>_<random>` id', () => {
     const sticky = {
       id: 'event_order_placed',
       eventStormingType: 'event',
@@ -69,7 +69,7 @@ describe('EventStormingCopyPaste: clones keep the label, get fresh DSL-style ids
 
     const clone = created[0]![0]!;
     expect(clone.eventStormingLabel).toBe('Order Placed');
-    expect(clone.id).toBe('event_1');
+    expect(clone.id).toMatch(/^event_[0-9a-z]{8}$/);
     expect(clone.width).toBe(STICKY_STYLES.event.width);
     expect(clone.height).toBe(STICKY_STYLES.event.height);
     expect(clone.x).toBe(sticky.x);
@@ -94,8 +94,9 @@ describe('EventStormingCopyPaste: clones keep the label, get fresh DSL-style ids
     expect(copyPaste.duplicate()).toBe(true);
 
     const [first, second] = created[0]! as [CreatedShape, CreatedShape];
-    expect(first.id).toBe('event_2');
-    expect(second.id).toBe('event_3');
+    expect(first.id).toMatch(/^event_[0-9a-z]{8}$/);
+    expect(second.id).toMatch(/^event_[0-9a-z]{8}$/);
+    expect(new Set([first.id, second.id, 'event_1', 'event_b']).size).toBe(4);
     expect(first.eventStormingLabel).toBe('Order Placed');
     expect(second.eventStormingLabel).toBe('Order Shipped');
   });
@@ -140,7 +141,7 @@ describe('EventStormingCopyPaste: pasted note box', () => {
 
     const clone = created[0]![0]!;
     expect(clone.eventStormingLabel).toBe('Risk');
-    expect(clone.id).toBe('note_1');
+    expect(clone.id).toMatch(/^note_[0-9a-z]{8}$/);
     expect(clone.width).toBe(base.width);
     expect(clone.height).toBe(base.height);
     expect(clone.x).toBe(note.x);

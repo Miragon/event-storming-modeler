@@ -30,6 +30,8 @@ import {
 
 interface ActiveEdit {
   field: HTMLElement;
+  /** Puts the field over its element again, for the current zoom and scroll. */
+  place: () => void;
   /** Saves the current value and closes (for Enter, blur, click outside). */
   commit: () => void;
   /** Discards and closes (only for Escape). */
@@ -109,15 +111,17 @@ export default class EventStormingLabelEditing {
       if (isEventStormingShape(event.element)) this.activate(event.element);
       else if (isEventStormingConnection(event.element)) this.activateConnection(event.element);
     });
-    // Click/drag/pan outside the field = SAVE (not discard). Only Escape discards.
-    eventBus.on(['element.mousedown', 'drag.init', 'canvas.viewbox.changing'], () =>
-      this.active?.commit(),
-    );
+    // Click/drag outside the field = SAVE (not discard). Only Escape discards.
+    eventBus.on(['element.mousedown', 'drag.init'], () => this.active?.commit());
+    // A view change is no edit gesture: a host fits or restores its view while the user types
+    // (modeler-api L5), and scroll and zoom move the board under the field. Committing there would
+    // write half-typed text, so the field follows its element instead.
+    eventBus.on('canvas.viewbox.changed', () => this.active?.place());
   }
 
   /**
    * Takes an open edit down WITHOUT committing it, for an import that replaces the board: its
-   * element is about to be removed, so a commit (the importer's viewbox change triggers one)
+   * element is about to be removed, so a commit (a blur or a click once the board is replaced)
    * would land on a detached shape and be wiped with the history. Hosts re-import remote states
    * while the user types; `resumeAfterImport` brings the editor back with the typed text.
    */
@@ -130,8 +134,8 @@ export default class EventStormingLabelEditing {
 
   /**
    * Reopens a suspended edit on the element with the same id, if the imported board still has
-   * it. Deferred to the next task, after the host has restored its viewbox around the import
-   * (a viewbox change commits an open editor).
+   * it. Deferred to the next task, after the host has restored its viewbox around the import, so
+   * the field opens where the element ends up.
    */
   resumeAfterImport(): void {
     clearTimeout(this.resumeTimer);
@@ -182,23 +186,23 @@ export default class EventStormingLabelEditing {
     }
 
     const container = this.canvas.getContainer();
-    const scale = this.canvas.zoom();
-    const vb = this.canvas.viewbox();
-    // Overlay the editor centered ON the sticky (the text lives inside it — WYSIWYG); this also
-    // keeps the field visible for stickies at the viewport edge.
-    const left = (element.x + element.width / 2 - vb.x) * scale;
-    const top = (element.y + element.height / 2 - vb.y) * scale;
-
     const field = document.createElement('textarea');
     field.className = 'event-storming-label-input event-storming-label-textarea';
     field.value = element.eventStormingLabel ?? '';
     field.rows = Math.max(2, field.value.split('\n').length);
     field.wrap = 'off';
     field.style.position = 'absolute';
-    field.style.left = `${left}px`;
-    field.style.top = `${top}px`;
     field.style.transform = 'translate(-50%, -50%)';
-    field.style.width = `${element.width * scale}px`;
+    // Overlay the editor centered ON the sticky (the text lives inside it — WYSIWYG); this also
+    // keeps the field visible for stickies at the viewport edge.
+    const place = () => {
+      const scale = this.canvas.zoom();
+      const vb = this.canvas.viewbox();
+      field.style.left = `${(element.x + element.width / 2 - vb.x) * scale}px`;
+      field.style.top = `${(element.y + element.height / 2 - vb.y) * scale}px`;
+      field.style.width = `${element.width * scale}px`;
+    };
+    place();
     container.appendChild(field);
     field.focus();
     field.select();
@@ -249,7 +253,7 @@ export default class EventStormingLabelEditing {
       selectionStart: field.selectionStart ?? undefined,
       selectionEnd: field.selectionEnd ?? undefined,
     });
-    this.active = { field, commit, cleanup, snapshot };
+    this.active = { field, place, commit, cleanup, snapshot };
   }
 
   /**
@@ -261,21 +265,11 @@ export default class EventStormingLabelEditing {
    */
   private activateNote(element: EventStormingShape): void {
     const container = this.canvas.getContainer();
-    const scale = this.canvas.zoom();
-    const vb = this.canvas.viewbox();
-    const left = (element.x + element.width / 2 - vb.x) * scale;
-    const top = (element.y + element.height / 2 - vb.y) * scale;
-
     const editor = document.createElement('div');
     editor.className = 'event-storming-label-input event-storming-note-editor';
     editor.contentEditable = 'true';
     editor.style.position = 'absolute';
-    editor.style.left = `${left}px`;
-    editor.style.top = `${top}px`;
     editor.style.transform = 'translate(-50%, -50%)';
-    // min- (not fixed) box: the editor covers the note's footprint but grows with new lines.
-    editor.style.minWidth = `${element.width * scale}px`;
-    editor.style.minHeight = `${element.height * scale}px`;
     noteMarkdownToDom(editor, element.eventStormingLabel ?? '');
 
     const align: NoteAlignState = {
@@ -285,10 +279,21 @@ export default class EventStormingLabelEditing {
     applyAlignPreview(editor, align);
 
     const toolbar = createNoteToolbar(document, (action) => onAction(action));
-    // Floats just above the note's top edge, x-centered like the editor.
-    toolbar.style.left = `${left}px`;
-    toolbar.style.top = `${(element.y - vb.y) * scale - 8}px`;
     toolbar.style.transform = 'translate(-50%, -100%)';
+    const place = () => {
+      const scale = this.canvas.zoom();
+      const vb = this.canvas.viewbox();
+      const left = (element.x + element.width / 2 - vb.x) * scale;
+      editor.style.left = `${left}px`;
+      editor.style.top = `${(element.y + element.height / 2 - vb.y) * scale}px`;
+      // min- (not fixed) box: the editor covers the note's footprint but grows with new lines.
+      editor.style.minWidth = `${element.width * scale}px`;
+      editor.style.minHeight = `${element.height * scale}px`;
+      // Floats just above the note's top edge, x-centered like the editor.
+      toolbar.style.left = `${left}px`;
+      toolbar.style.top = `${(element.y - vb.y) * scale - 8}px`;
+    };
+    place();
 
     container.appendChild(editor);
     container.appendChild(toolbar);
@@ -409,7 +414,7 @@ export default class EventStormingLabelEditing {
       value: domToNoteMarkdown(editor),
       align: { ...align },
     });
-    this.active = { field: editor, commit, cleanup, snapshot };
+    this.active = { field: editor, place, commit, cleanup, snapshot };
   }
 
   /**
@@ -421,8 +426,6 @@ export default class EventStormingLabelEditing {
     if (this.readOnly?.isReadOnly()) return;
 
     const container = this.canvas.getContainer();
-    const scale = this.canvas.zoom();
-    const vb = this.canvas.viewbox();
     const first = conn.waypoints[0];
     const last = conn.waypoints[conn.waypoints.length - 1];
     if (!first || !last) return;
@@ -433,8 +436,13 @@ export default class EventStormingLabelEditing {
     field.placeholder = 'arrow label';
     field.value = conn.linkLabel ?? '';
     field.style.position = 'absolute';
-    field.style.left = `${((first.x + last.x) / 2 - 60 - vb.x) * scale}px`;
-    field.style.top = `${((first.y + last.y) / 2 - 26 - vb.y) * scale}px`;
+    const place = () => {
+      const scale = this.canvas.zoom();
+      const vb = this.canvas.viewbox();
+      field.style.left = `${((first.x + last.x) / 2 - 60 - vb.x) * scale}px`;
+      field.style.top = `${((first.y + last.y) / 2 - 26 - vb.y) * scale}px`;
+    };
+    place();
     container.appendChild(field);
     field.focus();
     field.select();
@@ -479,7 +487,7 @@ export default class EventStormingLabelEditing {
       selectionStart: field.selectionStart ?? undefined,
       selectionEnd: field.selectionEnd ?? undefined,
     });
-    this.active = { field, commit, cleanup, snapshot };
+    this.active = { field, place, commit, cleanup, snapshot };
   }
 
   cancel(): void {

@@ -349,3 +349,54 @@ describe('EventStormingLabelEditing: WYSIWYG note editor', () => {
     });
   });
 });
+
+describe('EventStormingLabelEditing: the note editor across a view change', () => {
+  it('stays open with its text and moves editor and toolbar with the view', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const view = { x: 0, y: 0, scale: 1 };
+    let viewChanged: (() => void) | undefined;
+    const canvas = {
+      getContainer: () => container,
+      zoom: () => view.scale,
+      viewbox: () => ({ x: view.x, y: view.y }),
+    } as unknown as Canvas;
+    const eventBus = {
+      on: (names: string | string[], listener: () => void) => {
+        if (([] as string[]).concat(names).includes('canvas.viewbox.changed')) {
+          viewChanged = listener;
+        }
+      },
+    } as unknown as EventBus;
+    const updateProperties: unknown[][] = [];
+    const modeling = {
+      updateLabel: () => {},
+      updateProperties: (...args: unknown[]) => updateProperties.push(args),
+    } as unknown as EventStormingModeling;
+    const editing = new EventStormingLabelEditing(eventBus, canvas, modeling);
+    const element = {
+      id: 'note_kickoff',
+      eventStormingType: 'note',
+      eventStormingLabel: 'Kickoff',
+      x: 100,
+      y: 100,
+      width: 200,
+      height: 100,
+    } as unknown as EventStormingShape;
+    editing.activate(element);
+    const editor = container.querySelector<HTMLElement>('.event-storming-note-editor')!;
+    const toolbar = container.querySelector<HTMLElement>('.event-storming-note-toolbar')!;
+    editor.textContent = 'Kickoff moved';
+
+    Object.assign(view, { x: 50, y: 50, scale: 2 });
+    viewChanged!();
+
+    expect(updateProperties).toEqual([]);
+    expect(editing.openEdit()).toEqual({ elementId: 'note_kickoff', value: 'Kickoff moved' });
+    expect([editor.style.left, editor.style.top]).toEqual(['300px', '200px']);
+    expect([editor.style.minWidth, editor.style.minHeight]).toEqual(['400px', '200px']);
+    expect([toolbar.style.left, toolbar.style.top]).toEqual(['300px', '92px']);
+    editing.cancel();
+    container.remove();
+  });
+});

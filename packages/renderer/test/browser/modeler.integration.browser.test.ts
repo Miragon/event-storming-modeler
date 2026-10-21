@@ -432,24 +432,29 @@ describe('Modeler integration (real browser DOM)', () => {
     expect(modeler.exportDSL()).toBe(out);
   });
 
-  it('palette create gets a DSL-style id and a rename may duplicate an existing label', async () => {
+  it('palette create gets a random DSL-style id and a rename may duplicate an existing label', async () => {
     await modeler.importDSL(DUPLICATE_DSL);
     const modeling = modeler.get<Modeling>('modeling');
     const factory = modeler.get<EventStormingElementFactory>('eventStormingElementFactory');
     const root = modeler.get<Canvas>('canvas').getRootElement() as Shape;
 
     // Interactive create: numbered default label (pure UX) + a DSL-style id — NOT `shape_N`,
-    // because the id surfaces in the `.storm` text once the label is duplicated.
+    // because the id surfaces in the `.storm` text.
     const created = factory.createNew('aggregate', 'Order');
     expect(created.eventStormingLabel).toBe('Order 2');
-    expect(created.id).toBe('agg_1');
+    expect(created.id).toMatch(/^agg_[0-9a-z]{8}$/);
     modeling.createShape(created as unknown as Shape, { x: 1600, y: 290 }, root);
 
     // Renaming to an EXISTING label is allowed; the export disambiguates via `(id …)`.
     modeler.get<EventStormingModeling>('eventStormingModeling').updateLabel(created, 'Order');
     const board = modeler.exportMap();
     expect(board.elements.filter((e) => e.label === 'Order')).toHaveLength(3);
-    expect(modeler.exportDSL()).toContain('aggregate Order [1600, 290] (id agg_1)');
+    const text = modeler.exportDSL();
+    expect(text).toContain(`aggregate Order [1600, 290] (id ${created.id})`);
+
+    await modeler.importDSL(text);
+    expect(modeler.exportDSL()).toBe(text);
+    expect(modeler.get<ElementRegistry>('elementRegistry').get(created.id)).toBeDefined();
   });
 
   it('shows kind captions on stickies (live DOM + SVG export) and hides them on toggle', async () => {

@@ -65,6 +65,23 @@ function typedHalfway(fragment: string, typedSoFar: string): string {
   return orderCheckout.replace(fragment, typedSoFar);
 }
 
+function stickyToEdit(modeler: CollaborativeModeler): EventStormingShape {
+  const sticky = diagramOf(modeler)
+    .get<ElementRegistry>('elementRegistry')
+    .get('event_order_placed');
+  if (!sticky) throw new Error('the imported board has no sticky event_order_placed');
+  return sticky as EventStormingShape;
+}
+
+function openLabelField(modeler: CollaborativeModeler): HTMLTextAreaElement {
+  const field = diagramOf(modeler)
+    .get<Canvas>('canvas')
+    .getContainer()
+    .querySelector<HTMLTextAreaElement>('textarea.event-storming-label-textarea');
+  if (!field) throw new Error('no label editor is open');
+  return field;
+}
+
 function toggleLevel(modeler: CollaborativeModeler): void {
   const modeling = diagramOf(modeler).get<EventStormingModeling>('eventStormingModeling');
   modeling.setLevel(modeling.getLevel() === 'design' ? 'process' : 'design');
@@ -102,19 +119,26 @@ const harness: ConformanceHarness = {
     typedHalfway('(size 240x120)', '(size 240x'),
     'event Unclosed [10',
   ],
+  // A drag ends in one moveElements command; snapping lives in the drag, so the box moves by
+  // exactly this delta.
+  moveElement(modeler) {
+    const sticky = stickyToEdit(modeler);
+    diagramOf(modeler)
+      .get<Modeling>('modeling')
+      .moveElements([sticky as Shape], { x: 160, y: 120 });
+    return sticky.id;
+  },
   openInteraction(modeler) {
-    const diagram = diagramOf(modeler);
-    const sticky = diagram.get<ElementRegistry>('elementRegistry').get('event_order_placed');
-    if (!sticky) throw new Error('the imported board has no sticky event_order_placed to edit');
-    diagram
+    diagramOf(modeler)
       .get<EventStormingLabelEditing>('eventStormingLabelEditing')
-      .activate(sticky as EventStormingShape);
-    const field = diagram
-      .get<Canvas>('canvas')
-      .getContainer()
-      .querySelector<HTMLTextAreaElement>('textarea.event-storming-label-textarea');
-    if (!field) throw new Error('no label editor opened');
-    field.value = 'typed, not committed';
+      .activate(stickyToEdit(modeler));
+    openLabelField(modeler).value = 'typed, not committed';
+  },
+  // Cmd/Ctrl+Enter is the sticky editor's save key (plain Enter breaks the line).
+  commitInteraction(modeler) {
+    openLabelField(modeler).dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }),
+    );
   },
   interactionState(modeler) {
     const edit = diagramOf(modeler)
@@ -132,40 +156,18 @@ const failOnSkip = {
   },
 };
 
-const ID_COLLISION_CASE =
-  'elements (when present, recommended): ids created on two peers at the same time do not collide';
-
 const advisories: string[] = [];
-const completedCases = new Set<string>();
-
-// A filtered run (`-t`, `.only`) skips cases, so only the advisories of cases that ran are due.
-function recordingTest(name: string, run: () => Promise<void>): void {
-  test(name, async () => {
-    await run();
-    completedCases.add(name.replace(/^conformance: /, ''));
-  });
-}
 
 describe('Event Storming implements the collaborative-modeler contract', () => {
-  registerConformance(harness, recordingTest, {
+  registerConformance(harness, test, {
     ...failOnSkip,
     onAdvisory(caseName, advice) {
       advisories.push(`${caseName}: ${advice}`);
     },
   });
 
-  // Known and accepted for now: a new sticky takes the lowest free `event_<n>` of its own
-  // instance, so two peers that each add one both allocate 'event_1'. Collision-free ids are a
-  // RECOMMENDATION of contract 1.1 (a candidate law for 2.0). The exact list fails on any other
-  // advisory, and once this one is fixed, so the note cannot go stale.
+  // The renderer meets every recommendation, so any advisory is a regression to look at.
   afterAll(() => {
-    const expected = completedCases.has(ID_COLLISION_CASE)
-      ? [
-          expect.stringMatching(
-            /^elements \(when present, recommended\): ids created on two peers.*'event_1'/,
-          ),
-        ]
-      : [];
-    expect(advisories).toEqual(expected);
+    expect(advisories).toEqual([]);
   });
 });

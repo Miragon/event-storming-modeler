@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import EventBus from 'diagram-js/lib/core/EventBus';
 import type { BoardLevel } from '@miragon/event-storming-schema-model';
-import EventStormingPaletteProvider from '../src/palette/EventStormingPaletteProvider.js';
+import EventStormingPaletteProvider, {
+  type EventStormingPaletteConfig,
+} from '../src/palette/EventStormingPaletteProvider.js';
 import { ROOT_ID } from '../src/model/di-types.js';
 
 function providerHarness(level: BoardLevel = 'design') {
@@ -158,7 +160,12 @@ describe('EventStormingPaletteProvider: tooltips', () => {
 });
 
 describe('EventStormingPaletteProvider: Enter or Space on a creating entry (guide §5.5)', () => {
-  function keyboardHarness() {
+  const CHROME_INSETS = { top: 88, right: 24, bottom: 64, left: 24 };
+
+  function keyboardHarness(
+    freeArea: EventStormingPaletteConfig['freeArea'] = { insets: () => CHROME_INSETS },
+    config: EventStormingPaletteConfig = { freeArea },
+  ) {
     const eventBus = new EventBus();
     const placed: Array<{ id: string; x: number; y: number; width: number; height: number }> = [];
     let next = 0;
@@ -201,7 +208,7 @@ describe('EventStormingPaletteProvider: Enter or Space on a creating entry (guid
       selection as never,
       elementRegistry as never,
       labelEditing as never,
-      { freeRectInsets: () => ({ top: 88, right: 24, bottom: 64, left: 24 }) },
+      config,
     );
     const click = (detail: number) =>
       (provider.getPaletteEntries()['create.event']!.action as { click(event: Event): void }).click(
@@ -232,6 +239,25 @@ describe('EventStormingPaletteProvider: Enter or Space on a creating entry (guid
       { x: 374, y: 280 },
       { x: 398, y: 304 },
     ]);
+  });
+
+  it('takes the free centre itself when the host passes `freeArea: { center }`', () => {
+    const { click, modeling } = keyboardHarness({ center: () => ({ x: 420, y: 310 }) });
+    click(0);
+    expect(modeling.createShape.mock.calls[0]![1]).toEqual({ x: 420, y: 310 });
+  });
+
+  it('falls back to the centre of the container while the host has no centre yet', () => {
+    const { click, modeling } = keyboardHarness({ center: () => undefined });
+    click(0);
+    // The whole 1000 x 800 container at scale 2 from (100, 50).
+    expect(modeling.createShape.mock.calls[0]![1]).toEqual({ x: 350, y: 250 });
+  });
+
+  it('still reads the deprecated freeRectInsets of the palette config', () => {
+    const { click, modeling } = keyboardHarness(undefined, { freeRectInsets: () => CHROME_INSETS });
+    click(0);
+    expect(modeling.createShape.mock.calls[0]![1]).toEqual({ x: 350, y: 256 });
   });
 
   it('keeps the pointer create for a real click', () => {

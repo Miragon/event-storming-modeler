@@ -59,9 +59,9 @@ earlier events sit to the left of later ones — and arrows connect the stickies
   to “Nowhere”, which isn't on the board."); the pill at the bottom left counts them and opens that
   view.
 - **Stable sticky ids.** A sticky you create or rename on the canvas keeps its id in the text
-  (`(id event_3)`), so a reload, a peer or a tool that links to it finds the same sticky. Two
-  people who each add a sticky at the same time (on two branches, say) can both get `event_1`;
-  after the merge the second sticky gets a new id, and a link to it then finds the first.
+  (`(id event_k3x9q2ab)`), so a reload, a peer or a tool that links to it finds the same sticky.
+  The id of a new sticky is random, so two people who each add one at the same time (on two
+  branches, say) do not get the same id.
 - **Commands** (Command Palette or the `…` menu of the editor title, while a board is focused):
   **Event Storming: Fit to View**, **Export as PNG**, **Export as SVG**, **Export as PNG (4×,
   Transparent)**, **Export as JSON**, and **Open Source to the Side** / **Open Board to the Side**.
