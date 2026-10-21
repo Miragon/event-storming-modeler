@@ -67,10 +67,23 @@ afterAll(async () => {
   if (workDirectory) await rm(workDirectory, { recursive: true, force: true });
 });
 
+// VS Code applies a color theme once it notices that its settings file changed. Once in 35 Docker
+// runs it did not, and the workbench kept the previous theme through the driver's whole wait: such a
+// run, and only such a run, gets a second one in a fresh VS Code. Any other failure fails at once.
+const MISSED_THEME_SWITCH = /^themes: .+: the workbench never switched/;
+const MISSED_THEME_SWITCH_ERROR = 'VS Code missed a theme switch';
+
+function onlyMissedThemeSwitches(failures: readonly string[]): boolean {
+  return failures.length > 0 && failures.every((failure) => MISSED_THEME_SWITCH.test(failure));
+}
+
 // The first run downloads VS Code: about 320 to 360 MB, 0.9 GB unpacked, kept in the OS cache.
 it(
   'opens, edits, saves, undoes and themes a board in a real VS Code',
-  { timeout: 600_000 },
+  {
+    timeout: 600_000,
+    retry: { count: 1, condition: new RegExp(`^${MISSED_THEME_SWITCH_ERROR}`) },
+  },
   async () => {
     const fixtureText = await readFile(fixtureFile, 'utf8');
 
@@ -87,6 +100,9 @@ it(
     });
     console.log(formatVsCodeSmoke(result));
 
-    expect(result.failures).toEqual([]);
+    if (onlyMissedThemeSwitches(result.failures)) {
+      throw new Error(`${MISSED_THEME_SWITCH_ERROR}: ${result.failures.join('; ')}`);
+    }
+    expect(result.failures, result.failures.join('\n')).toEqual([]);
   },
 );

@@ -62,8 +62,9 @@ portless service install` — see [`CONTRIBUTING.md`](CONTRIBUTING.md)). `npm ru
   screenshots in the gitignored `test-results/vscode-smoke/`); no build needed, on macOS a VS Code
   window opens for ~5 s and takes the focus, the first run downloads VS Code into the OS cache;
   `VSCODE_SMOKE_VERSION=1.96.0` for another version, `VSCODE_SMOKE_KEEP=1` keeps VS Code's profile
-  and logs. No retry: the driver (shell 0.3.1) reads the save only once the tab is clean, so a
-  failure is real. In CI only
+  and logs. A failed save is not retried (the driver, shell 0.3.1, reads it only once the tab is
+  clean); only a run whose sole failures are missed theme switches gets one retry, shown as
+  `(retry x1)`. In CI only
   [`.github/workflows/vscode-smoke.yml`](.github/workflows/vscode-smoke.yml) runs it (weekly, on
   PRs touching `apps/vscode/**`, on demand; `xvfb-run -a`, engines floor and newest stable;
   screenshots and VS Code's logs as artifacts), never the CI workflow. Details in
