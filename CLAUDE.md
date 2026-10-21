@@ -49,10 +49,11 @@ portless service install` — see [`CONTRIBUTING.md`](CONTRIBUTING.md)). `npm ru
   `E2E_WEBVIEW_PORT` (default 5180 / 5190)
 - `npm run test:vscode:docker` — the VS Code smoke test below in a Linux container under
   `xvfb-run -a` (the shell's `modeler-shell-vscode-docker`): the way to run it locally, since no
-  VS Code window opens; needs Docker, ~10 s once the image and VS Code are cached. It copies the
-  repo in without `node_modules`/`.git`, runs `npm ci` there and brings `test-results/vscode-smoke/`
-  back; options after `--`, e.g. `-- --env VSCODE_SMOKE_VERSION=1.96.0 --env VSCODE_SMOKE_KEEP=1`
-  (VS Code's logs in `vscode-logs/`).
+  VS Code window opens; needs Docker, 10 to 16 s once the image and VS Code are cached (leave a few
+  seconds between two runs, see CONTRIBUTING). It copies the repo in without `node_modules`/`.git`,
+  runs `npm ci` there and brings `test-results/vscode-smoke/` back; options after `--`, e.g.
+  `-- --env VSCODE_SMOKE_VERSION=1.96.0 --env VSCODE_SMOKE_KEEP=1` (VS Code's logs in
+  `vscode-logs/`).
 - `npm run test:vscode` — the packaged extension in a real VS Code on the host, for CI and for
   watching the window (Vitest project `vscode`,
   [`apps/vscode/test-smoke/`](apps/vscode/test-smoke/)): packs it as the release does
