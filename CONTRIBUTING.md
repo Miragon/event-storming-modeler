@@ -101,6 +101,7 @@ extension's bundle does. `unzip` must be on the `PATH` (it is on macOS and Ubunt
 ```bash
 npm run test:vscode                              # newest stable VS Code
 VSCODE_SMOKE_VERSION=1.96.0 npm run test:vscode  # the engines.vscode floor, or any other version
+VSCODE_SMOKE_KEEP=1 npm run test:vscode          # keep VS Code's profile and logs ("kept <dir>")
 ```
 
 A VS Code window opens for about 5 seconds; leave it alone until it closes. The first run of a
@@ -109,17 +110,28 @@ version downloads VS Code (about 330 MB, 0.9 GB unpacked) into
 machine; later runs take about 6 to 7 seconds in all. The log names each step, then the VS Code
 version, the timings and every theme with its screenshot; a failure names its step (`open: …`,
 `save: …`), and a failed open leaves `event-storming-open-failure.png` with VS Code's error from the
-extension host. Keep `playwright-core` in `apps/vscode/package.json` at the root `playwright`
+extension host. With `VSCODE_SMOKE_KEEP=1` it also names the folder of VS Code's logs (main
+process, renderer, extension host); an exception inside the webview is not in them, it shows only
+in the webview's developer tools (**Developer: Open Webview Developer Tools** while the extension
+runs in VS Code). Keep `playwright-core` in `apps/vscode/package.json` at the root `playwright`
 version.
+
+The test retries once in a fresh VS Code; Vitest marks such a pass `(retry x1)`. The driver's save
+step (`@miragon/modeler-shell` 0.3.0) reads the file as soon as it differs from the fixture and can
+catch it while VS Code is still writing it: on Linux in about 1 of 20 runs (5 of 92 against VS Code
+1.143.0 in an Ubuntu 24.04 container), on macOS not yet seen. The save check then fails with
+`save: the saved text does not parse: 0 elements and 0 arrows in 0 characters, expected 7 and 4 …`.
+A failure that survives the retry is a real one.
 
 **In CI.** [`.github/workflows/vscode-smoke.yml`](.github/workflows/vscode-smoke.yml) runs it on
 `ubuntu-24.04` under `xvfb-run -a` (VS Code needs an X server), against both the floor of
 `engines.vscode` and the newest stable release: weekly on Mondays (a new VS Code arrives without a
 commit here), on pull requests that touch `apps/vscode/**` or the workflow, and on demand
-(**Actions → VS Code smoke → Run workflow**). The download is cached per VS Code version, and the
-screenshots are uploaded as the artifacts `vscode-smoke-minimum` and `vscode-smoke-stable` (7
-days). It is a workflow of its own and not a required check, so it never delays or blocks the CI
-workflow.
+(**Actions → VS Code smoke → Run workflow**). The download is cached per VS Code version. The
+screenshots are uploaded as the artifacts `vscode-smoke-minimum` and `vscode-smoke-stable`, and VS
+Code's logs (the job runs with `VSCODE_SMOKE_KEEP=1`) as `vscode-smoke-minimum-logs` and
+`vscode-smoke-stable-logs`, each for 7 days. It is a workflow of its own and not a required check,
+so it never delays or blocks the CI workflow.
 
 ## Design tokens
 
