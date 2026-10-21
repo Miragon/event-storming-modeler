@@ -107,6 +107,10 @@ const viewer = createCollaborativeViewer(); // meta.editable: false, never chang
 - `getViewState()` / `setViewState()` read and set the diagram-js viewbox (`x`, `y`, `width`,
   `height`); an import fits the board, never above 100% and never below 0.1% (a board too wide to
   show whole at 0.1% is centred there instead).
+- A view change never commits an open label editor: `setViewState`, a host's fit and the user's own
+  scroll or zoom leave it open with the typed text, and it moves with its element. A click or a
+  drag on the canvas, Cmd/Ctrl+Enter (Enter on an arrow label) or leaving the field commits it;
+  Escape discards it.
 - `elements` lists the stickies with their ids and labels, reveals (selects and scrolls to) one
   and reports the selection. Sticky ids survive a save and a re-open: the DSL writes `(id …)`
   back for every sticky whose id the parser would not derive again from its label at that line (one

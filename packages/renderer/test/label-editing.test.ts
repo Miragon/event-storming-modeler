@@ -302,3 +302,126 @@ describe('EventStormingLabelEditing: an import while the editor is open', () => 
     container.remove();
   });
 });
+
+describe('EventStormingLabelEditing: a view change while the editor is open', () => {
+  // Hosts fit and restore their view while the user types (modeler-api L5); a commit there would
+  // write half-typed text. The field stays open and follows its element instead.
+  function viewHarness() {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const view = { x: 0, y: 0, scale: 1 };
+    const canvas = {
+      getContainer: () => container,
+      zoom: () => view.scale,
+      viewbox: () => ({ x: view.x, y: view.y }),
+    } as unknown as Canvas;
+    const listeners = new Map<string, Array<(event: unknown) => void>>();
+    const eventBus = {
+      on: (names: string | string[], listener: (event: unknown) => void) => {
+        for (const name of ([] as string[]).concat(names)) {
+          listeners.set(name, [...(listeners.get(name) ?? []), listener]);
+        }
+      },
+    } as unknown as EventBus;
+    const changeView = (next: { x: number; y: number; scale: number }) => {
+      for (const listener of listeners.get('canvas.viewbox.changing') ?? []) listener({});
+      Object.assign(view, next);
+      for (const listener of listeners.get('canvas.viewbox.changed') ?? []) listener({});
+    };
+    const fire = (name: string) => (listeners.get(name) ?? []).forEach((listener) => listener({}));
+    const calls: { updateLabel: unknown[][]; updateProperties: unknown[][] } = {
+      updateLabel: [],
+      updateProperties: [],
+    };
+    const modeling = {
+      updateLabel: (...args: unknown[]) => calls.updateLabel.push(args),
+      updateProperties: (...args: unknown[]) => calls.updateProperties.push(args),
+    } as unknown as EventStormingModeling;
+    const editing = new EventStormingLabelEditing(eventBus, canvas, modeling);
+    return { container, editing, calls, changeView, fire };
+  }
+
+  const sticky = {
+    id: 'event_order_placed',
+    eventStormingType: 'event',
+    eventStormingLabel: 'Order Placed',
+    x: 100,
+    y: 50,
+    width: 130,
+    height: 90,
+  } as unknown as EventStormingShape;
+
+  let harness: ReturnType<typeof viewHarness>;
+
+  beforeEach(() => {
+    harness = viewHarness();
+  });
+
+  afterEach(() => {
+    harness.editing.cancel();
+    harness.container.remove();
+  });
+
+  it('keeps a sticky editor open with its typed text and moves it with the view', () => {
+    harness.editing.activate(sticky);
+    const field = harness.container.querySelector('textarea')!;
+    field.value = 'Order Confirmed';
+    expect([field.style.left, field.style.top, field.style.width]).toEqual([
+      '165px',
+      '95px',
+      '130px',
+    ]);
+
+    harness.changeView({ x: 40, y: -20, scale: 2 });
+
+    expect(harness.calls.updateLabel).toEqual([]);
+    expect(harness.editing.openEdit()).toEqual({
+      elementId: 'event_order_placed',
+      value: 'Order Confirmed',
+    });
+    expect(harness.container.querySelector('textarea')).toBe(field);
+    expect([field.style.left, field.style.top, field.style.width]).toEqual([
+      '250px',
+      '230px',
+      '260px',
+    ]);
+
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true }));
+    expect(harness.calls.updateLabel).toEqual([[sticky, 'Order Confirmed']]);
+  });
+
+  it('keeps an arrow label editor open and moves it with the view', () => {
+    const conn = {
+      id: 'arrow_1',
+      eventStormingType: 'arrow',
+      waypoints: [
+        { x: 0, y: 0 },
+        { x: 200, y: 0 },
+      ],
+    } as unknown as EventStormingConnection;
+    harness.editing.activateConnection(conn);
+    const field = harness.container.querySelector('input')!;
+    field.value = 'on retry';
+
+    harness.changeView({ x: 10, y: 10, scale: 0.5 });
+
+    expect(harness.calls.updateProperties).toEqual([]);
+    expect(harness.editing.openEdit()).toEqual({ elementId: 'arrow_1', value: 'on retry' });
+    expect([field.style.left, field.style.top]).toEqual(['15px', '-18px']);
+  });
+
+  it('still commits on a click or a drag on the canvas', () => {
+    harness.editing.activate(sticky);
+    harness.container.querySelector('textarea')!.value = 'Order Confirmed';
+    harness.fire('element.mousedown');
+    expect(harness.calls.updateLabel).toEqual([[sticky, 'Order Confirmed']]);
+
+    harness.editing.activate(sticky);
+    harness.container.querySelector('textarea')!.value = 'Order Shipped';
+    harness.fire('drag.init');
+    expect(harness.calls.updateLabel).toEqual([
+      [sticky, 'Order Confirmed'],
+      [sticky, 'Order Shipped'],
+    ]);
+  });
+});

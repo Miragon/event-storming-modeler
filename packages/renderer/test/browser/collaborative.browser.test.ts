@@ -219,6 +219,46 @@ describe('a remote import while the user types a label', () => {
   });
 });
 
+describe("a host's view change while the user types a label (modeler-api L5)", () => {
+  it('neither commits nor closes the editor, which stays over its sticky', async () => {
+    const modeler = editor();
+    await modeler.importText(orderCheckout);
+    const canvas = modeler.diagram.get<Canvas>('canvas');
+    const sticky = modeler.diagram
+      .get<ElementRegistry>('elementRegistry')
+      .get('event_order_placed') as EventStormingShape;
+    modeler.diagram.get<EventStormingLabelEditing>('eventStormingLabelEditing').activate(sticky);
+    const field = () =>
+      document.querySelector<HTMLTextAreaElement>('textarea.event-storming-label-textarea');
+    const opened = field()!;
+    opened.value = 'Order Confirmed';
+    let changes = 0;
+    modeler.onContentChanged(() => (changes += 1));
+    const document_ = modeler.exportText();
+
+    modeler.setViewState({ x: 120, y: 80, width: 640, height: 480 });
+    canvas.zoom('fit-viewport');
+    canvas.scroll({ dx: 37, dy: -21 });
+    canvas.zoom(1.5);
+    await settle();
+
+    expect(changes).toBe(0);
+    expect(modeler.exportText()).toBe(document_);
+    expect(field()).toBe(opened);
+    expect(opened.value).toBe('Order Confirmed');
+    const fieldBox = opened.getBoundingClientRect();
+    const stickyBox = canvas.getGraphics(sticky).getBoundingClientRect();
+    expect(fieldBox.left + fieldBox.width / 2).toBeCloseTo(stickyBox.left + stickyBox.width / 2, 0);
+    expect(fieldBox.top + fieldBox.height / 2).toBeCloseTo(stickyBox.top + stickyBox.height / 2, 0);
+
+    opened.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }),
+    );
+    expect(changes).toBe(1);
+    expect(modeler.exportText()).toContain('event Order Confirmed [660, 320]');
+  });
+});
+
 describe('destroy while the user types a label', () => {
   it('takes the editor down without a commit and leaves no focus call on the destroyed canvas', async () => {
     const modeler = editor();
