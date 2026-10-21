@@ -95,8 +95,33 @@ starts the real one with the **packaged** extension, through the `@miragon/model
    each theme gets a screenshot in `test-results/vscode-smoke/` (gitignored), e.g.
    `event-storming-dark.png`.
 
-**Locally (macOS).** No build needed — the parser check takes the package sources, as the
-extension's bundle does. `unzip` must be on the `PATH` (it is on macOS and Ubuntu).
+No build is needed to run it: the parser check takes the package sources, as the extension's
+bundle does.
+
+**Locally, in Docker (no window).** The way to run it on your machine: `npm run test:vscode:docker`
+runs `npm run test:vscode` in a Linux container under `xvfb-run -a`, through the shell's command
+`modeler-shell-vscode-docker`, so no VS Code window opens and nothing takes the focus. It needs
+Docker (Docker Desktop on a Mac) next to the installed dependencies. Options go after `--`:
+
+```bash
+npm run test:vscode:docker                                       # newest stable VS Code
+npm run test:vscode:docker -- --env VSCODE_SMOKE_VERSION=1.96.0  # the engines.vscode floor, or another
+npm run test:vscode:docker -- --env VSCODE_SMOKE_KEEP=1          # VS Code's logs in vscode-logs/
+```
+
+The command copies the repository into the container without `node_modules` and `.git`, runs
+`npm ci` there (the host's `node_modules` stay as they are) and brings `test-results/vscode-smoke/`
+back, emptied first; paths in the log are the container's (`/work/…`). The first run builds the
+image `modeler-shell-vscode-smoke:node<version>-<hash>` (about 0.9 GB, for the Node version that
+runs the command) and downloads VS Code's Linux build into the Docker volume
+`modeler-shell-vscode-cache`, both shared by every Miragon modeler on the machine; that takes about
+a minute. Later runs take about 10 seconds (`npm ci` 3 to 4 s, the test 5 s). On Apple silicon the
+container runs VS Code's `linux-arm64` build, CI the `linux-x64` one. `docker volume rm
+modeler-shell-vscode-cache modeler-shell-npm-cache` starts over; the details are in the shell's
+README ([In Docker, without a window](https://github.com/Miragon/modeler-api/tree/main/packages/shell#in-docker-without-a-window)).
+
+**Locally, with a window (macOS).** `npm run test:vscode` runs the same test on the host, for
+watching VS Code go through it. `unzip` must be on the `PATH` (it is on macOS and Ubuntu).
 
 ```bash
 npm run test:vscode                              # newest stable VS Code
@@ -104,17 +129,19 @@ VSCODE_SMOKE_VERSION=1.96.0 npm run test:vscode  # the engines.vscode floor, or 
 VSCODE_SMOKE_KEEP=1 npm run test:vscode          # keep VS Code's profile and logs ("kept <dir>")
 ```
 
-A VS Code window opens for about 5 seconds; leave it alone until it closes. The first run of a
-version downloads VS Code (about 330 MB, 0.9 GB unpacked) into
+A VS Code window opens for about 5 seconds and takes the focus; leave it alone until it closes. The
+first run of a version downloads VS Code (about 330 MB, 0.9 GB unpacked) into
 `~/Library/Caches/miragon-modeler-shell/vscode-test`, shared by every Miragon modeler on the
-machine; later runs take about 6 to 7 seconds in all. The log names each step, then the VS Code
-version, the timings and every theme with its screenshot; a failure names its step (`open: …`,
-`save: …`), and a failed open leaves `event-storming-open-failure.png` with VS Code's error from the
-extension host. With `VSCODE_SMOKE_KEEP=1` it also names the folder of VS Code's logs (main
-process, renderer, extension host); an exception inside the webview is not in them, it shows only
-in the webview's developer tools (**Developer: Open Webview Developer Tools** while the extension
-runs in VS Code). Keep `playwright-core` in `apps/vscode/package.json` at the root `playwright`
-version.
+machine; later runs take about 6 to 7 seconds in all.
+
+Either way the log names each step, then the VS Code version, the timings and every theme with its
+screenshot; a failure names its step (`open: …`, `save: …`), and a failed open leaves
+`event-storming-open-failure.png` with VS Code's error from the extension host. With
+`VSCODE_SMOKE_KEEP=1` it also names the folder of VS Code's logs (main process, renderer, extension
+host; from Docker they come back in `vscode-logs/`); an exception inside the webview is not in
+them, it shows only in the webview's developer tools (**Developer: Open Webview Developer Tools**
+while the extension runs in VS Code). Keep `playwright-core` in `apps/vscode/package.json` at the
+root `playwright` version.
 
 The test does not retry, so every failure is a real one. The driver's save step
 (`@miragon/modeler-shell` 0.3.1) reads the file only after the editor tab turned clean, which VS

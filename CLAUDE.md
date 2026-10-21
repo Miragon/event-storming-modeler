@@ -47,14 +47,22 @@ portless service install` — see [`CONTRIBUTING.md`](CONTRIBUTING.md)). `npm ru
   VS Code stub, incl. the kit on the `ide` host); one project with
   `npm run test:e2e -- --project=vscode-webview`, other ports via `E2E_PORT` /
   `E2E_WEBVIEW_PORT` (default 5180 / 5190)
-- `npm run test:vscode` — the packaged extension in a real VS Code (Vitest project `vscode`,
+- `npm run test:vscode:docker` — the VS Code smoke test below in a Linux container under
+  `xvfb-run -a` (the shell's `modeler-shell-vscode-docker`): the way to run it locally, since no
+  VS Code window opens; needs Docker, ~10 s once the image and VS Code are cached. It copies the
+  repo in without `node_modules`/`.git`, runs `npm ci` there and brings `test-results/vscode-smoke/`
+  back; options after `--`, e.g. `-- --env VSCODE_SMOKE_VERSION=1.96.0 --env VSCODE_SMOKE_KEEP=1`
+  (VS Code's logs in `vscode-logs/`).
+- `npm run test:vscode` — the packaged extension in a real VS Code on the host, for CI and for
+  watching the window (Vitest project `vscode`,
   [`apps/vscode/test-smoke/`](apps/vscode/test-smoke/)): packs it as the release does
   (`vsce package`, which runs `vscode:prepublish`), unpacks the VSIX outside the repo and runs the
   shell's `runVsCodeSmoke` (open `smoke.storm`, palette edit, save, undo, the four default themes,
-  screenshots in the gitignored `test-results/vscode-smoke/`); no build needed, a VS Code window
-  opens for ~5 s, the first run downloads VS Code into the OS cache; `VSCODE_SMOKE_VERSION=1.96.0`
-  for another version, `VSCODE_SMOKE_KEEP=1` keeps VS Code's profile and logs. No retry: the
-  driver (shell 0.3.1) reads the save only once the tab is clean, so a failure is real. In CI only
+  screenshots in the gitignored `test-results/vscode-smoke/`); no build needed, on macOS a VS Code
+  window opens for ~5 s and takes the focus, the first run downloads VS Code into the OS cache;
+  `VSCODE_SMOKE_VERSION=1.96.0` for another version, `VSCODE_SMOKE_KEEP=1` keeps VS Code's profile
+  and logs. No retry: the driver (shell 0.3.1) reads the save only once the tab is clean, so a
+  failure is real. In CI only
   [`.github/workflows/vscode-smoke.yml`](.github/workflows/vscode-smoke.yml) runs it (weekly, on
   PRs touching `apps/vscode/**`, on demand; `xvfb-run -a`, engines floor and newest stable;
   screenshots and VS Code's logs as artifacts), never the CI workflow. Details in
