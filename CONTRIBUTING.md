@@ -158,7 +158,11 @@ commit here), on pull requests that touch `apps/vscode/**` or the workflow, and 
 screenshots are uploaded as the artifacts `vscode-smoke-minimum` and `vscode-smoke-stable`, and VS
 Code's logs (the job runs with `VSCODE_SMOKE_KEEP=1`) as `vscode-smoke-minimum-logs` and
 `vscode-smoke-stable-logs`, each for 7 days. It is a workflow of its own and not a required check,
-so it never delays or blocks the CI workflow.
+so it never delays or blocks the CI workflow. It calls `npm run test:vscode` on the runner, not the
+Docker command: the runner already has an X server and VS Code's libraries, and `actions/cache`
+keeps each VS Code version between runs, while the Docker command would build its image, install
+the dependencies a second time and download VS Code again on every run, since a hosted runner keeps
+neither images nor volumes.
 
 ## Design tokens
 
