@@ -136,6 +136,7 @@ describe('createCollaborativeModeler / createCollaborativeViewer', () => {
     const modeler = editor();
     expect(modeler.elements.list()).toEqual([]);
     expect(modeler.elements.reveal('event_no_such_sticky')).toBe(false);
+    expect(modeler.elements.bounds('event_no_such_sticky')).toBeUndefined();
     expect(modeler.elements.selection()).toEqual([]);
     const listener = vi.fn();
     const unsubscribe = modeler.elements.onSelection(listener);
@@ -165,6 +166,7 @@ describe('createCollaborativeModeler / createCollaborativeViewer', () => {
     expect(() => modeler.destroy()).not.toThrow();
     expect(modeler.getViewState()).toBeUndefined();
     expect(modeler.elements.reveal('anything')).toBe(false);
+    expect(modeler.elements.bounds('anything')).toBeUndefined();
     expect(modeler.elements.list()).toEqual([]);
     expect(modeler.elements.selection()).toEqual([]);
   });

@@ -159,8 +159,47 @@ describe('the elements surface', () => {
     for (const id of ['note_checkout_flow_n_reviewed_with_the_team', 'draw_line', 'arrow_1']) {
       if (!registry.get(id)) continue;
       expect(modeler.elements.reveal(id)).toBe(false);
+      expect(modeler.elements.bounds(id)).toBeUndefined();
     }
     expect(modeler.elements.reveal('event_order_placed')).toBe(true);
+  });
+
+  // Hosts outline a peer's selection and place todo markers with it, so it is the sticky's box on
+  // the board (centre [660, 320]), whatever the zoom.
+  it('gives a sticky its box in board coordinates, live through a move and a zoom', async () => {
+    const modeler = editor();
+    await modeler.importText(orderCheckout);
+    const { width, height } = STICKY_STYLES.event;
+    expect(modeler.elements.bounds('event_order_placed')).toEqual({
+      x: 660 - width / 2,
+      y: 320 - height / 2,
+      width,
+      height,
+    });
+    const sticky = modeler.diagram
+      .get<ElementRegistry>('elementRegistry')
+      .get('event_order_placed') as Shape;
+    modeler.diagram.get<Modeling>('modeling').moveElements([sticky], { x: 40, y: -20 });
+    modeler.diagram.get<Canvas>('canvas').zoom(2.5);
+    expect(modeler.elements.bounds('event_order_placed')).toEqual({
+      x: 700 - width / 2,
+      y: 300 - height / 2,
+      width,
+      height,
+    });
+  });
+
+  it('gives the viewer the same boxes', async () => {
+    const modeler = viewer();
+    await modeler.importText(orderCheckout);
+    const { width, height } = STICKY_STYLES.event;
+    expect(modeler.elements.bounds('event_order_placed')).toEqual({
+      x: 660 - width / 2,
+      y: 320 - height / 2,
+      width,
+      height,
+    });
+    expect(modeler.elements.bounds('event_no_such_sticky')).toBeUndefined();
   });
 
   // Hosts anchor todos, presence and deep links to these ids: a peer that imports the export,

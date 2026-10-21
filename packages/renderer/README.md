@@ -90,9 +90,9 @@ drawing keeps literal light colours in its SVG attributes, so exports look the s
 
 ### Collaborative hosts
 
-The package implements the collaborative-modeler contract of
+The package implements the collaborative-modeler contract 1.2 of
 [`@miragon/modeler-api`](https://www.npmjs.com/package/@miragon/modeler-api) (notation
-`event-storming`) and runs its conformance kit in CI:
+`event-storming`) and runs its conformance kit in CI, every case and no advisory:
 
 ```ts
 import {
@@ -127,6 +127,10 @@ const viewer = createCollaborativeViewer(); // meta.editable: false, never chang
   back for every sticky whose id the parser would not derive again from its label at that line (one
   created on the canvas, a renamed one). Notes, drawings and arrows have no id in the text yet (theirs
   derive from their text or position), so they are not addressable.
+- `elements.bounds(id)` gives a sticky's box in board coordinates (`{ x, y, width, height }`, the
+  top-left corner and the size, which zoom and scroll leave alone), read from the live canvas: a
+  sticky created or moved in the session has its current box. Any other id gives `undefined`. The
+  viewer answers it too.
 - New sticky ids are random: a sticky created on the canvas (palette, keyboard, append, paste) gets
   `<prefix>_<8 characters of [0-9a-z]>`, such as `(id event_k3x9q2ab)`, so two peers that each add
   one at the same time do not pick the same id. Ids already in a text are read as they are.

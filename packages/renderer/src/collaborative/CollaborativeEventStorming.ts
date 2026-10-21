@@ -1,6 +1,8 @@
 import {
   MODELER_API_VERSION,
   type CollaborativeModeler,
+  type CollaborativeModelerOptions,
+  type ElementBounds,
   type ElementInfo,
   type ElementsSurface,
   type ImportResult,
@@ -16,11 +18,7 @@ import { NavigatedViewer } from '../NavigatedViewer.js';
 import { importWarningText } from '../io/index.js';
 import type { EventStormingViewerOptions } from '../EventStormingBaseViewer.js';
 import { isSticky, type EventStormingShape } from '../model/di-types.js';
-import {
-  resolveFreeArea,
-  type FreeArea,
-  type FreeRectInsets,
-} from '../palette/EventStormingPaletteProvider.js';
+import { resolveFreeArea, type FreeRectInsets } from '../palette/EventStormingPaletteProvider.js';
 
 /** Stable notation id in `meta.notation` of the collaborative-modeler contract. */
 export const EVENT_STORMING_NOTATION = 'event-storming';
@@ -30,15 +28,9 @@ export const EVENT_STORMING_NOTATION = 'event-storming';
  * own. The viewer takes the same object and ignores what only editing uses (`undoRedoKeys`,
  * `freeArea`).
  */
-export interface CollaborativeEventStormingOptions {
+export interface CollaborativeEventStormingOptions extends CollaborativeModelerOptions {
   /** Appended to the renderer's own modules (e.g. a host's chrome module). */
   additionalModules?: ModuleDeclaration[] | undefined;
-  /** See `EventStormingViewerOptions.freeArea`. */
-  freeArea?: FreeArea | undefined;
-  /** See `EventStormingViewerOptions.fitOnImport` (default true). */
-  fitOnImport?: boolean | undefined;
-  /** See `EventStormingViewerOptions.undoRedoKeys` (default true). */
-  undoRedoKeys?: boolean | undefined;
   /**
    * @deprecated Pass `freeArea: { insets }` instead. Accepted until the next minor release;
    * `freeArea` wins when both are given.
@@ -46,9 +38,13 @@ export interface CollaborativeEventStormingOptions {
   freeRectInsets?: (() => FreeRectInsets) | undefined;
 }
 
+/** The elements surface with `bounds`, which every Event Storming mount answers. */
+export type EventStormingElementsSurface = ElementsSurface &
+  Required<Pick<ElementsSurface, 'bounds'>>;
+
 /** The contract surface plus the wrapped diagram for host-specific wiring. */
 export interface CollaborativeEventStormingModeler extends CollaborativeModeler {
-  readonly elements: ElementsSurface;
+  readonly elements: EventStormingElementsSurface;
   readonly diagram: Modeler | NavigatedViewer;
 }
 
@@ -124,7 +120,7 @@ function collaborative(
     });
   }
 
-  const elements: ElementsSurface = {
+  const elements: EventStormingElementsSurface = {
     list: () =>
       destroyed
         ? []
@@ -145,6 +141,11 @@ function collaborative(
         callback(addressableIds((event as { newSelection?: unknown[] }).newSelection ?? []));
       eventBus.on('selection.changed', listener);
       return () => eventBus.off('selection.changed', listener);
+    },
+    bounds(id) {
+      if (destroyed) return undefined;
+      const element = elementRegistry.get(id);
+      return isAddressable(element) ? elementBounds(element) : undefined;
     },
   };
 
@@ -209,6 +210,11 @@ function isAddressable(element: unknown): element is AddressableElement {
 
 function addressableIds(elements: readonly unknown[]): string[] {
   return elements.filter(isAddressable).map((element) => element.id);
+}
+
+/** The sticky's own box in diagram coordinates, read from the live shape. */
+function elementBounds(element: AddressableElement): ElementBounds {
+  return { x: element.x, y: element.y, width: element.width, height: element.height };
 }
 
 function elementInfo(element: AddressableElement): ElementInfo {

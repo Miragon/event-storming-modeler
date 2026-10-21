@@ -4,4 +4,5 @@ export {
   createCollaborativeViewer,
   type CollaborativeEventStormingModeler,
   type CollaborativeEventStormingOptions,
+  type EventStormingElementsSurface,
 } from './CollaborativeEventStorming.js';

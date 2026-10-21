@@ -92,17 +92,20 @@ libraries to npm (with provenance) and the VS Code extension
   diagnostics). Install once with `/plugin marketplace add Miragon/event-storming-modeler` and
   `/plugin install event-storming-modeler@event-storming`; the skill files are readable directly
   under `plugins/event-storming-modeler/skills/` either way.
-- The renderer implements the collaborative-modeler contract
+- The renderer implements the collaborative-modeler contract 1.2
   [`@miragon/modeler-api`](https://www.npmjs.com/package/@miragon/modeler-api)
   (`createCollaborativeModeler` / `createCollaborativeViewer`, notation `event-storming`, in
   [`packages/renderer/src/collaborative/`](packages/renderer/src/collaborative/)); its conformance
-  kit runs in `npm run test:browser`. The DOM-free packages may take only type-only imports from
-  the contract (ESLint and dependency-cruiser). The elements surface lists stickies only: their ids
-  survive a save and re-open because the serializer writes `(id …)` back whenever the parser would
-  not derive the same id at that line; notes, drawings and arrows have no id grammar yet. New
-  sticky ids are `<prefix>_<8 random [0-9a-z]>` (`allocateId`, e.g. `event_k3x9q2ab`), so stickies
-  two peers add at the same time do not collide; the conformance test fails on any advisory of the
-  kit.
+  kit runs in `npm run test:browser`, with every harness hook (`moveElement`, `openInteraction`,
+  `interactionState`, `commitInteraction`, …), so a skip or an advisory fails the suite. The
+  DOM-free packages may take only type-only imports from the contract (ESLint and
+  dependency-cruiser). The elements surface lists stickies only, with their live box
+  (`elements.bounds`): their ids survive a save and re-open because the serializer writes `(id …)`
+  back whenever the parser would not derive the same id at that line; notes, drawings and arrows
+  have no id grammar yet. New sticky ids are `<prefix>_<8 random [0-9a-z]>` (`allocateId`, e.g.
+  `event_k3x9q2ab`), so stickies two peers add at the same time do not collide. A view change
+  (`setViewState`, a host's fit, scroll, zoom) never commits an open label editor: it stays open
+  and follows its element (contract L5).
 - Contributor onboarding in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Design system (mandatory)

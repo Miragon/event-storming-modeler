@@ -6,6 +6,7 @@ import type EventBus from 'diagram-js/lib/core/EventBus';
 import type Modeling from 'diagram-js/lib/features/modeling/Modeling';
 import type Selection from 'diagram-js/lib/features/selection/Selection';
 import type { Shape } from 'diagram-js/lib/model/Types';
+import type { FreeArea } from '@miragon/modeler-api';
 import type LassoTool from 'diagram-js/lib/features/lasso-tool/LassoTool';
 import type EventStormingDrawTool from '../draw-tool/EventStormingDrawTool.js';
 import type {
@@ -34,14 +35,7 @@ export interface FreeRectInsets {
   left: number;
 }
 
-/**
- * The part of the canvas no host chrome covers (modeler-api `FreeArea`): either the margins the
- * chrome covers, or the free area's centre in diagram coordinates (`undefined` while there is
- * none).
- */
-export type FreeArea =
-  | { insets: () => FreeRectInsets; center?: never }
-  | { center: () => { x: number; y: number } | undefined; insets?: never };
+export type { FreeArea };
 
 export interface EventStormingPaletteConfig {
   freeArea?: FreeArea | undefined;

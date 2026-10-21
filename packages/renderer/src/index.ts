@@ -13,6 +13,7 @@ export {
 export type {
   CollaborativeEventStormingModeler,
   CollaborativeEventStormingOptions,
+  EventStormingElementsSurface,
 } from './collaborative/index.js';
 
 export { eventStormingModelModule, EventStormingElementFactory } from './model/index.js';
@@ -58,7 +59,7 @@ export {
   EventStormingReadOnly,
   READ_ONLY_CHANGED_EVENT,
 } from './read-only/index.js';
-export type { FreeRectInsets } from './palette/EventStormingPaletteProvider.js';
+export type { FreeArea, FreeRectInsets } from './palette/EventStormingPaletteProvider.js';
 
 /* The board's menu entries and keyboard shortcuts for the chrome around it (guide §5.4), typed
    structurally so a host hands them to @miragon/modeler-shell without the renderer importing it. */
