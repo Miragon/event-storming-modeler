@@ -121,13 +121,6 @@ one. `docker volume rm modeler-shell-vscode-cache modeler-shell-npm-cache` start
 are in the shell's README
 ([In Docker, without a window](https://github.com/Miragon/modeler-api/tree/main/packages/shell#in-docker-without-a-window)).
 
-Leave a few seconds between two runs, also in a loop (`sleep 3`). The command deletes and recreates
-`test-results/vscode-smoke/` before it starts the container, and within about a second of the last
-container's end Docker Desktop's file sharing can still hand the new container the deleted folder:
-the test passes, but copying its screenshots back fails
-(`cp: cannot create regular file '/results/./event-storming-light.png': No such file or directory`)
-and the command exits with 1 (modeler-shell 0.3.1, 4 of 9 runs started right after the last one).
-
 **Locally, with a window (macOS).** `npm run test:vscode` runs the same test on the host, for
 watching VS Code go through it. `unzip` must be on the `PATH` (it is on macOS and Ubuntu).
 
@@ -151,7 +144,7 @@ them, it shows only in the webview's developer tools (**Developer: Open Webview 
 while the extension runs in VS Code). Keep `playwright-core` in `apps/vscode/package.json` at the
 root `playwright` version.
 
-A failed save is not retried. The driver's save step (`@miragon/modeler-shell` 0.3.1) reads the
+A failed save is not retried. The driver's save step (`@miragon/modeler-shell` 0.3.2) reads the
 file only after the editor tab turned clean, which VS Code does once its write has finished, and
 only when two reads 100 ms apart agree. The parse check accepts only the fixture's board with one
 sticky more, since an empty or cut-short `.storm` file can parse without a diagnostic; anything else
