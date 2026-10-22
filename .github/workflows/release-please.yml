@@ -99,9 +99,25 @@ jobs:
       # The file the next step uploads, in the newest stable VS Code through the driver of the VS
       # Code smoke workflow: a VSIX that cannot open, edit and save a board is never published.
       - name: Smoke-test the VSIX in VS Code
-        run: xvfb-run -a npm run test:vscode
+        run: |
+          mkdir -p "$TMPDIR"
+          xvfb-run -a npm run test:vscode
         env:
+          VSCODE_VERSION: stable
           VSCODE_SMOKE_VSIX: ${{ github.workspace }}/apps/vscode/event-storming-modeler.vsix
+          VSCODE_SMOKE_KEEP: '1'
+          TMPDIR: ${{ runner.temp }}/vscode-smoke
+      # The release is already tagged when this smoke fails, so its screenshots and VS Code's logs
+      # are all there is to tell why. The smoke step holds no secret.
+      - if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-smoke-vscode-marketplace
+          path: |
+            test-results/vscode-smoke/
+            ${{ runner.temp }}/vscode-smoke/modeler-shell-vscode-*/user-data/logs/
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Publish to VS Code Marketplace
         working-directory: apps/vscode
         run: npx vsce publish --packagePath event-storming-modeler.vsix
@@ -129,9 +145,25 @@ jobs:
       # The file the next step uploads, in the newest stable VS Code through the driver of the VS
       # Code smoke workflow: a VSIX that cannot open, edit and save a board is never published.
       - name: Smoke-test the VSIX in VS Code
-        run: xvfb-run -a npm run test:vscode
+        run: |
+          mkdir -p "$TMPDIR"
+          xvfb-run -a npm run test:vscode
         env:
+          VSCODE_VERSION: stable
           VSCODE_SMOKE_VSIX: ${{ github.workspace }}/apps/vscode/event-storming-modeler.vsix
+          VSCODE_SMOKE_KEEP: '1'
+          TMPDIR: ${{ runner.temp }}/vscode-smoke
+      # The release is already tagged when this smoke fails, so its screenshots and VS Code's logs
+      # are all there is to tell why. The smoke step holds no secret.
+      - if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-smoke-open-vsx
+          path: |
+            test-results/vscode-smoke/
+            ${{ runner.temp }}/vscode-smoke/modeler-shell-vscode-*/user-data/logs/
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Publish to Open VSX Marketplace
         working-directory: apps/vscode
         run: npx ovsx --pat "$OVSX_PAT" publish --packagePath event-storming-modeler.vsix
@@ -156,6 +188,20 @@ jobs:
         working-directory: apps/vscode
         run: npx vsce package --no-dependencies -o event-storming-modeler.vsix
       - name: Smoke-test the VSIX in VS Code
-        run: xvfb-run -a npm run test:vscode
+        run: |
+          mkdir -p "$TMPDIR"
+          xvfb-run -a npm run test:vscode
         env:
+          VSCODE_VERSION: stable
           VSCODE_SMOKE_VSIX: ${{ github.workspace }}/apps/vscode/event-storming-modeler.vsix
+          VSCODE_SMOKE_KEEP: '1'
+          TMPDIR: ${{ runner.temp }}/vscode-smoke
+      - if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-smoke-dry-run
+          path: |
+            test-results/vscode-smoke/
+            ${{ runner.temp }}/vscode-smoke/modeler-shell-vscode-*/user-data/logs/
+          if-no-files-found: ignore
+          retention-days: 7
