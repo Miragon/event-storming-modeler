@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.5.1](https://github.com/Miragon/event-storming-modeler/compare/webapp-v0.5.0...webapp-v0.5.1) (2026-10-22)
+
+
+### Bug Fixes
+
+* keep the open board when a JSON board lies beyond ±1e38 ([#55](https://github.com/Miragon/event-storming-modeler/issues/55)) ([ad72b03](https://github.com/Miragon/event-storming-modeler/commit/ad72b03ff57b8b7614e191a224836e734b33e70a))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @miragon/event-storming-dsl bumped from 0.3.0 to 0.3.1
+    * @miragon/event-storming-renderer bumped from 0.4.0 to 0.4.1
+    * @miragon/event-storming-schema-model bumped from 0.2.1 to 0.2.2
+
 ## [0.5.0](https://github.com/Miragon/event-storming-modeler/compare/webapp-v0.4.0...webapp-v0.5.0) (2026-10-21)
 
 

@@ -1,6 +1,6 @@
 {
   "name": "@miragon/event-storming-transforms",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Pure functions that turn an Event Storming board into a new one, such as move, kind, color and arrange.",
   "license": "MIT",
   "repository": {
@@ -33,7 +33,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@miragon/event-storming-schema-model": "0.2.1"
+    "@miragon/event-storming-schema-model": "0.2.2"
   },
   "devDependencies": {
     "tsup": "9.0.0",
