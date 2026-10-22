@@ -105,7 +105,10 @@ libraries to npm (with provenance) and the VS Code extension
   `node-workspace` plugin). CI-enforced via `miragon/pin-npm-dependencies`. **Exception:**
   consumer-shared third-party runtime libs (`zod`; `diagram-js`/`didi`/`tiny-svg`) are
   `peerDependencies` with **caret ranges** so consumers can dedupe against a single copy —
-  mirrored by an exact `devDependency`, with the bundling apps declaring the exact version. See
+  mirrored by an exact `devDependency`, with the bundling apps declaring the exact version.
+  [`peer-dependencies.sync.test.ts`](packages/renderer/test/peer-dependencies.sync.test.ts) fails
+  when one of these exact versions falls outside the peer range (after a major bump, widen it:
+  `"didi": "^11.0.0 || ^12.0.0"`). See
   [`.claude/rules/package-json-fixed-versions.md`](.claude/rules/package-json-fixed-versions.md).
 - The repo's Claude skills ship as the **`event-storming-modeler` plugin**
   ([`plugins/event-storming-modeler/`](plugins/event-storming-modeler/)) via the marketplace in
