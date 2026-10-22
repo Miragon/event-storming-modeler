@@ -60,7 +60,7 @@ jobs:
           mkdir -p "$TMPDIR"
           xvfb-run -a npm run test:vscode
         env:
-          VSCODE_SMOKE_VERSION: ${{ steps.version.outputs.value }}
+          VSCODE_VERSION: ${{ steps.version.outputs.value }}
           VSCODE_SMOKE_KEEP: '1'
           TMPDIR: ${{ runner.temp }}/vscode-smoke
       - if: always()

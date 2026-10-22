@@ -110,9 +110,9 @@ runs `npm run test:vscode` in a Linux container under `xvfb-run -a`, through the
 Docker (Docker Desktop on a Mac) next to the installed dependencies. Options go after `--`:
 
 ```bash
-npm run test:vscode:docker                                       # newest stable VS Code
-npm run test:vscode:docker -- --env VSCODE_SMOKE_VERSION=1.96.0  # the engines.vscode floor, or another
-npm run test:vscode:docker -- --env VSCODE_SMOKE_KEEP=1          # VS Code's logs in vscode-logs/
+npm run test:vscode:docker                                 # newest stable VS Code
+npm run test:vscode:docker -- --env VSCODE_VERSION=1.96.0  # the engines.vscode floor, or another
+npm run test:vscode:docker -- --env VSCODE_SMOKE_KEEP=1    # VS Code's logs in vscode-logs/
 ```
 
 The command copies the repository into the container without `node_modules` and `.git`, runs
@@ -131,9 +131,10 @@ are in the shell's README
 watching VS Code go through it. `unzip` must be on the `PATH` (it is on macOS and Ubuntu).
 
 ```bash
-npm run test:vscode                              # newest stable VS Code
-VSCODE_SMOKE_VERSION=1.96.0 npm run test:vscode  # the engines.vscode floor, or any other version
-VSCODE_SMOKE_KEEP=1 npm run test:vscode          # keep VS Code's profile and logs ("kept <dir>")
+npm run test:vscode                                 # newest stable VS Code
+VSCODE_VERSION=1.96.0 npm run test:vscode           # the engines.vscode floor, or any other version
+VSCODE_SMOKE_KEEP=1 npm run test:vscode             # keep VS Code's profile and logs ("kept <dir>")
+VSCODE_SMOKE_VSIX=path/to.vsix npm run test:vscode  # smoke a packaged VSIX instead of packing one
 ```
 
 A VS Code window opens for about 5 seconds and takes the focus; leave it alone until it closes. The

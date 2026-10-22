@@ -52,7 +52,7 @@ portless service install` — see [`CONTRIBUTING.md`](CONTRIBUTING.md)). `npm ru
   VS Code window opens; needs Docker, about 7 to 17 s (mostly under 10) once the image and VS Code
   are cached. It copies the repo in without `node_modules`/`.git`, runs `npm ci` there and brings
   `test-results/vscode-smoke/` back; options after `--`, e.g.
-  `-- --env VSCODE_SMOKE_VERSION=1.96.0 --env VSCODE_SMOKE_KEEP=1` (VS Code's logs in
+  `-- --env VSCODE_VERSION=1.96.0 --env VSCODE_SMOKE_KEEP=1` (VS Code's logs in
   `vscode-logs/`).
 - `npm run test:vscode` — the packaged extension in a real VS Code on the host, for CI and for
   watching the window (Vitest project `vscode`,
@@ -61,10 +61,10 @@ portless service install` — see [`CONTRIBUTING.md`](CONTRIBUTING.md)). `npm ru
   shell's `runVsCodeSmoke` (open `smoke.storm`, palette edit, save, undo, the four default themes,
   screenshots in the gitignored `test-results/vscode-smoke/`); no build needed, on macOS a VS Code
   window opens for ~5 s and takes the focus, the first run downloads VS Code into the OS cache;
-  `VSCODE_SMOKE_VERSION=1.96.0` for another version, `VSCODE_SMOKE_KEEP=1` keeps VS Code's profile
-  and logs. A failed save is not retried (the driver, shell 0.3.2, reads it only once the tab is
-  clean); only a run whose sole failures are missed theme switches gets one retry, shown as
-  `(retry x1)`. In CI only
+  `VSCODE_VERSION=1.96.0` for another version, `VSCODE_SMOKE_KEEP=1` keeps VS Code's profile
+  and logs, `VSCODE_SMOKE_VSIX=<file>` smokes a packaged VSIX instead of packing one. A failed
+  save is not retried (the driver, shell 0.3.2, reads it only once the tab is clean); only a run
+  whose sole failures are missed theme switches gets one retry, shown as `(retry x1)`. In CI only
   [`.github/workflows/vscode-smoke.yml`](.github/workflows/vscode-smoke.yml) runs it (weekly, on
   PRs touching `apps/vscode/**`, on demand; `xvfb-run -a`, engines floor and newest stable;
   screenshots and VS Code's logs as artifacts), never the CI workflow. Details in

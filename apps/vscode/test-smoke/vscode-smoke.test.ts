@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { parseDSLWithDiagnostics } from '@miragon/event-storming-dsl';
@@ -18,8 +18,9 @@ const screenshotDirectory = fileURLToPath(
 );
 const fixtureFile = new URL('smoke.storm', import.meta.url);
 const vsceCli = createRequire(import.meta.url).resolve('@vscode/vsce/vsce');
-const requestedVsCodeVersion = process.env.VSCODE_SMOKE_VERSION;
+const requestedVsCodeVersion = process.env.VSCODE_VERSION;
 const keepVsCodeProfile = process.env.VSCODE_SMOKE_KEEP === '1';
+const prebuiltVsix = process.env.VSCODE_SMOKE_VSIX;
 
 let workDirectory: string | undefined;
 let packagedExtension = '';
@@ -49,16 +50,23 @@ function savedBoardParser(fixtureBoard: EventStormingBoard): (text: string) => E
   };
 }
 
-// The release's packaging command (vsce runs vscode:prepublish, the production build), unpacked
-// outside the repository: VS Code then loads exactly what the VSIX ships, and a module missing
-// from the bundle cannot be found in a node_modules further up.
-beforeAll(async () => {
-  await rm(screenshotDirectory, { recursive: true, force: true });
-  workDirectory = await mkdtemp(join(tmpdir(), 'event-storming-vsix-'));
-  const vsix = join(workDirectory, 'event-storming-modeler.vsix');
+async function packageExtension(vsix: string): Promise<string> {
   await run(process.execPath, [vsceCli, 'package', '--no-dependencies', '-o', vsix], {
     cwd: extensionSources,
   });
+  return vsix;
+}
+
+// The release's packaging command (vsce runs vscode:prepublish, the production build), unpacked
+// outside the repository: VS Code then loads exactly what the VSIX ships, and a module missing
+// from the bundle cannot be found in a node_modules further up. The release passes the VSIX it is
+// about to publish instead, so the smoked file and the uploaded file are the same.
+beforeAll(async () => {
+  await rm(screenshotDirectory, { recursive: true, force: true });
+  workDirectory = await mkdtemp(join(tmpdir(), 'event-storming-vsix-'));
+  const vsix = prebuiltVsix
+    ? resolve(prebuiltVsix)
+    : await packageExtension(join(workDirectory, 'event-storming-modeler.vsix'));
   await run('unzip', ['-q', vsix, 'extension/*', '-d', workDirectory]);
   packagedExtension = join(workDirectory, 'extension');
 }, 300_000);
