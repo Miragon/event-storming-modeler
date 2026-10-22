@@ -101,8 +101,34 @@ starts the real one with the **packaged** extension, through the `@miragon/model
    each theme gets a screenshot in `test-results/vscode-smoke/` (gitignored), e.g.
    `event-storming-dark.png`.
 
-**Locally (macOS).** No build needed — the parser check takes the package sources, as the
-extension's bundle does. `unzip` must be on the `PATH` (it is on macOS and Ubuntu).
+No build is needed to run it: the parser check takes the package sources, as the extension's
+bundle does.
+
+**Locally, in Docker (no window).** The way to run it on your machine: `npm run test:vscode:docker`
+runs `npm run test:vscode` in a Linux container under `xvfb-run -a`, through the shell's command
+`modeler-shell-vscode-docker`, so no VS Code window opens and nothing takes the focus. It needs
+Docker (Docker Desktop on a Mac) next to the installed dependencies. Options go after `--`:
+
+```bash
+npm run test:vscode:docker                                       # newest stable VS Code
+npm run test:vscode:docker -- --env VSCODE_SMOKE_VERSION=1.96.0  # the engines.vscode floor, or another
+npm run test:vscode:docker -- --env VSCODE_SMOKE_KEEP=1          # VS Code's logs in vscode-logs/
+```
+
+The command copies the repository into the container without `node_modules` and `.git`, runs
+`npm ci` there (the host's `node_modules` stay as they are) and brings `test-results/vscode-smoke/`
+back, emptied first; paths in the log are the container's (`/work/…`). The first run builds the
+image `modeler-shell-vscode-smoke:node<version>-<hash>` (about 0.9 GB, for the Node version that
+runs the command) and downloads VS Code's Linux build into the Docker volume
+`modeler-shell-vscode-cache`, both shared by every Miragon modeler on the machine; that takes about
+a minute. Later runs take about 7 to 17 seconds, most of them under 10 (`npm ci` 2 to 7 s, the test
+4 to 8 s). On Apple silicon the container runs VS Code's `linux-arm64` build, CI the `linux-x64`
+one. `docker volume rm modeler-shell-vscode-cache modeler-shell-npm-cache` starts over; the details
+are in the shell's README
+([In Docker, without a window](https://github.com/Miragon/modeler-api/tree/main/packages/shell#in-docker-without-a-window)).
+
+**Locally, with a window (macOS).** `npm run test:vscode` runs the same test on the host, for
+watching VS Code go through it. `unzip` must be on the `PATH` (it is on macOS and Ubuntu).
 
 ```bash
 npm run test:vscode                              # newest stable VS Code
@@ -110,24 +136,31 @@ VSCODE_SMOKE_VERSION=1.96.0 npm run test:vscode  # the engines.vscode floor, or 
 VSCODE_SMOKE_KEEP=1 npm run test:vscode          # keep VS Code's profile and logs ("kept <dir>")
 ```
 
-A VS Code window opens for about 5 seconds; leave it alone until it closes. The first run of a
-version downloads VS Code (about 330 MB, 0.9 GB unpacked) into
+A VS Code window opens for about 5 seconds and takes the focus; leave it alone until it closes. The
+first run of a version downloads VS Code (about 330 MB, 0.9 GB unpacked) into
 `~/Library/Caches/miragon-modeler-shell/vscode-test`, shared by every Miragon modeler on the
-machine; later runs take about 6 to 7 seconds in all. The log names each step, then the VS Code
-version, the timings and every theme with its screenshot; a failure names its step (`open: …`,
-`save: …`), and a failed open leaves `event-storming-open-failure.png` with VS Code's error from the
-extension host. With `VSCODE_SMOKE_KEEP=1` it also names the folder of VS Code's logs (main
-process, renderer, extension host); an exception inside the webview is not in them, it shows only
-in the webview's developer tools (**Developer: Open Webview Developer Tools** while the extension
-runs in VS Code). Keep `playwright-core` in `apps/vscode/package.json` at the root `playwright`
-version.
+machine; later runs take about 6 to 7 seconds in all.
 
-The test retries once in a fresh VS Code; Vitest marks such a pass `(retry x1)`. The driver's save
-step (`@miragon/modeler-shell` 0.3.0) reads the file as soon as it differs from the fixture and can
-catch it while VS Code is still writing it: on Linux in about 1 of 20 runs (5 of 92 against VS Code
-1.143.0 in an Ubuntu 24.04 container), on macOS not yet seen. The save check then fails with
-`save: the saved text does not parse: 0 elements and 0 arrows in 0 characters, expected 7 and 4 …`.
-A failure that survives the retry is a real one.
+Either way the log names each step, then the VS Code version, the timings and every theme with its
+screenshot; a failure names its step (`open: …`, `save: …`), and a failed open leaves
+`event-storming-open-failure.png` with VS Code's error from the extension host. With
+`VSCODE_SMOKE_KEEP=1` it also names the folder of VS Code's logs (main process, renderer, extension
+host; from Docker they come back in `vscode-logs/`); an exception inside the webview is not in
+them, it shows only in the webview's developer tools (**Developer: Open Webview Developer Tools**
+while the extension runs in VS Code). Keep `playwright-core` in `apps/vscode/package.json` at the
+root `playwright` version.
+
+A failed save is not retried. The driver's save step (`@miragon/modeler-shell` 0.3.2) reads the
+file only after the editor tab turned clean, which VS Code does once its write has finished, and
+only when two reads 100 ms apart agree. The parse check accepts only the fixture's board with one
+sticky more, since an empty or cut-short `.storm` file can parse without a diagnostic; anything else
+fails the save step with the counts it found
+(`save: the saved text does not parse: 6 elements and 0 arrows in 181 characters, expected 7 and 4 …`).
+The one retry, in a fresh VS Code, is for a run whose only failures are missed theme switches
+(`themes: Default High Contrast Light: the workbench never switched (no .hc-light)`): VS Code
+applies a theme once it notices that its settings file changed, and in 1 of 35 Docker runs it did
+not within the driver's 30 s. Vitest marks such a pass `(retry x1)`; every other failure fails the
+run at once.
 
 **In CI.** [`.github/workflows/vscode-smoke.yml`](.github/workflows/vscode-smoke.yml) runs it on
 `ubuntu-24.04` under `xvfb-run -a` (VS Code needs an X server), against both the floor of
@@ -137,7 +170,11 @@ commit here), on pull requests that touch `apps/vscode/**` or the workflow, and 
 screenshots are uploaded as the artifacts `vscode-smoke-minimum` and `vscode-smoke-stable`, and VS
 Code's logs (the job runs with `VSCODE_SMOKE_KEEP=1`) as `vscode-smoke-minimum-logs` and
 `vscode-smoke-stable-logs`, each for 7 days. It is a workflow of its own and not a required check,
-so it never delays or blocks the CI workflow.
+so it never delays or blocks the CI workflow. It calls `npm run test:vscode` on the runner, not the
+Docker command: the runner already has an X server and VS Code's libraries, and `actions/cache`
+keeps each VS Code version between runs, while the Docker command would build its image, install
+the dependencies a second time and download VS Code again on every run, since a hosted runner keeps
+neither images nor volumes.
 
 ## Design tokens
 

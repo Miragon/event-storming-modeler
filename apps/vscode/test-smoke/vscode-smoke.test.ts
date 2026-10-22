@@ -32,10 +32,8 @@ function parseBoard(text: string): EventStormingBoard {
   return board;
 }
 
-// The driver takes the first read of the file that differs from the fixture. VS Code truncates the
-// file before it writes the new text, so that read can be empty or cut short, and an empty board
-// parses without a diagnostic: only the fixture's elements plus the new one, with all the arrows,
-// count as the saved board.
+// Any whole lines of a board parse without a diagnostic, an empty file too: only the fixture's
+// elements plus the new one, with all the arrows, count as the saved board.
 function savedBoardParser(fixtureBoard: EventStormingBoard): (text: string) => EventStormingBoard {
   const elements = fixtureBoard.elements.length + 1;
   const arrows = fixtureBoard.edges.length;
@@ -44,7 +42,7 @@ function savedBoardParser(fixtureBoard: EventStormingBoard): (text: string) => E
     if (board.elements.length !== elements || board.edges.length !== arrows) {
       throw new Error(
         `${board.elements.length} elements and ${board.edges.length} arrows in ${text.length} characters, ` +
-          `expected ${elements} and ${arrows} (read while VS Code was still writing the file?)`,
+          `expected ${elements} and ${arrows}`,
       );
     }
     return board;
@@ -69,12 +67,23 @@ afterAll(async () => {
   if (workDirectory) await rm(workDirectory, { recursive: true, force: true });
 });
 
+// VS Code applies a color theme once it notices that its settings file changed. Once in 35 Docker
+// runs it did not, and the workbench kept the previous theme through the driver's whole wait: such a
+// run, and only such a run, gets a second one in a fresh VS Code. Any other failure fails at once.
+const MISSED_THEME_SWITCH = /^themes: .+: the workbench never switched/;
+const MISSED_THEME_SWITCH_ERROR = 'VS Code missed a theme switch';
+
+function onlyMissedThemeSwitches(failures: readonly string[]): boolean {
+  return failures.length > 0 && failures.every((failure) => MISSED_THEME_SWITCH.test(failure));
+}
+
 // The first run downloads VS Code: about 320 to 360 MB, 0.9 GB unpacked, kept in the OS cache.
-// One retry, in a fresh VS Code: the driver's save read can still race VS Code's write (see
-// savedBoardParser), and a slow runner can miss a theme switch now and then.
 it(
   'opens, edits, saves, undoes and themes a board in a real VS Code',
-  { timeout: 600_000, retry: 1 },
+  {
+    timeout: 600_000,
+    retry: { count: 1, condition: new RegExp(`^${MISSED_THEME_SWITCH_ERROR}`) },
+  },
   async () => {
     const fixtureText = await readFile(fixtureFile, 'utf8');
 
@@ -91,6 +100,9 @@ it(
     });
     console.log(formatVsCodeSmoke(result));
 
-    expect(result.failures).toEqual([]);
+    if (onlyMissedThemeSwitches(result.failures)) {
+      throw new Error(`${MISSED_THEME_SWITCH_ERROR}: ${result.failures.join('; ')}`);
+    }
+    expect(result.failures, result.failures.join('\n')).toEqual([]);
   },
 );

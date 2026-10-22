@@ -50,6 +50,9 @@ jobs:
         with:
           path: ~/.cache/miragon-modeler-shell/vscode-test
           key: vscode-${{ runner.os }}-${{ runner.arch }}-${{ steps.version.outputs.value }}
+      # On the runner, not through `npm run test:vscode:docker`: ubuntu-24.04 has the X server and
+      # VS Code's libraries and actions/cache keeps VS Code, while the Docker command would build
+      # its image, run npm ci a second time and download VS Code on every run.
       # VSCODE_SMOKE_KEEP keeps each run's VS Code profile in TMPDIR, so the logs of a failed run
       # (extension host, renderer, main process) can be uploaded below.
       - name: Smoke test in VS Code ${{ steps.version.outputs.value }}
