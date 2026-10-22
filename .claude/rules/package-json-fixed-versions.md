@@ -34,4 +34,12 @@ exact versions as regular `dependencies`. This exception does **not** apply to i
 `miragon/pin-npm-dependencies` does not check `peerDependencies` by default, so these ranges pass
 `pin-check`.
 
+`pin-check` therefore also misses a bump that moves the exact pins out of a peer range, which makes
+the published package uninstallable next to the version this repo ships with (`ERESOLVE`).
+[`packages/renderer/test/peer-dependencies.sync.test.ts`](../../packages/renderer/test/peer-dependencies.sync.test.ts)
+(`npm test`) catches it: every mirror, and every exact version a workspace depending on the package
+declares, must satisfy the peer range. When a major bump fails it, widen the range instead of
+replacing it while another peer still depends on the older major, e.g.
+`"didi": "^11.0.0 || ^12.0.0"` (diagram-js 15 depends on didi 11).
+
 When adding a new dependency: install it first with `npm install <pkg>` (the root `.npmrc` sets `save-exact=true`, so npm pins the exact version), then verify the installed version with `npm ls <pkg>` or in `package-lock.json` and make sure that exact version is written into `package.json`.
