@@ -1,0 +1,44 @@
+name: VS Code smoke (weekly)
+
+# A new VS Code release lands without a commit here, so nothing else would start the smoke against
+# it. A failed run opens a tracking issue (or comments on the open one): a scheduled run's failure
+# mails nobody but the person who last edited the cron.
+on:
+  schedule:
+    - cron: '41 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  vscode-smoke:
+    uses: ./.github/workflows/vscode-smoke.yml
+
+  alert:
+    needs: vscode-smoke
+    if: failure()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Here and not in the called workflow: GitHub rejects a called workflow whose jobs ask for more
+    # than the caller grants, even when the job would be skipped.
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update the tracking issue
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TITLE: 'VS Code smoke: the weekly run failed'
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          number="$(gh issue list --state open --limit 500 --json number,title |
+            jq -r --arg title "$TITLE" 'map(select(.title == $title)) | first | .number // empty')"
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body "The weekly VS Code smoke failed again: $RUN_URL"
+          else
+            gh issue create --title "$TITLE" --body "The weekly VS Code smoke failed: $RUN_URL
+          The run's artifacts hold the screenshots and VS Code's logs of both versions (the floor of
+          engines.vscode and the newest stable). Close this issue once a run passes again."
+          fi

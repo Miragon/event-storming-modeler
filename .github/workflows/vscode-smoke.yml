@@ -1,28 +1,89 @@
 name: VS Code smoke
 
-# The packaged extension in a real VS Code (`npm run test:vscode`). A workflow of its own, so it
-# never delays or blocks the CI workflow: weekly, because a new VS Code release lands without a
-# commit here; on pull requests only where the extension itself changes (its sources, manifest,
-# bundling and dependency pins), since the stub-based e2e already covers the renderer; on demand.
+# The packaged extension in a real VS Code (`npm run test:vscode`). The CI workflow calls it as the
+# job vscode-smoke, so ci-ok waits for it; vscode-smoke-weekly.yml calls it every Monday, because a
+# new VS Code release lands without a commit here. A pull request, a push or a merge group starts
+# VS Code only when it changes what the VSIX is built from (the extension, the packages its two
+# bundles inline, a manifest, the lockfile) or how the smoke runs; otherwise smoke-ok still ends
+# green with a notice, so the gate never sees an unexplained skip.
 on:
-  pull_request:
-    paths:
-      - 'apps/vscode/**'
-      - '.github/workflows/vscode-smoke.yml'
-  schedule:
-    - cron: '41 5 * * 1'
+  workflow_call:
   workflow_dispatch:
 
 permissions:
   contents: read
 
-concurrency:
-  group: vscode-smoke-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  vscode-smoke:
-    name: vscode-smoke (${{ matrix.vscode }})
+  changes:
+    name: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+      reason: ${{ steps.decide.outputs.reason }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: decide
+        name: Decide whether VS Code starts
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PULL_REQUEST_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          MERGE_GROUP_BASE: ${{ github.event.merge_group.base_sha }}
+        run: |
+          decide() {
+            echo "run=$1" >> "$GITHUB_OUTPUT"
+            echo "reason=$2" >> "$GITHUB_OUTPUT"
+            echo "run=$1: $2"
+          }
+          smoke_relevant() {
+            case "$1" in
+              package-lock.json | package.json | */package.json) return 0 ;;
+              apps/vscode/* | packages/*) return 0 ;;
+              vitest.config.ts | .github/actions/setup/*) return 0 ;;
+              .github/workflows/ci.yml | .github/workflows/vscode-smoke.yml | .github/workflows/vscode-smoke-weekly.yml) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+          case "$EVENT_NAME" in
+            pull_request) base="$PULL_REQUEST_BASE" ;;
+            push) base="$PUSH_BEFORE" ;;
+            merge_group) base="$MERGE_GROUP_BASE" ;;
+            *)
+              decide true "a $EVENT_NAME run always starts VS Code"
+              exit 0
+              ;;
+          esac
+          # A new branch or a first push has no base (empty or all zeros): nothing to compare with.
+          if [ -z "${base//0/}" ]; then
+            decide true "no base commit to compare with"
+            exit 0
+          fi
+          # The checkout holds HEAD alone; comparing two trees needs no history in between.
+          if ! git fetch --no-tags --depth=1 origin "$base"; then
+            decide true "the base commit $base cannot be fetched"
+            exit 0
+          fi
+          changed="$RUNNER_TEMP/changed-paths"
+          # --no-renames lists both sides of a move, so moving a file out of apps/vscode counts too.
+          if ! git diff --name-only --no-renames -z "$base" HEAD > "$changed"; then
+            decide true "git diff against $base failed"
+            exit 0
+          fi
+          while IFS= read -r -d '' path; do
+            if smoke_relevant "$path"; then
+              echo "$path changed since $base"
+              decide true "a path the VSIX or the smoke depends on changed since $base"
+              exit 0
+            fi
+          done < "$changed"
+          decide false "nothing the VSIX or the smoke depends on changed since $base"
+
+  smoke:
+    name: smoke (${{ matrix.vscode }})
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     # Pinned rather than ubuntu-latest: VS Code needs the image's X server and GTK libraries, and a
     # label migration should not break this job unnoticed.
     runs-on: ubuntu-24.04
@@ -38,11 +99,17 @@ jobs:
       - id: version
         name: Resolve the VS Code version
         shell: bash
+        env:
+          WHICH: ${{ matrix.vscode }}
         run: |
-          if [ "${{ matrix.vscode }}" = minimum ]; then
-            version="$(node -p 'require("./apps/vscode/package.json").engines.vscode.replace(/^\^/, "")')"
+          if [ "$WHICH" = minimum ]; then
+            version="$(node -p 'require("semver").minVersion(require("./apps/vscode/package.json").engines.vscode).version')"
           else
             version="$(curl -fsS --retry 3 https://update.code.visualstudio.com/api/releases/stable | jq -r '.[0]')"
+          fi
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::no VS Code version for $WHICH (got '$version')"
+            exit 1
           fi
           echo "value=$version" >> "$GITHUB_OUTPUT"
       # The driver's default download folder on Linux; one VS Code version per key.
@@ -76,3 +143,34 @@ jobs:
           path: ${{ runner.temp }}/vscode-smoke/modeler-shell-vscode-*/user-data/logs/
           if-no-files-found: ignore
           retention-days: 7
+
+  # Always the last job, so the caller sees success for a smoke that passed or was not needed, and
+  # failure for one that failed, was cancelled or could not decide.
+  smoke-ok:
+    name: smoke-ok
+    needs: [changes, smoke]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check the smoke
+        shell: bash
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          RUN: ${{ needs.changes.outputs.run }}
+          REASON: ${{ needs.changes.outputs.reason }}
+          SMOKE_RESULT: ${{ needs.smoke.result }}
+        run: |
+          if [ "$CHANGES_RESULT" != success ]; then
+            echo "::error::changes: $CHANGES_RESULT"
+            exit 1
+          fi
+          if [ "$RUN" != true ]; then
+            echo "::notice title=VS Code smoke skipped::$REASON"
+            exit 0
+          fi
+          if [ "$SMOKE_RESULT" != success ]; then
+            echo "::error::smoke: $SMOKE_RESULT"
+            exit 1
+          fi
+          echo "VS Code smoke passed: $REASON"
