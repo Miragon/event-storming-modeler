@@ -24,6 +24,13 @@ const BROKEN_BOARD = [
   'A -> Nowhere',
 ].join('\n');
 
+/** Issue #50: valid in every field, but `event_b` lies beyond what the canvas can draw. */
+const HUGE_BOARD =
+  '{"schemaVersion":1,"config":{"title":"Huge"},"elements":[' +
+  '{"id":"event_a","label":"Near","position":{"x":100,"y":100},"elementType":"event"},' +
+  '{"id":"event_b","label":"Far","position":{"x":1e39,"y":100},"elementType":"event"}' +
+  '],"edges":[]}';
+
 async function linkTo(dsl: string): Promise<string> {
   return `/#mz=${await encodeMapCompressed(dsl)}`;
 }
@@ -270,6 +277,83 @@ test.describe('webapp: the shell web chrome and the app behind it', () => {
       toast(page, "Couldn't read “bad.json”. Check that it contains a valid Event Storming board."),
     ).toHaveAttribute('data-status', 'danger');
     expect(await exportDSL(page)).toBe(before);
+  });
+
+  test('a .json board beyond the canvas is refused whole: board and history stay', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await waitForViewer(page);
+    await openExample(page);
+    const stickies = async () => (await exportBoard(page)).elements.length;
+    const example = await stickies();
+    await page.locator('.djs-palette [data-action="create.event"]').focus();
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Escape');
+    await expect.poll(stickies).toBe(example + 1);
+    const before = await exportDSL(page);
+
+    await fileInput(page).setInputFiles({
+      name: 'huge.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(HUGE_BOARD),
+    });
+
+    await expect(
+      toast(
+        page,
+        "Couldn't open “huge.json”. “event_b” lies beyond ±1e38 (position.x 1e+39), too far out for the canvas.",
+      ),
+    ).toHaveAttribute('data-status', 'danger');
+    expect(await exportDSL(page)).toBe(before);
+    await expect(toast(page, 'Board replaced')).toHaveCount(0);
+    // The canvas was never cleared, so its own undo still takes back the sticky added above.
+    await page.locator('.cd-shell-canvas svg[tabindex]').focus();
+    await page.keyboard.press('ControlOrMeta+Z');
+    await expect.poll(stickies).toBe(example);
+  });
+
+  test('an import that stops half-way puts the previous board and its view back', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await waitForViewer(page);
+    await openExample(page);
+    const before = await exportDSL(page);
+    const view = () =>
+      page.evaluate(() => {
+        const box = window.__eventStormingApp!.connection.viewport.getViewbox()!;
+        return [box.x, box.y, box.width, box.height].map((value) => Math.round(value * 100));
+      });
+    const viewBefore = await view();
+    // A canvas that gives up on the second sticky, after the import cleared the example away.
+    await page.evaluate(() => {
+      type Canvas = { addShape(shape: { id: string }, ...rest: unknown[]): unknown };
+      const viewer = window.__eventStormingViewer as unknown as { get(name: string): Canvas };
+      const canvas = viewer.get('canvas');
+      const addShape = canvas.addShape.bind(canvas);
+      canvas.addShape = (shape, ...rest) => {
+        if (shape.id === 'event_boom') throw new Error('The canvas gave up half-way.');
+        return addShape(shape, ...rest);
+      };
+    });
+
+    await fileInput(page).setInputFiles({
+      name: 'boom.storm',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('title Boom\nevent Fine [0, 0]\nevent Boom [200, 0]\n'),
+    });
+
+    await expect(
+      toast(
+        page,
+        "Couldn't read “boom.storm”. Check that it contains a valid Event Storming board.",
+      ),
+    ).toHaveAttribute('data-status', 'danger');
+    expect(await exportDSL(page)).toBe(before);
+    expect(await view()).toEqual(viewBefore);
+    await expect(toast(page, 'Board replaced')).toHaveCount(0);
+    await expect(page).toHaveTitle('Order Checkout · Event Storming Modeler');
   });
 
   test('a .storm file dropped on the start screen opens', async ({ page }) => {
