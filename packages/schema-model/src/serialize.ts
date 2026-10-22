@@ -1,7 +1,7 @@
 import { eventStormingBoardSchema } from './schema.js';
 import { migrate, CURRENT_SCHEMA_VERSION } from './migrations.js';
 import { HOST_STICKY_KINDS } from './attachments.js';
-import { assertDrawable } from './drawable.js';
+import { assertElementsDrawable } from './drawable.js';
 import type { BoardConfig, EventStormingBoard } from './types.js';
 
 /** Number of decimal places for coordinates in serialization. */
@@ -90,9 +90,11 @@ export function validateBoard(data: unknown): EventStormingBoard {
  * beyond ±1e38, which the canvas could not draw and would stop importing half-way through.
  */
 export function loadBoard(data: unknown): EventStormingBoard {
-  const board = validateBoard(migrate(data));
-  assertDrawable(board);
-  return board;
+  const migrated = migrate(data);
+  // Ahead of the schema: a JSON number too large for a double (1e400) reads as Infinity, which the
+  // schema refuses without saying that the board lies beyond the canvas.
+  assertElementsDrawable(migrated['elements']);
+  return validateBoard(migrated);
 }
 
 export function parseBoardJSON(json: string): EventStormingBoard {

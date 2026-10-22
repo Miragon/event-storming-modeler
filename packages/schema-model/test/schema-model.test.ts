@@ -377,6 +377,7 @@ describe('the drawable range (±1e38, as in the .storm lexer)', () => {
     ['points[1].x', drawing([origin, { x: beyond, y: 0 }]), 'draw_far', beyond],
     ['size.width', note({ width: beyond, height: 10 }), 'note_big', beyond],
     ['size.height', note({ width: 10, height: beyond }), 'note_big', beyond],
+    ['points[0].y', drawing([{ x: 0, y: -Infinity }, origin]), 'draw_far', -Infinity],
   ])(
     'loadBoard refuses a board with %s beyond it, naming where',
     (field, data, elementId, value) => {
@@ -399,6 +400,25 @@ describe('the drawable range (±1e38, as in the .storm lexer)', () => {
     expect(() => parseBoardJSON(huge)).toThrow(
       'Element event_b: position.x 1e+39 lies beyond ±1e38, more than the canvas can draw.',
     );
+  });
+
+  it('names a JSON number too large for a double, which JSON.parse reads as Infinity', () => {
+    const overflow =
+      '{"schemaVersion":1,"config":{"title":"Huge"},"elements":[' +
+      '{"id":"note_big","label":"Big","position":{"x":0,"y":0},"elementType":"note",' +
+      '"size":{"width":10,"height":1e400}}' +
+      '],"edges":[]}';
+    const error = refusal(JSON.parse(overflow));
+    expect(error).toBeInstanceOf(UndrawableBoardError);
+    expect(error).toMatchObject({ elementId: 'note_big', field: 'size.height', value: Infinity });
+  });
+
+  it('leaves an element without an id to the schema', () => {
+    const error = refusal(
+      withElement({ elementType: 'event', label: 'Far', position: { x: beyond, y: 0 } }),
+    );
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(UndrawableBoardError);
   });
 
   it('reads ±1e38 itself', () => {

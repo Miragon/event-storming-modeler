@@ -12,16 +12,19 @@ function refusal(json: string): unknown {
 }
 
 describe('openErrorText', () => {
-  it('names the element and the number of a board beyond the canvas', () => {
+  it.each([
+    ['1e39', '1e+39'],
+    ['1e400', 'Infinity'],
+  ])('names the element and the number of a board at %s, beyond the canvas', (written, shown) => {
     const error = refusal(
       '{"schemaVersion":1,"config":{"title":"Huge"},"elements":[' +
-        '{"id":"event_b","label":"Far","position":{"x":1e39,"y":100},"elementType":"event"}' +
+        `{"id":"event_b","label":"Far","position":{"x":${written},"y":100},"elementType":"event"}` +
         '],"edges":[]}',
     );
 
     expect(error).toBeInstanceOf(UndrawableBoardError);
     expect(openErrorText('huge.json', error)).toBe(
-      "Couldn't open “huge.json”. “event_b” lies beyond ±1e38 (position.x 1e+39), too far out for the canvas.",
+      `Couldn't open “huge.json”. “event_b” lies beyond ±1e38 (position.x ${shown}), too far out for the canvas.`,
     );
   });
 

@@ -1,4 +1,4 @@
-import type { BoardElement, EventStormingBoard } from './types.js';
+import type { EventStormingBoard } from './types.js';
 
 /**
  * The canvas places shapes with 32-bit SVG transforms, which overflow near 3.4e38 and would make
@@ -24,29 +24,54 @@ export class UndrawableBoardError extends RangeError {
   }
 }
 
-function* numbersOf(element: BoardElement): Generator<readonly [string, number]> {
-  yield ['position.x', element.position.x];
-  yield ['position.y', element.position.y];
-  if (element.elementType === 'drawing') {
-    for (const [index, point] of element.points.entries()) {
-      yield [`points[${index}].x`, point.x];
-      yield [`points[${index}].y`, point.y];
+type Fields = Readonly<Record<string, unknown>>;
+
+function isFields(value: unknown): value is Fields {
+  return typeof value === 'object' && value !== null;
+}
+
+function* pairOf(
+  path: string,
+  value: unknown,
+  keys: readonly [string, string],
+): Generator<readonly [string, unknown]> {
+  if (!isFields(value)) return;
+  for (const key of keys) yield [`${path}.${key}`, value[key]];
+}
+
+function* numbersOf(element: Fields): Generator<readonly [string, unknown]> {
+  const { elementType, position, points, size } = element;
+  yield* pairOf('position', position, ['x', 'y']);
+  if (elementType === 'drawing' && Array.isArray(points)) {
+    const pointList: readonly unknown[] = points;
+    for (const [index, point] of pointList.entries()) {
+      yield* pairOf(`points[${index}]`, point, ['x', 'y']);
     }
   }
-  if (element.elementType === 'note' && element.size) {
-    yield ['size.width', element.size.width];
-    yield ['size.height', element.size.height];
+  if (elementType === 'note') yield* pairOf('size', size, ['width', 'height']);
+}
+
+/**
+ * Throws an `UndrawableBoardError` for the first coordinate or size beyond ±1e38. Takes elements
+ * the schema has not checked yet too; one without an id to name is left to the schema.
+ */
+export function assertElementsDrawable(elements: unknown): void {
+  if (!Array.isArray(elements)) return;
+  const elementList: readonly unknown[] = elements;
+  for (const element of elementList) {
+    if (!isFields(element)) continue;
+    const { id } = element;
+    if (typeof id !== 'string' || id === '') continue;
+    for (const [field, value] of numbersOf(element)) {
+      // Negated so that NaN, which a board built in code can hold, is refused as well.
+      if (typeof value === 'number' && !(Math.abs(value) <= LARGEST_DRAWABLE_NUMBER)) {
+        throw new UndrawableBoardError(id, field, value);
+      }
+    }
   }
 }
 
 /** Throws an `UndrawableBoardError` for the first coordinate or size beyond ±1e38. */
 export function assertDrawable(board: EventStormingBoard): void {
-  for (const element of board.elements) {
-    for (const [field, value] of numbersOf(element)) {
-      // Negated so that NaN, which a board built in code can hold, is refused as well.
-      if (!(Math.abs(value) <= LARGEST_DRAWABLE_NUMBER)) {
-        throw new UndrawableBoardError(element.id, field, value);
-      }
-    }
-  }
+  assertElementsDrawable(board.elements);
 }
