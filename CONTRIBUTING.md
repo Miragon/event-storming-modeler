@@ -201,8 +201,9 @@ The job `vscode-smoke` calls the VS Code smoke workflow. Its first job, `changes
 VS Code starts at all: on a pull request, a push to `main` and in the merge queue it compares the
 commit with its base (the pull request's base, the commit before the push, the merge group's base)
 and starts VS Code only when one of these paths changed: `package-lock.json`, any `package.json`,
-`apps/vscode/**`, `packages/**` (the extension bundles the packages' sources), `vitest.config.ts`
-(the smoke's Vitest project), `.github/actions/setup/**`, `ci.yml`, `vscode-smoke.yml` or
+`apps/vscode/**`, `packages/**` (the extension bundles the packages' sources),
+`tsconfig.base.json` (esbuild compiles both bundles with its options), `vitest.config.ts` (the
+smoke's Vitest project), `.github/actions/setup/**`, `ci.yml`, `vscode-smoke.yml` or
 `vscode-smoke-weekly.yml`. A missing or all-zero base, a base it cannot fetch, the weekly schedule
 and a manual run always start it. The last job, `smoke-ok`, passes when the smoke passed or was not
 needed (with a notice that says why) and fails otherwise, so `ci-ok` sees `vscode-smoke` succeed or

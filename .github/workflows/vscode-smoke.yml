@@ -4,8 +4,9 @@ name: VS Code smoke
 # job vscode-smoke, so ci-ok waits for it; vscode-smoke-weekly.yml calls it every Monday, because a
 # new VS Code release lands without a commit here. A pull request, a push or a merge group starts
 # VS Code only when it changes what the VSIX is built from (the extension, the packages its two
-# bundles inline, a manifest, the lockfile) or how the smoke runs; otherwise smoke-ok still ends
-# green with a notice, so the gate never sees an unexplained skip.
+# bundles inline, the compiler options of tsconfig.base.json, a manifest, the lockfile) or how the
+# smoke runs; otherwise smoke-ok still ends green with a notice, so the gate never sees an
+# unexplained skip.
 on:
   workflow_call:
   workflow_dispatch:
@@ -41,7 +42,7 @@ jobs:
             case "$1" in
               package-lock.json | package.json | */package.json) return 0 ;;
               apps/vscode/* | packages/*) return 0 ;;
-              vitest.config.ts | .github/actions/setup/*) return 0 ;;
+              tsconfig.base.json | vitest.config.ts | .github/actions/setup/*) return 0 ;;
               .github/workflows/ci.yml | .github/workflows/vscode-smoke.yml | .github/workflows/vscode-smoke-weekly.yml) return 0 ;;
               *) return 1 ;;
             esac
