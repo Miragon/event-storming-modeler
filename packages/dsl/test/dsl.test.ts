@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseDSL, parseDSLWithDiagnostics, serializeDSL } from '../src/index.js';
+import { boardFromJSON, parseDSL, parseDSLWithDiagnostics, serializeDSL } from '../src/index.js';
 
 /** Canonical example board (spec §7) — kept verbatim in webapp/vscode/e2e. */
 const ORDER_CHECKOUT = `title Order Checkout
@@ -1639,6 +1639,16 @@ describe('numbers the canvas cannot draw (beyond 1e38, or overflowing to Infinit
     expect(board.elements[0]?.position).toEqual({ x: -1e38, y: 1e38 });
     const once = serializeDSL(board);
     expect(serializeDSL(parseDSL(once))).toBe(once);
+  });
+
+  it('holds a JSON board to the same bound, refusing it whole', () => {
+    const json = (x: string) =>
+      `{"schemaVersion":1,"config":{"title":"T"},"elements":[` +
+      `{"id":"event_a","elementType":"event","label":"A","position":{"x":${x},"y":0}}],"edges":[]}`;
+    expect(boardFromJSON(json(`-1${'0'.repeat(38)}`)).elements[0]?.position.x).toBe(-1e38);
+    expect(() => boardFromJSON(json(beyondTheCanvas))).toThrow(
+      'Element event_a: position.x 1e+39 lies beyond ±1e38, more than the canvas can draw.',
+    );
   });
 });
 
