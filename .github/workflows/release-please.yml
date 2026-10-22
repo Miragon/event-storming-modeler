@@ -81,7 +81,8 @@ jobs:
   publish-vscode:
     needs: release-please
     if: needs.release-please.outputs.vscode_released == 'true'
-    runs-on: ubuntu-latest
+    # Pinned like the smoke workflow: VS Code needs the image's X server and GTK libraries.
+    runs-on: ubuntu-24.04
     environment: vscode-marketplace
     permissions:
       contents: read
@@ -95,6 +96,12 @@ jobs:
       - name: Package extension
         working-directory: apps/vscode
         run: npx vsce package --no-dependencies -o event-storming-modeler.vsix
+      # The file the next step uploads, in the newest stable VS Code through the driver of the VS
+      # Code smoke workflow: a VSIX that cannot open, edit and save a board is never published.
+      - name: Smoke-test the VSIX in VS Code
+        run: xvfb-run -a npm run test:vscode
+        env:
+          VSCODE_SMOKE_VSIX: ${{ github.workspace }}/apps/vscode/event-storming-modeler.vsix
       - name: Publish to VS Code Marketplace
         working-directory: apps/vscode
         run: npx vsce publish --packagePath event-storming-modeler.vsix
@@ -104,7 +111,8 @@ jobs:
   publish-open-vsx:
     needs: release-please
     if: needs.release-please.outputs.vscode_released == 'true'
-    runs-on: ubuntu-latest
+    # Pinned like the smoke workflow: VS Code needs the image's X server and GTK libraries.
+    runs-on: ubuntu-24.04
     environment: vscode-marketplace
     permissions:
       contents: read
@@ -118,6 +126,12 @@ jobs:
       - name: Package extension
         working-directory: apps/vscode
         run: npx vsce package --no-dependencies -o event-storming-modeler.vsix
+      # The file the next step uploads, in the newest stable VS Code through the driver of the VS
+      # Code smoke workflow: a VSIX that cannot open, edit and save a board is never published.
+      - name: Smoke-test the VSIX in VS Code
+        run: xvfb-run -a npm run test:vscode
+        env:
+          VSCODE_SMOKE_VSIX: ${{ github.workspace }}/apps/vscode/event-storming-modeler.vsix
       - name: Publish to Open VSX Marketplace
         working-directory: apps/vscode
         run: npx ovsx --pat "$OVSX_PAT" publish --packagePath event-storming-modeler.vsix
@@ -126,7 +140,8 @@ jobs:
 
   dry-run:
     if: github.event_name == 'workflow_dispatch' && inputs.dry_run
-    runs-on: ubuntu-latest
+    # Pinned like the smoke workflow: VS Code needs the image's X server and GTK libraries.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -140,3 +155,7 @@ jobs:
       - name: Package extension
         working-directory: apps/vscode
         run: npx vsce package --no-dependencies -o event-storming-modeler.vsix
+      - name: Smoke-test the VSIX in VS Code
+        run: xvfb-run -a npm run test:vscode
+        env:
+          VSCODE_SMOKE_VSIX: ${{ github.workspace }}/apps/vscode/event-storming-modeler.vsix
