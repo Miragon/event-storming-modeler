@@ -4,7 +4,7 @@ import type Canvas from 'diagram-js/lib/core/Canvas';
 import type CommandStack from 'diagram-js/lib/command/CommandStack';
 import type EventBus from 'diagram-js/lib/core/EventBus';
 import type PopupMenu from 'diagram-js/lib/features/popup-menu/PopupMenu';
-import type { EventStormingBoard } from '@miragon/event-storming-schema-model';
+import { assertDrawable, type EventStormingBoard } from '@miragon/event-storming-schema-model';
 import { parseDSLWithDiagnostics, serializeDSL } from '@miragon/event-storming-dsl';
 import { saveSVG } from './io/saveSvg.js';
 import type EventStormingImporter from './io/EventStormingImporter.js';
@@ -127,6 +127,9 @@ export abstract class EventStormingBaseViewer {
     const eventBus = diagram.get<EventBus>('eventBus');
     const importer = diagram.get<EventStormingImporter>('eventStormingImporter');
     assertNoEngineIds(board);
+    // A board straight from code skips loadBoard; its import would stop at the first shape the SVG
+    // transforms cannot hold, after the previous board was cleared.
+    assertDrawable(board);
     const labelEditing = diagram.get<EventStormingLabelEditing>('eventStormingLabelEditing', false);
     labelEditing?.suspend();
     diagram.get<PopupMenu>('popupMenu', false)?.close();
