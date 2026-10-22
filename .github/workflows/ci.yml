@@ -110,8 +110,9 @@ jobs:
   vscode-smoke:
     uses: ./.github/workflows/vscode-smoke.yml
 
-  # The merge gate: it needs every other job, so a job that failed, was cancelled or was skipped
-  # because a job it needs failed (e2e and test-browser after a red lint) fails it.
+  # The merge gate. A job skipped because a job it needs failed reports "skipped", and a required
+  # check counts a skip as passed, so this job, not the single ones, is the check for the ruleset to
+  # require. Every other job of this workflow belongs in its needs.
   ci-ok:
     name: ci-ok
     if: always()
@@ -130,25 +131,26 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Check every needed job
+      - name: Require every job to succeed
         shell: bash
         env:
           NEEDS: ${{ toJSON(needs) }}
-          # dependency-review compares a pull request with its base, so its own `if:` skips it on a
-          # push, in the merge queue and on a manual run; there that skip is no failure.
+          # Jobs whose own if: leaves them out of this event: dependency-review compares the
+          # dependencies of a pull request with its base, which no other event has.
           SKIPPED_BY_DESIGN: ${{ github.event_name != 'pull_request' && 'dependency-review' || '' }}
         run: |
-          results="$(jq -r 'to_entries[] | "\(.key) \(.value.result)"' <<< "$NEEDS")"
-          if [ -z "$results" ]; then
-            echo "::error::ci-ok got no job results"
+          set -euo pipefail
+          results=$(jq -r 'to_entries[] | "\(.key) \(.value.result)"' <<< "$NEEDS")
+          if [[ -z "$results" ]]; then
+            echo "::error::ci-ok needs no job"
             exit 1
           fi
           failed=0
           while read -r job result; do
-            if [ "$result" = success ]; then
+            if [[ "$result" == success ]]; then
               echo "$job: success"
-            elif [ "$result" = skipped ] && [[ " $SKIPPED_BY_DESIGN " == *" $job "* ]]; then
-              echo "$job: skipped by design on $GITHUB_EVENT_NAME"
+            elif [[ "$result" == skipped && " $SKIPPED_BY_DESIGN " == *" $job "* ]]; then
+              echo "$job: skipped by design on this event"
             else
               echo "::error::$job: $result"
               failed=1

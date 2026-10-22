@@ -134,7 +134,8 @@ libraries to npm (with provenance) and the VS Code extension
   (`setViewState`, a host's fit, scroll, zoom) never commits an open label editor: it stays open
   and follows its element (contract L5).
 - CI: the job `ci-ok` in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) is the merge gate;
-  it fails unless every other job succeeded, so **a new CI job goes into its `needs`** (see
+  it fails unless every other job succeeded, so **a new CI job goes into its `needs`**. `ci-ok` and
+  the PR-title check are the checks for the `main` ruleset to require, not the single jobs (see
   [CI and the merge gate](CONTRIBUTING.md#ci-and-the-merge-gate)).
 - Contributor onboarding in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 

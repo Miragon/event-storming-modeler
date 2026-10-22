@@ -1,4 +1,4 @@
-name: VS Code smoke (weekly)
+name: VS Code smoke weekly
 
 # A new VS Code release lands without a commit here, so nothing else would start the smoke against
 # it. A failed run opens a tracking issue (or comments on the open one): a scheduled run's failure
@@ -25,7 +25,7 @@ jobs:
     permissions:
       issues: write
     steps:
-      - name: Open or update the tracking issue
+      - name: Open the tracking issue or comment on it
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

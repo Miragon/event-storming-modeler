@@ -165,11 +165,11 @@ run at once.
 
 **In CI.** [`.github/workflows/vscode-smoke.yml`](.github/workflows/vscode-smoke.yml) is a
 reusable workflow: the CI workflow calls it as the job `vscode-smoke`, so `ci-ok` waits for it (see
-[CI and the merge gate](#ci-and-the-merge-gate) for when it starts VS Code). Its `smoke` job runs on
-`ubuntu-24.04` under `xvfb-run -a` (VS Code needs an X server), once against the floor of
-`engines.vscode` (read from `apps/vscode/package.json` at run time) and once against the newest
-stable release, passing each version as `VSCODE_VERSION`. The download is cached per VS Code
-version. The screenshots are uploaded as the artifacts `vscode-smoke-minimum` and
+[CI and the merge gate](#ci-and-the-merge-gate) for when it starts VS Code). Inside it, the matrix
+job of the same name runs on `ubuntu-24.04` under `xvfb-run -a` (VS Code needs an X server), once
+against the floor of `engines.vscode` (read from `apps/vscode/package.json` at run time) and once
+against the newest stable release, passing each version as `VSCODE_VERSION`. The download is
+cached per VS Code version. The screenshots are uploaded as the artifacts `vscode-smoke-minimum` and
 `vscode-smoke-stable`, and VS Code's logs (the job runs with `VSCODE_SMOKE_KEEP=1`) as
 `vscode-smoke-minimum-logs` and `vscode-smoke-stable-logs`, each for 7 days. It calls
 `npm run test:vscode` on the runner, not the Docker command: the runner already has an X server and
@@ -179,7 +179,7 @@ every run, since a hosted runner keeps neither images nor volumes.
 
 [`.github/workflows/vscode-smoke-weekly.yml`](.github/workflows/vscode-smoke-weekly.yml) calls the
 same workflow every Monday, because a new VS Code arrives without a commit here, and on demand
-(**Actions → VS Code smoke (weekly) → Run workflow**). When it fails, its `alert` job opens the
+(**Actions → VS Code smoke weekly → Run workflow**). When it fails, its `alert` job opens the
 issue **VS Code smoke: the weekly run failed**, or comments on it while it is open; close it once a
 run passes again. The release smokes the VSIX it is about to upload: each job that publishes to the
 VS Code Marketplace or Open VSX packages the extension, runs `npm run test:vscode` under
@@ -189,12 +189,15 @@ when it passes; the release workflow's dry run does the same.
 ## CI and the merge gate
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) ends with the job **`ci-ok`**, the merge
-gate: it runs after every other job of the workflow, even when one of them failed, and passes only
-when each one succeeded. A failed or cancelled job fails it, and so does a job that was skipped because a
-job it needs failed (a red `lint` skips `e2e` and `test-browser`). The one skip it accepts is
-`dependency-review` outside pull requests, which that job's own `if:` skips by design; such skips
-are listed in `SKIPPED_BY_DESIGN`. **A new job in `ci.yml` has to go into `ci-ok`'s `needs`**, or
-the gate does not wait for it; a new job that skips itself on some events by design also goes into
+gate: it and the PR-title check (`validate-pr-title`) are the checks for the `main` ruleset to
+require, in place of the single jobs, so that Dependabot's auto-merge waits for every job, the VS
+Code smoke included. `ci-ok` runs after every other job of the workflow, even when one of them
+failed, and passes only when each one succeeded. A failed or cancelled job fails it, and so does a
+job that was skipped because a job it needs failed (a red `lint` skips `e2e` and `test-browser`; a
+required check would count that skip as passed). The one skip it accepts is `dependency-review`
+outside pull requests, which that job's own `if:` skips by design; such skips are listed in
+`SKIPPED_BY_DESIGN`. **A new job in `ci.yml` has to go into `ci-ok`'s `needs`**, or the gate does
+not wait for it; a new job that skips itself on some events by design also goes into
 `SKIPPED_BY_DESIGN` for those events.
 
 The job `vscode-smoke` calls the VS Code smoke workflow. Its first job, `changes`, decides whether
@@ -205,9 +208,8 @@ and starts VS Code only when one of these paths changed: `package-lock.json`, an
 `tsconfig.base.json` (esbuild compiles both bundles with its options), `vitest.config.ts` (the
 smoke's Vitest project), `.github/actions/setup/**`, `ci.yml`, `vscode-smoke.yml` or
 `vscode-smoke-weekly.yml`. A missing or all-zero base, a base it cannot fetch, the weekly schedule
-and a manual run always start it. The last job, `smoke-ok`, passes when the smoke passed or was not
-needed (with a notice that says why) and fails otherwise, so `ci-ok` sees `vscode-smoke` succeed or
-fail, never skip.
+and a manual run always start it. When it skips VS Code, the job `skipped` succeeds with a notice
+that says why, so `ci-ok` sees `vscode-smoke` succeed or fail, never skip.
 
 Dependabot groups minor and patch updates of npm packages and auto-merges them once the checks
 pass, except updates of `@miragon/modeler-*` (the group `modeler-platform`): a 0.x minor of the

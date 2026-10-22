@@ -5,7 +5,7 @@ name: VS Code smoke
 # new VS Code release lands without a commit here. A pull request, a push or a merge group starts
 # VS Code only when it changes what the VSIX is built from (the extension, the packages its two
 # bundles inline, the compiler options of tsconfig.base.json, a manifest, the lockfile) or how the
-# smoke runs; otherwise smoke-ok still ends green with a notice, so the gate never sees an
+# smoke runs; otherwise the job skipped ends green with a notice, so the gate never sees an
 # unexplained skip.
 on:
   workflow_call:
@@ -16,7 +16,6 @@ permissions:
 
 jobs:
   changes:
-    name: changes
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -81,8 +80,7 @@ jobs:
           done < "$changed"
           decide false "nothing the VSIX or the smoke depends on changed since $base"
 
-  smoke:
-    name: smoke (${{ matrix.vscode }})
+  vscode-smoke:
     needs: changes
     if: needs.changes.outputs.run == 'true'
     # Pinned rather than ubuntu-latest: VS Code needs the image's X server and GTK libraries, and a
@@ -92,8 +90,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The floor of engines.vscode (VS Code 1.96 runs extensions on Node 20) and the newest stable.
-        vscode: [minimum, stable]
+        # The newest stable and the floor of engines.vscode (VS Code 1.96 runs extensions on Node 20).
+        vscode: [stable, minimum]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
@@ -145,33 +143,14 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  # Always the last job, so the caller sees success for a smoke that passed or was not needed, and
-  # failure for one that failed, was cancelled or could not decide.
-  smoke-ok:
-    name: smoke-ok
-    needs: [changes, smoke]
-    if: always()
+  # A skipped smoke ends in a job that succeeds, so the caller sees success, never a skip that
+  # ci-ok would have to tell apart from a skip after a failure.
+  skipped:
+    needs: changes
+    if: needs.changes.outputs.run != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Check the smoke
-        shell: bash
+      - run: echo "::notice title=VS Code smoke skipped::$REASON"
         env:
-          CHANGES_RESULT: ${{ needs.changes.result }}
-          RUN: ${{ needs.changes.outputs.run }}
           REASON: ${{ needs.changes.outputs.reason }}
-          SMOKE_RESULT: ${{ needs.smoke.result }}
-        run: |
-          if [ "$CHANGES_RESULT" != success ]; then
-            echo "::error::changes: $CHANGES_RESULT"
-            exit 1
-          fi
-          if [ "$RUN" != true ]; then
-            echo "::notice title=VS Code smoke skipped::$REASON"
-            exit 0
-          fi
-          if [ "$SMOKE_RESULT" != success ]; then
-            echo "::error::smoke: $SMOKE_RESULT"
-            exit 1
-          fi
-          echo "VS Code smoke passed: $REASON"
