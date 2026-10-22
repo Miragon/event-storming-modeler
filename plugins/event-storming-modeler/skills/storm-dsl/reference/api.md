@@ -87,7 +87,9 @@ const any = loadBoard(unknownValue); // validate + migrate an older schemaVersio
 ```
 
 `boardFromJSON` / `loadBoard` validate against the Zod schema and **do** throw on invalid input —
-unlike `parseDSL`.
+unlike `parseDSL`. That includes a coordinate or size beyond ±1e38, the bound the DSL applies line
+by line: the whole board is refused with an `UndrawableBoardError` naming the element, the field
+and the number.
 
 ## Related packages
 
