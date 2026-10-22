@@ -41,6 +41,9 @@ export {
   createEmptyBoard,
 } from './serialize.js';
 
+// The drawable range — what loadBoard and the canvas refuse rather than import half-way
+export { LARGEST_DRAWABLE_NUMBER, UndrawableBoardError, assertDrawable } from './drawable.js';
+
 export { eventStormingBoardSchema, boardElementSchema, boardEdgeSchema } from './schema.js';
 export type { EventStormingBoardInput } from './schema.js';
 

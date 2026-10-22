@@ -31,6 +31,11 @@ const json = serializeBoard(board); // deterministic: stable key order, rounded 
 const restored = parseBoardJSON(json); // validated + migrated to the current schema
 ```
 
+`parseBoardJSON` and `loadBoard` throw on a board that is not valid, and with an
+`UndrawableBoardError` (element id, field, value) on one with a coordinate or size beyond ±1e38
+(`LARGEST_DRAWABLE_NUMBER`), more than the canvas can draw: the same bound the `.storm` DSL applies.
+`validateBoard` checks the structure only.
+
 Part of the [Event Storming Modeler](https://github.com/Miragon/event-storming-modeler) monorepo.
 
 ## License

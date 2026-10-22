@@ -3,7 +3,9 @@ import { z } from 'zod';
 /**
  * Zod schemas mirror the metamodel (types.ts) and form the runtime validation gate.
  * Coordinates are unbounded board pixels; unique IDs and edge endpoints referencing
- * existing elements are cross-field validated in `validateBoard`.
+ * existing elements are cross-field validated in `validateBoard`. The drawable range (±1e38) is
+ * checked by `loadBoard` only: the exporter validates what the canvas holds, and its float
+ * arithmetic can land a number a hair beyond the bound, which must not make an export throw.
  */
 
 const coordinateSchema = z.object({

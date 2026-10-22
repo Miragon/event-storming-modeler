@@ -3,6 +3,9 @@ import {
   ATTACHABLE_STICKY_KINDS,
   CURRENT_SCHEMA_VERSION,
   DEFAULT_BOARD_LEVEL,
+  LARGEST_DRAWABLE_NUMBER,
+  UndrawableBoardError,
+  assertDrawable,
   DEFAULT_BOARD_SIZE,
   HOST_STICKY_KINDS,
   LEVEL_STICKY_KINDS,
@@ -342,6 +345,112 @@ describe('Note size (manual resize)', () => {
 
   it('rejects a negative height', () => {
     expect(() => loadBoard(withNote({ width: 240, height: -1 }))).toThrow();
+  });
+});
+
+describe('the drawable range (±1e38, as in the .storm lexer)', () => {
+  const beyond = 1e39;
+  const origin = { x: 0, y: 0 };
+  const withElement = (element: Record<string, unknown>) => ({
+    ...sample,
+    elements: [...sample.elements, element],
+  });
+  const event = (position: { x: number; y: number }) =>
+    withElement({ id: 'event_far', elementType: 'event', label: 'Far', position });
+  const drawing = (points: Array<{ x: number; y: number }>) =>
+    withElement({ id: 'draw_far', elementType: 'drawing', label: '', position: origin, points });
+  const note = (size: { width: number; height: number }) =>
+    withElement({ id: 'note_big', elementType: 'note', label: 'Big', position: origin, size });
+
+  function refusal(data: unknown): unknown {
+    try {
+      loadBoard(data);
+    } catch (error) {
+      return error;
+    }
+    return undefined;
+  }
+
+  it.each([
+    ['position.x', event({ x: beyond, y: 0 }), 'event_far', beyond],
+    ['position.y', event({ x: 0, y: -beyond }), 'event_far', -beyond],
+    ['points[1].x', drawing([origin, { x: beyond, y: 0 }]), 'draw_far', beyond],
+    ['size.width', note({ width: beyond, height: 10 }), 'note_big', beyond],
+    ['size.height', note({ width: 10, height: beyond }), 'note_big', beyond],
+    ['points[0].y', drawing([{ x: 0, y: -Infinity }, origin]), 'draw_far', -Infinity],
+  ])(
+    'loadBoard refuses a board with %s beyond it, naming where',
+    (field, data, elementId, value) => {
+      const error = refusal(data);
+      expect(error).toBeInstanceOf(UndrawableBoardError);
+      expect(error).toBeInstanceOf(RangeError);
+      expect(error).toMatchObject({ elementId, field, value });
+      expect((error as Error).message).toBe(
+        `Element ${elementId}: ${field} ${value} lies beyond ±1e38, more than the canvas can draw.`,
+      );
+    },
+  );
+
+  it('parseBoardJSON refuses the file from issue #50', () => {
+    const huge =
+      '{"schemaVersion":1,"config":{"title":"Huge"},"elements":[' +
+      '{"id":"event_a","label":"Near","position":{"x":100,"y":100},"elementType":"event"},' +
+      '{"id":"event_b","label":"Far","position":{"x":1e39,"y":100},"elementType":"event"}' +
+      '],"edges":[]}';
+    expect(() => parseBoardJSON(huge)).toThrow(
+      'Element event_b: position.x 1e+39 lies beyond ±1e38, more than the canvas can draw.',
+    );
+  });
+
+  it('names a JSON number too large for a double, which JSON.parse reads as Infinity', () => {
+    const overflow =
+      '{"schemaVersion":1,"config":{"title":"Huge"},"elements":[' +
+      '{"id":"note_big","label":"Big","position":{"x":0,"y":0},"elementType":"note",' +
+      '"size":{"width":10,"height":1e400}}' +
+      '],"edges":[]}';
+    const error = refusal(JSON.parse(overflow));
+    expect(error).toBeInstanceOf(UndrawableBoardError);
+    expect(error).toMatchObject({ elementId: 'note_big', field: 'size.height', value: Infinity });
+  });
+
+  it('leaves an element without an id to the schema', () => {
+    const error = refusal(
+      withElement({ elementType: 'event', label: 'Far', position: { x: beyond, y: 0 } }),
+    );
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(UndrawableBoardError);
+  });
+
+  it('reads ±1e38 itself', () => {
+    const largest = LARGEST_DRAWABLE_NUMBER;
+    expect(largest).toBe(1e38);
+    const edges = [
+      event({ x: -largest, y: largest }),
+      drawing([
+        { x: -largest, y: -largest },
+        { x: largest, y: largest },
+      ]),
+      note({ width: largest, height: largest }),
+    ];
+    for (const data of edges) expect(refusal(data)).toBeUndefined();
+  });
+
+  it('assertDrawable checks a board that never went through loadBoard', () => {
+    const board = validateBoard(event({ x: Number.MAX_VALUE, y: 0 }));
+    expect(() => assertDrawable(board)).toThrow(UndrawableBoardError);
+    const notANumber: EventStormingBoard = {
+      ...sample,
+      elements: [
+        { id: 'event_nan', elementType: 'event', label: 'NaN', position: { x: 0, y: NaN } },
+      ],
+    };
+    expect(() => assertDrawable(notANumber)).toThrow('Element event_nan: position.y NaN lies');
+    expect(() => assertDrawable(sample)).not.toThrow();
+  });
+
+  // The exporter validates what the canvas holds; its float arithmetic can land a hair beyond.
+  it('validateBoard leaves the range to loadBoard', () => {
+    expect(() => validateBoard(event({ x: beyond, y: 0 }))).not.toThrow();
   });
 });
 

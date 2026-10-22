@@ -3,6 +3,8 @@
  * The DSL is line-based; a full tokenizer/generator is not needed.
  */
 
+import { LARGEST_DRAWABLE_NUMBER } from '@miragon/event-storming-schema-model';
+
 export interface ParsedCoords {
   readonly a: number;
   readonly b: number;
@@ -11,13 +13,9 @@ export interface ParsedCoords {
 const COORDS_RE = /\[\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\]/;
 
 /**
- * The canvas places shapes with 32-bit SVG transforms, which overflow near 3.4e38 and would make
- * an import throw half-way; 1e38 leaves room for a corner half a note's size beyond its centre.
- * A larger number (a digit run of 309 or more even overflows to Infinity) is unreadable like
- * `1.2.3`, so its line stays in rawPassthrough.
+ * A number beyond the canvas's range (a digit run of 309 or more even overflows to Infinity) is
+ * unreadable like `1.2.3`, so its line stays in rawPassthrough; JSON boards share the bound.
  */
-const LARGEST_DRAWABLE_NUMBER = 1e38;
-
 function isDrawable(value: number): boolean {
   return Math.abs(value) <= LARGEST_DRAWABLE_NUMBER;
 }

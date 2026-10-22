@@ -8,6 +8,7 @@ import type Modeling from 'diagram-js/lib/features/modeling/Modeling';
 import type Rules from 'diagram-js/lib/features/rules/Rules';
 import type { Shape } from 'diagram-js/lib/model/Types';
 import { parseDSL } from '@miragon/event-storming-dsl';
+import { UndrawableBoardError } from '@miragon/event-storming-schema-model';
 import {
   createCollaborativeModeler,
   createCollaborativeViewer,
@@ -122,6 +123,26 @@ describe('texts that used to reject after the previous board was cleared', () =>
       elements: board.elements.map((element) => ({ ...element, id: 'event-storming-root' })),
     };
     await expect(modeler.diagram.importMap(reserved)).rejects.toThrow(/reserved/);
+    expect(modeler.exportText()).toBe(before);
+    expect(modeler.diagram.get<CommandStack>('commandStack').canUndo()).toBe(true);
+  });
+
+  it.each([
+    ['position', { x: 1e39, y: 100 }, undefined],
+    ['note size', { x: 200, y: 100 }, { width: 1e39, height: 80 }],
+  ])('a board with a %s beyond ±1e38 rejects without a trace', async (_, position, size) => {
+    const modeler = editor();
+    await modeler.importText(orderCheckout);
+    addDomainEvent(modeler);
+    const before = modeler.exportText();
+    const board = parseDSL('title Huge\nevent Near [100, 100]\nnote Far [200, 100]\n');
+    const huge = {
+      ...board,
+      elements: board.elements.map((element) =>
+        element.label === 'Far' ? { ...element, position, ...(size ? { size } : {}) } : element,
+      ),
+    };
+    await expect(modeler.diagram.importMap(huge)).rejects.toThrow(UndrawableBoardError);
     expect(modeler.exportText()).toBe(before);
     expect(modeler.diagram.get<CommandStack>('commandStack').canUndo()).toBe(true);
   });

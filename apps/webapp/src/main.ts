@@ -39,6 +39,7 @@ import {
   readBoardFile,
   svgToPng,
 } from './io.js';
+import { openErrorText } from './open-error.js';
 import { readTypeCaptionsVisible, writeTypeCaptionsVisible } from './preferences.js';
 import { importWarningsText, problemItems } from './problems.js';
 import { hashHoldsBoard, readHashMap, shareUrl, writeHashMap } from './share.js';
@@ -48,6 +49,7 @@ interface DiagramElement {
   id: string;
   parent?: unknown;
   waypoints?: unknown;
+  businessObject?: unknown;
 }
 interface ElementRegistryLike {
   getAll(): DiagramElement[];
@@ -67,7 +69,6 @@ const NEW_BOARD_TITLE = 'New board';
 const REPOSITORY_URL = 'https://github.com/Miragon/event-storming-modeler';
 /** Extensions for the file picker and the drop; the MIME types decide during a drag (guide §9). */
 const BOARD_FILE_TYPES = ['.storm', '.json', '.txt', 'application/json', 'text/plain'];
-const CHECK_BOARD_FILE = 'Check that it contains a valid Event Storming board.';
 const BROKEN_LINK_TEXT =
   "Couldn't read the board in this link. Check that you copied the whole link.";
 
@@ -225,6 +226,32 @@ function withdrawReplaceUndo(): void {
   replaceUndo = undefined;
 }
 
+/** Every element on the canvas and its business object: an import that got going replaces one. */
+function canvasIdentity(): unknown[] {
+  return registry.getAll().flatMap((element) => [element, element.businessObject]);
+}
+
+/**
+ * Opens a board, or keeps the current one as it was when the import throws. The renderer refuses
+ * some boards before it touches the canvas, which then keeps its history too; an import that
+ * stopped half-way leaves a mix of both boards, so the previous board text goes back in.
+ */
+async function openDocumentOrKeepBoard(load: BoardLoad): Promise<void> {
+  const text = modeler.exportDSL();
+  const view = viewport.getState();
+  const identity = canvasIdentity();
+  try {
+    await openDocument(load, true);
+  } catch (error) {
+    const now = canvasIdentity();
+    const touched =
+      now.length !== identity.length || now.some((item, index) => item !== identity[index]);
+    if (touched) await modeler.importDSL(text);
+    if (view) viewport.setState(view);
+    throw error;
+  }
+}
+
 /**
  * Replacing a board clears the canvas history, so instead of asking first (guide §9) every
  * replacement keeps the previous board as text and offers it back: "Board replaced · Undo", and
@@ -232,7 +259,7 @@ function withdrawReplaceUndo(): void {
  */
 async function replaceBoard(load: BoardLoad): Promise<void> {
   const previous = boardIsEmpty() ? undefined : modeler.exportDSL();
-  await openDocument(load, true);
+  await openDocumentOrKeepBoard(load);
   withdrawReplaceUndo();
   if (previous === undefined || previous === modeler.exportDSL()) return;
   const undo = (): void => {
@@ -269,10 +296,7 @@ async function openBoardFile(file: File): Promise<void> {
     await replaceBoard(() => importBoardFile(boardFile, modeler));
   } catch (error) {
     console.error('[event-storming-open]', error);
-    shell.toast({
-      status: 'danger',
-      text: `Couldn't read “${file.name}”. ${CHECK_BOARD_FILE}`,
-    });
+    shell.toast({ status: 'danger', text: openErrorText(file.name, error) });
   }
 }
 
