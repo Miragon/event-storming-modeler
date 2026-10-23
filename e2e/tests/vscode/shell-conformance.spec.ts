@@ -14,8 +14,9 @@ import { postedMessages } from './support/webview.js';
  * chrome keys and select all that never reach VS Code, keyboard creation from the palette, a label
  * editor the shell's zoom, fit and refit keep open, the read-only lock of an invalid file, the
  * appearance VS Code requests (a light-only board stays light, high contrast passes) and a clean
- * teardown. Event Storming has neither a legend nor an inspector, so the harness declares them
- * absent and the kit asserts they never show; any skip fails the suite.
+ * teardown. Event Storming has neither a legend nor an inspector, and the webview's menu has no
+ * action that hands the focus to the canvas, so the harness declares them absent and the kit
+ * asserts they never show; any skip fails the suite.
  */
 const describeSkips = (skips: readonly ShellSkip[]): string =>
   skips.map((skip) => `${skip.hook}: ${skip.reason}`).join('; ');
