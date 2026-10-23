@@ -8,12 +8,13 @@ import { exportDSL, waitForViewer } from './support/viewer.js';
 
 /**
  * The shell's conformance kit against the real web app (the web host of guide §5.2): geometry at
- * three sizes with the primary action, the legal line and the raised zoom row, ARIA and keyboard
- * models, keyboard creation from the palette, a label editor the chrome's zoom, fit and refit keep
- * open, the focus after a File action, the light-only mode under any system setting, the start
- * screen, toasts, the problems list, the drop zone and a clean teardown. The web app has
- * neither a legend nor an inspector, and no invalid-file state (an import that fails leaves the
- * board as it was), so the harness declares them absent; any skip fails the suite.
+ * four sizes (1600 × 900 first, then the kit's three) with the primary action, the legal line and
+ * the raised zoom row, ARIA and keyboard models, keyboard creation from the palette, a label
+ * editor the chrome's zoom, fit and refit keep open, the focus after a File action, the light-only
+ * mode under any system setting, the start screen, toasts, the problems list, the drop zone and a
+ * clean teardown. The web app has neither a legend nor an inspector, no invalid-file state (an
+ * import that fails leaves the board as it was) and no problem that points at an element, so the
+ * harness declares them absent; any skip fails the suite.
  */
 const describeSkips = (skips: readonly ShellSkip[]): string =>
   skips.map((skip) => `${skip.hook}: ${skip.reason}`).join('; ');
