@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/Miragon/event-storming-modeler/compare/renderer-v0.4.1...renderer-v0.5.0) (2026-10-23)
+
+
+### Features
+
+* **renderer:** report the board's content bounds (modeler-api 1.3); the apps fit to them with modeler-shell 0.4.0 ([#60](https://github.com/Miragon/event-storming-modeler/issues/60)) ([d4b1689](https://github.com/Miragon/event-storming-modeler/commit/d4b168964d67d09f52c162b5cc89fb8064733b48))
+
 ## [0.4.1](https://github.com/Miragon/event-storming-modeler/compare/renderer-v0.4.0...renderer-v0.4.1) (2026-10-22)
 
 
