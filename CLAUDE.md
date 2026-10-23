@@ -120,7 +120,7 @@ libraries to npm (with provenance) and the VS Code extension
   diagnostics). Install once with `/plugin marketplace add Miragon/event-storming-modeler` and
   `/plugin install event-storming-modeler@event-storming`; the skill files are readable directly
   under `plugins/event-storming-modeler/skills/` either way.
-- The renderer implements the collaborative-modeler contract 1.2
+- The renderer implements the collaborative-modeler contract 1.3
   [`@miragon/modeler-api`](https://www.npmjs.com/package/@miragon/modeler-api)
   (`createCollaborativeModeler` / `createCollaborativeViewer`, notation `event-storming`, in
   [`packages/renderer/src/collaborative/`](packages/renderer/src/collaborative/)); its conformance
@@ -131,7 +131,9 @@ libraries to npm (with provenance) and the VS Code extension
   (`elements.bounds`): their ids survive a save and re-open because the serializer writes `(id …)`
   back whenever the parser would not derive the same id at that line; notes, drawings and arrows
   have no id grammar yet. New sticky ids are `<prefix>_<8 random [0-9a-z]>` (`allocateId`, e.g.
-  `event_k3x9q2ab`), so stickies two peers add at the same time do not collide. A view change
+  `event_k3x9q2ab`), so stickies two peers add at the same time do not collide. `contentBounds()`
+  (on the contract instances and on `Modeler`/`Viewer`/`NavigatedViewer`) is the board's tight
+  box, `boardBounds.contentBounds(0)`, or `undefined` while the board has no element. A view change
   (`setViewState`, a host's fit, scroll, zoom) never commits an open label editor: it stays open
   and follows its element (contract L5).
 - CI: the job `ci-ok` in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) is the merge gate;

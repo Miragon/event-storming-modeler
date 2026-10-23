@@ -9,6 +9,8 @@ import {
   createCollaborativeViewer,
   type CollaborativeEventStormingModeler,
 } from '../src/collaborative/index.js';
+import { Modeler } from '../src/Modeler.js';
+import { Viewer } from '../src/Viewer.js';
 
 /**
  * Smoke test of the contract wrapper. jsdom cannot lay out SVG, so the importer is a stub and the
@@ -171,6 +173,38 @@ describe('createCollaborativeModeler / createCollaborativeViewer', () => {
     expect(modeler.elements.selection()).toEqual([]);
   });
 
+  it('report no content bounds for a board without elements, and none after destroy', async () => {
+    for (const modeler of [
+      editor(),
+      createCollaborativeViewer({ additionalModules: [stubImporterModule()] }),
+    ]) {
+      mounted.push(modeler);
+      expect(modeler.contentBounds()).toBeUndefined();
+      await modeler.importText('title Empty\n');
+      expect(modeler.contentBounds()).toBeUndefined();
+      modeler.destroy();
+      expect(modeler.contentBounds()).toBeUndefined();
+    }
+  });
+
+  // The shell's fit insets are a host's only margin (guide §5.9): the box carries no padding of
+  // its own, unlike BoardBounds' default framing for the importer's fit and the SVG export.
+  it('report the board bounds without padding as the content bounds', () => {
+    const contentBounds = vi.fn((padding = 120) => ({
+      x: 100 - padding,
+      y: 50 - padding,
+      width: 400 + 2 * padding,
+      height: 300 + 2 * padding,
+    }));
+    const boardBounds = { isEmpty: () => false, contentBounds };
+    const modeler = createCollaborativeModeler({
+      additionalModules: [stubImporterModule(), { boardBounds: ['value', boardBounds] }],
+    });
+    mounted.push(modeler);
+    expect(modeler.contentBounds()).toEqual({ x: 100, y: 50, width: 400, height: 300 });
+    expect(contentBounds).toHaveBeenCalledWith(0);
+  });
+
   // A host that flushes a debounced save on unmount must neither build a new diagram (with its
   // document key listener) on the detached container nor lose the last state.
   it('answer exportText from the state at destroy and reject imports afterwards', async () => {
@@ -183,5 +217,19 @@ describe('createCollaborativeModeler / createCollaborativeViewer', () => {
     expect(document.querySelectorAll('.event-storming-container').length).toBeLessThanOrEqual(
       containers,
     );
+  });
+});
+
+describe('Modeler / Viewer contentBounds', () => {
+  // A host may ask before it mounts anything: the answer must not build a diagram, with its
+  // keyboard on the document, on a container nobody shows.
+  it.each([
+    ['Modeler', () => new Modeler()],
+    ['Viewer', () => new Viewer()],
+  ])('the %s answers none before its diagram exists, without building it', (_, make) => {
+    const diagram = make();
+    expect(diagram.contentBounds()).toBeUndefined();
+    expect(diagram.container.childElementCount).toBe(0);
+    diagram.destroy();
   });
 });

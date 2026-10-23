@@ -10,6 +10,7 @@ import { saveSVG } from './io/saveSvg.js';
 import type EventStormingImporter from './io/EventStormingImporter.js';
 import type EventStormingExporter from './io/EventStormingExporter.js';
 import type BoardBounds from './board-bounds/BoardBounds.js';
+import type { Bounds } from './board-bounds/BoardBounds.js';
 import type EventStormingLabelEditing from './label-editing/EventStormingLabelEditing.js';
 import { ROOT_ID, type ImportWarning } from './io/types.js';
 import {
@@ -171,6 +172,18 @@ export abstract class EventStormingBaseViewer {
 
   exportDSL(): string {
     return serializeDSL(this.exportMap());
+  }
+
+  /**
+   * The tight box around the board in diagram coordinates, which zoom and scroll leave alone, or
+   * `undefined` while the board has no element: what a host fits its view to (modeler-api 1.3
+   * `contentBounds`). Read from the live shapes, so an element created or moved counts at once.
+   */
+  contentBounds(): Bounds | undefined {
+    // A diagram not built yet, or destroyed, holds no board: asking must not build one.
+    if (!this._diagram) return undefined;
+    const boardBounds = this._diagram.get<BoardBounds>('boardBounds');
+    return boardBounds.isEmpty() ? undefined : boardBounds.contentBounds(0);
   }
 
   /** Static, standalone SVG — framed by the content bounds of the free canvas. */

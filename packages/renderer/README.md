@@ -31,6 +31,7 @@ Place Order -> Order Placed`);
 const board = viewer.exportMap(); // canonical JSON model
 const dsl = viewer.exportDSL(); // back to .storm text
 const { svg } = await viewer.saveSVG();
+const box = viewer.contentBounds(); // the board's tight box, undefined while it is empty
 ```
 
 Swap `NavigatedViewer` for `Modeler` to get the editable board (sticky palette, context pad,
@@ -73,6 +74,11 @@ erases the undo history without firing `commandStack.changed`, and fires `import
 largest zoom that shows all of it, never above 100%; an empty board shows at 100%. A label being
 typed when an import arrives is reopened on the same element afterwards, with the typed text.
 
+`contentBounds()` gives the tight box around everything the board draws (`{ x, y, width, height }`
+in board coordinates, which zoom and scroll leave alone), read from the live canvas, or
+`undefined` while the board has no element: a host that fits the view itself fits to it and adds
+its own margins. Unlike the importer's fit and the SVG export, it carries no padding.
+
 Enter or Space on a creating palette entry (a click without a pointer, `detail` 0) places the
 element in the centre of `freeArea` (the container minus the margins a host's chrome covers, or the
 centre the host names; without it the container's centre), 24px down and right while that spot is
@@ -90,7 +96,7 @@ drawing keeps literal light colours in its SVG attributes, so exports look the s
 
 ### Collaborative hosts
 
-The package implements the collaborative-modeler contract 1.2 of
+The package implements the collaborative-modeler contract 1.3 of
 [`@miragon/modeler-api`](https://www.npmjs.com/package/@miragon/modeler-api) (notation
 `event-storming`) and runs its conformance kit in CI, every case and no advisory:
 
@@ -132,6 +138,11 @@ const viewer = createCollaborativeViewer(); // meta.editable: false, never chang
   top-left corner and the size, which zoom and scroll leave alone), read from the live canvas: a
   sticky created or moved in the session has its current box. Any other id gives `undefined`. The
   viewer answers it too.
+- `contentBounds()` (contract 1.3) is the board's tight box, as on the `Modeler` and the viewers
+  above: it covers every `elements.bounds` box and the notes, drawings and arrows too, and is
+  `undefined` for a board without elements, before the first import and after `destroy()`. The
+  modeler shell's `connectDiagramJs(shell, diagram, { modeler })` fits to it. The viewer answers
+  it too.
 - New sticky ids are random: a sticky created on the canvas (palette, keyboard, append, paste) gets
   `<prefix>_<8 characters of [0-9a-z]>`, such as `(id event_k3x9q2ab)`, so two peers that each add
   one at the same time do not pick the same id. Ids already in a text are read as they are.

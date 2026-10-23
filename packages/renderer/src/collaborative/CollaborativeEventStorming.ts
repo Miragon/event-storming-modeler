@@ -45,6 +45,8 @@ export type EventStormingElementsSurface = ElementsSurface &
 
 /** The contract surface plus the wrapped diagram for host-specific wiring. */
 export interface CollaborativeEventStormingModeler extends CollaborativeModeler {
+  /** The tight box around the board, `undefined` while it has no element (contract 1.3). */
+  contentBounds(): ElementBounds | undefined;
   readonly elements: EventStormingElementsSurface;
   readonly diagram: Modeler | NavigatedViewer;
 }
@@ -190,6 +192,9 @@ function collaborative(
     setViewState(state) {
       if (destroyed || !isViewState(state)) return;
       canvas.viewbox({ x: state.x, y: state.y, width: state.width, height: state.height });
+    },
+    contentBounds() {
+      return diagram.contentBounds();
     },
     destroy() {
       if (destroyed) return;

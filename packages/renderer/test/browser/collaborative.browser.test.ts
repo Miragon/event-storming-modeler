@@ -246,6 +246,68 @@ describe('the elements surface', () => {
   });
 });
 
+describe('the content bounds (modeler-api 1.3)', () => {
+  /** The tight box around every shape on the canvas, read from the registry. */
+  function shapeBox(modeler: CollaborativeEventStormingModeler) {
+    const root = modeler.diagram.get<Canvas>('canvas').getRootElement();
+    const shapes = modeler.diagram
+      .get<ElementRegistry>('elementRegistry')
+      .filter((element) => element !== root && !('waypoints' in element)) as Shape[];
+    const left = Math.min(...shapes.map((shape) => shape.x));
+    const top = Math.min(...shapes.map((shape) => shape.y));
+    const right = Math.max(...shapes.map((shape) => shape.x + shape.width));
+    const bottom = Math.max(...shapes.map((shape) => shape.y + shape.height));
+    return { x: left, y: top, width: right - left, height: bottom - top };
+  }
+
+  // The fixture's dashed frame and its note reach further than any sticky: the box is the whole
+  // board, not only what `elements` lists, and without padding, since the host's fit adds the
+  // only margin.
+  it('frame every shape tightly, live after a new sticky, whatever the zoom', async () => {
+    const modeler = editor();
+    expect(modeler.contentBounds()).toBeUndefined();
+    await modeler.importText(orderCheckout);
+    const imported = shapeBox(modeler);
+    expect(modeler.contentBounds()).toEqual(imported);
+    expect(imported.x).toBe(40);
+    for (const { id } of modeler.elements.list()) {
+      const box = modeler.elements.bounds(id)!;
+      expect(box.x).toBeGreaterThanOrEqual(imported.x);
+      expect(box.y).toBeGreaterThanOrEqual(imported.y);
+      expect(box.x + box.width).toBeLessThanOrEqual(imported.x + imported.width);
+      expect(box.y + box.height).toBeLessThanOrEqual(imported.y + imported.height);
+    }
+
+    const created = addDomainEvent(modeler);
+    const grown = shapeBox(modeler);
+    expect(grown).not.toEqual(imported);
+    expect(modeler.contentBounds()).toEqual(grown);
+    expect(grown.x + grown.width).toBe(created.x + created.width);
+    expect(grown.y + grown.height).toBe(created.y + created.height);
+
+    const canvas = modeler.diagram.get<Canvas>('canvas');
+    canvas.zoom(2.5);
+    canvas.scroll({ dx: 300, dy: -120 });
+    expect(modeler.contentBounds()).toEqual(grown);
+    modeler.setViewState({ x: 120, y: 80, width: 640, height: 480 });
+    expect(modeler.contentBounds()).toEqual(grown);
+  });
+
+  it('report none for a board without elements, and the viewer the same box', async () => {
+    const modeler = editor();
+    await modeler.importText(orderCheckout);
+    await modeler.importText('title Empty\nlevel process\n');
+    expect(modeler.contentBounds()).toBeUndefined();
+
+    const readOnly = viewer();
+    await readOnly.importText(orderCheckout);
+    const editing = editor();
+    await editing.importText(orderCheckout);
+    expect(readOnly.contentBounds()).toEqual(editing.contentBounds());
+    expect(readOnly.contentBounds()).toEqual(shapeBox(readOnly));
+  });
+});
+
 describe('a remote import while the user types a label', () => {
   it('reopens the label editor with the typed text on the same element', async () => {
     const modeler = editor();
