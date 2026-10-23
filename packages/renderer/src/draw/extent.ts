@@ -98,12 +98,16 @@ export function drawnShapeBox(shape: PositionedShape): DrawnBox {
 export function linkLabelBox(connection: EventStormingConnection): DrawnBox | undefined {
   if (!connection.linkLabel) return undefined;
   const anchor = linkLabelAnchor(connection);
-  const { width, ascent, descent } = linkLabelMetrics(connection.linkLabel);
-  return { x: anchor.x - width / 2, y: anchor.y - ascent, width, height: ascent + descent };
+  const { advance, left, right, ascent, descent } = linkLabelMetrics(connection.linkLabel);
+  const start = anchor.x - advance / 2;
+  return { x: start + left, y: anchor.y - ascent, width: right - left, height: ascent + descent };
 }
 
+/** Horizontal extents from the text's start, where the centred advance begins. */
 interface TextMetrics {
-  width: number;
+  advance: number;
+  left: number;
+  right: number;
   ascent: number;
   descent: number;
 }
@@ -119,13 +123,20 @@ function canvasContext(): CanvasRenderingContext2D | null {
   return measuringContext;
 }
 
-/** Measured on a 2D canvas, which needs no drawn element. */
+/**
+ * Measured on a 2D canvas, which needs no drawn element. The ink counts beside the advance: an
+ * italic the browser slants from an upright face (Geist's default import has no italic) leans
+ * about 2px past the last advance, and the SVG draws that lean.
+ */
 function linkLabelMetrics(text: string): TextMetrics {
   const collapsed = text.replace(/\s+/g, ' ').trim();
   const context = canvasContext();
   if (!context) {
+    const advance = collapsed.length * LINK_LABEL_FONT_SIZE * (STICKY_CHAR_WIDTH / FONT.label);
     return {
-      width: collapsed.length * LINK_LABEL_FONT_SIZE * (STICKY_CHAR_WIDTH / FONT.label),
+      advance,
+      left: 0,
+      right: advance,
       ascent: LINK_LABEL_FONT_SIZE,
       descent: LINK_LABEL_FONT_SIZE / 4,
     };
@@ -134,7 +145,9 @@ function linkLabelMetrics(text: string): TextMetrics {
   context.textRendering = LINK_LABEL_TEXT_RENDERING;
   const metrics = context.measureText(collapsed);
   return {
-    width: metrics.width,
+    advance: metrics.width,
+    left: Math.min(0, -metrics.actualBoundingBoxLeft),
+    right: Math.max(metrics.width, metrics.actualBoundingBoxRight),
     ascent: metrics.fontBoundingBoxAscent,
     descent: metrics.fontBoundingBoxDescent,
   };

@@ -331,23 +331,26 @@ describe('the content bounds (modeler-api 1.3)', () => {
     return { x: left, y: top, width: right - left, height: bottom - top };
   }
 
-  // The annotation stands centred between two stickies and reaches past both on the left; the
-  // tilted hotspot is the board's right and bottom edge.
+  // One annotation reaches past both stickies on the left, the other is the board's right edge,
+  // where the slant of its italic is the last thing drawn; the tilted hotspot is the bottom edge.
   const annotatedBoard = `title Annotated
 command Place Order [100, 100]
 event Order Placed [100, 400]
 hotspot Double payment on retry? [400, 400]
+command Ship Order [700, 100]
+event Order Shipped [700, 400]
 Place Order -> Order Placed; a very long arrow annotation that runs far wider than either sticky
+Ship Order -> Order Shipped; another long annotation that is the right edge of the whole board
 `;
 
-  it('cover an arrow annotation and the tilt of a hotspot, as drawn, at any zoom', async () => {
+  it('cover arrow annotations and the tilt of a hotspot, as drawn, at any zoom', async () => {
     for (const modeler of [editor(), viewer()]) {
       await modeler.importText(annotatedBoard);
       const canvas = modeler.diagram.get<Canvas>('canvas');
       canvas.zoom(1);
       const box = modeler.contentBounds()!;
       expect(box.x).toBeLessThan(0);
-      expect(box.x + box.width).toBeGreaterThan(465);
+      expect(box.x + box.width).toBeGreaterThan(765);
       expect(box.y + box.height).toBeGreaterThan(445);
 
       // Chromium lays SVG text out at the zoomed font size unless told otherwise, and on Linux

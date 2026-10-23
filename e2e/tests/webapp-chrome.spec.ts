@@ -25,13 +25,18 @@ const BROKEN_BOARD = [
   'A -> Nowhere',
 ].join('\n');
 
-/** The annotation stands between the two stickies on the left and reaches past both. */
+/**
+ * Each annotation stands between two stickies and reaches past both: the board's left edge, and its
+ * right edge, where the slant of the italic is the last thing drawn.
+ */
 const ANNOTATED_BOARD = [
   'title Annotated',
   'command Place Order [100, 100]',
   'event Order Placed [100, 400]',
-  'aggregate Far Right [1500, 250]',
+  'command Ship Order [1500, 100]',
+  'event Order Shipped [1500, 400]',
   'Place Order -> Order Placed; a very long arrow annotation that runs far wider than either sticky',
+  'Ship Order -> Order Shipped; another long annotation that is the right edge of the whole board',
 ].join('\n');
 
 /** Issue #50: valid in every field, but `event_b` lies beyond what the canvas can draw. */
@@ -124,7 +129,7 @@ test.describe('webapp: the shell web chrome and the app behind it', () => {
     await expectFittedToContentBounds(page);
   });
 
-  test('Fit to view frames an arrow annotation that reaches past every sticky', async ({
+  test('Fit to view frames the arrow annotations that reach past every sticky', async ({
     page,
   }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
