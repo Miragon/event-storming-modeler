@@ -63,7 +63,7 @@ portless service install` — see [`CONTRIBUTING.md`](CONTRIBUTING.md)). `npm ru
   window opens for ~5 s and takes the focus, the first run downloads VS Code into the OS cache;
   `VSCODE_VERSION=1.96.0` for another version, `VSCODE_SMOKE_KEEP=1` keeps VS Code's profile
   and logs, `VSCODE_SMOKE_VSIX=<file>` smokes a packaged VSIX instead of packing one. A failed
-  save is not retried (the driver, shell 0.3.2, reads it only once the tab is clean); only a run
+  save is not retried (the driver, shell 0.4.0, reads it only once the tab is clean); only a run
   whose sole failures are missed theme switches gets one retry, shown as `(retry x1)`. In CI the
   reusable [`.github/workflows/vscode-smoke.yml`](.github/workflows/vscode-smoke.yml) runs it
   (`xvfb-run -a`, engines floor and newest stable; screenshots and, for a failed run, VS Code's
