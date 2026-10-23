@@ -375,6 +375,22 @@ Ship Order -> Order Shipped; another long annotation that is the right edge of t
       expect(y + height).toBeGreaterThanOrEqual(box.y + box.height);
     }
   });
+
+  // SVG collapses only spaces, tabs and line breaks: a no-break or an ideographic space is drawn at
+  // its full width, and here the annotation of them is the board's widest thing.
+  it('measure the no-break and ideographic spaces of an annotation as drawn', async () => {
+    const modeler = editor();
+    await modeler.importText(`title Spaced
+command Place Order [100, 100]
+event Order Placed [100, 400]
+Place Order -> Order Placed; ideographic\u3000\u3000\u3000\u3000\u3000\u3000and no-break\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0spaces
+`);
+    const box = modeler.contentBounds()!;
+    const drawn = drawnBox(modeler);
+    expect(box.x).toBeLessThan(100);
+    expect(box.x).toBeCloseTo(drawn.x, 1);
+    expect(box.x + box.width).toBeCloseTo(drawn.x + drawn.width, 1);
+  });
 });
 
 describe('an annotated board imported while its font loads', () => {

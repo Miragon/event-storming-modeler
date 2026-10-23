@@ -141,12 +141,20 @@ export function linkLabelFontLoading(texts: readonly string[]): Promise<void> | 
 }
 
 /**
+ * Only what SVG collapses: a no-break or ideographic space is drawn at its full width, where `\s`
+ * would merge it away.
+ */
+function collapseWhiteSpace(text: string): string {
+  return text.replace(/[ \t\n\r]+/g, ' ').replace(/^ | $/g, '');
+}
+
+/**
  * Measured on a 2D canvas, which needs no drawn element. The ink counts beside the advance: an
  * italic the browser slants from an upright face (Geist's default import has no italic) leans
  * about 2px past the last advance, and the SVG draws that lean.
  */
 function linkLabelMetrics(text: string): TextMetrics {
-  const collapsed = text.replace(/\s+/g, ' ').trim();
+  const collapsed = collapseWhiteSpace(text);
   const context = canvasContext();
   if (!context) {
     const advance = collapsed.length * LINK_LABEL_FONT_SIZE * (STICKY_CHAR_WIDTH / FONT.label);
