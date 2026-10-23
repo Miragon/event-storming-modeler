@@ -158,17 +158,16 @@ them, it shows only in the webview's developer tools (**Developer: Open Webview 
 while the extension runs in VS Code). Keep `playwright-core` in `apps/vscode/package.json` at the
 root `playwright` version.
 
-A failed save is not retried. The driver's save step (`@miragon/modeler-shell` 0.4.0) reads the
-file only after the editor tab turned clean, which VS Code does once its write has finished, and
-only when two reads 100 ms apart agree. The parse check accepts only the fixture's board with one
-sticky more, since an empty or cut-short `.storm` file can parse without a diagnostic; anything else
-fails the save step with the counts it found
+The test is not retried: every failure fails the run at once. The driver's save step
+(`@miragon/modeler-shell` 0.4.1) reads the file only after the editor tab turned clean, which VS
+Code does once its write has finished, and only when two reads 100 ms apart agree. The parse check
+accepts only the fixture's board with one sticky more, since an empty or cut-short `.storm` file can
+parse without a diagnostic; anything else fails the save step with the counts it found
 (`save: the saved text does not parse: 6 elements and 0 arrows in 181 characters, expected 7 and 4 …`).
-The one retry, in a fresh VS Code, is for a run whose only failures are missed theme switches
-(`themes: Default High Contrast Light: the workbench never switched (no .hc-light)`): VS Code
-applies a theme once it notices that its settings file changed, and in 1 of 35 Docker runs it did
-not within the driver's 30 s. Vitest marks such a pass `(retry x1)`; every other failure fails the
-run at once.
+A theme switch VS Code does not pick up is the driver's to handle: it writes the setting again,
+then switches through another default theme and back, all within its 30 s wait, and logs each of
+these steps; a theme that still fails names the theme requested and the one VS Code shows
+(`themes: Default High Contrast Light: the workbench never switched (no .hc-light): requested Default High Contrast Light, VS Code shows Default High Contrast …`).
 
 **In CI.** [`.github/workflows/vscode-smoke.yml`](.github/workflows/vscode-smoke.yml) is a
 reusable workflow: the CI workflow calls it as the job `vscode-smoke`, so `ci-ok` waits for it (see
