@@ -175,9 +175,10 @@ export abstract class EventStormingBaseViewer {
   }
 
   /**
-   * The tight box around the board in diagram coordinates, which zoom and scroll leave alone, or
-   * `undefined` while the board has no element: what a host fits its view to (modeler-api 1.3
-   * `contentBounds`). Read from the live shapes, so an element created or moved counts at once.
+   * The tight box around what the board draws, in diagram coordinates, which zoom and scroll leave
+   * alone: every sticky, note and drawing, a hotspot with its tilt and every arrow annotation.
+   * `undefined` while the board has no element. What a host fits its view to (modeler-api 1.3
+   * `contentBounds`); read from the live canvas, so an element created or moved counts at once.
    */
   contentBounds(): Bounds | undefined {
     // A diagram not built yet, or destroyed, holds no board: asking must not build one.

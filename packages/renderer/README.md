@@ -74,10 +74,14 @@ erases the undo history without firing `commandStack.changed`, and fires `import
 largest zoom that shows all of it, never above 100%; an empty board shows at 100%. A label being
 typed when an import arrives is reopened on the same element afterwards, with the typed text.
 
-`contentBounds()` gives the tight box around everything the board draws (`{ x, y, width, height }`
-in board coordinates, which zoom and scroll leave alone), read from the live canvas, or
-`undefined` while the board has no element: a host that fits the view itself fits to it and adds
-its own margins. Unlike the importer's fit and the SVG export, it carries no padding.
+`contentBounds()` gives the tight box around what the board draws (`{ x, y, width, height }` in
+board coordinates, which zoom and scroll leave alone): every sticky, note and drawing, a hotspot
+with its tilt, and every arrow's annotation, which can reach far past the two stickies it stands
+between. It reads the live canvas and measures the annotations on a 2D canvas, so a zoom never
+changes it, and gives `undefined` while the board has no element. A host that fits the view itself
+fits to it and adds its own margins; the importer's fit and the SVG export frame the same box with
+padding. A sticky's label wider than the sticky can overhang it, since the wrapping goes by an
+estimated character width; that overhang is not part of the box.
 
 Enter or Space on a creating palette entry (a click without a pointer, `detail` 0) places the
 element in the centre of `freeArea` (the container minus the margins a host's chrome covers, or the
@@ -139,10 +143,10 @@ const viewer = createCollaborativeViewer(); // meta.editable: false, never chang
   sticky created or moved in the session has its current box. Any other id gives `undefined`. The
   viewer answers it too.
 - `contentBounds()` (contract 1.3) is the board's tight box, as on the `Modeler` and the viewers
-  above: it covers every `elements.bounds` box and the notes, drawings and arrows too, and is
-  `undefined` for a board without elements, before the first import and after `destroy()`. The
-  modeler shell's `connectDiagramJs(shell, diagram, { modeler })` fits to it. The viewer answers
-  it too.
+  above: it covers every `elements.bounds` box, the notes and drawings, a hotspot's tilt and every
+  arrow's annotation, and is `undefined` for a board without elements, before the first import and
+  after `destroy()`. The modeler shell's `connectDiagramJs(shell, diagram, { modeler })` fits to
+  it. The viewer answers it too.
 - New sticky ids are random: a sticky created on the canvas (palette, keyboard, append, paste) gets
   `<prefix>_<8 characters of [0-9a-z]>`, such as `(id event_k3x9q2ab)`, so two peers that each add
   one at the same time do not pick the same id. Ids already in a text are read as they are.

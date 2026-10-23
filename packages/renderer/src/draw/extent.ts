@@ -1,0 +1,137 @@
+import type { Point } from 'diagram-js/lib/util/Types';
+import { FONT, STICKY_CHAR_WIDTH } from './styles.js';
+import type { EventStormingConnection, EventStormingShape } from '../model/di-types.js';
+
+/** Hotspots stand out with a slight tilt (rotated around the sticky center). */
+export const HOTSPOT_ROTATION_DEG = -3;
+
+/** The arrow annotation (`; …`): small italic text centred above the arrow's midpoint. */
+export const LINK_LABEL_FONT_SIZE = 11;
+export const LINK_LABEL_RISE = 5;
+const LINK_LABEL_FONT = `italic ${LINK_LABEL_FONT_SIZE}px ${FONT.family}`;
+
+export interface DrawnBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface PositionedShape {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  eventStormingType?: unknown;
+}
+
+function centerOf(shape: PositionedShape): Point {
+  return { x: shape.x + shape.width / 2, y: shape.y + shape.height / 2 };
+}
+
+/** Point where the ray from the rect center towards `to` exits the (slightly padded) rect. */
+function rectBoundaryPoint(shape: PositionedShape, to: Point): Point {
+  const center = centerOf(shape);
+  const dx = to.x - center.x;
+  const dy = to.y - center.y;
+  if (dx === 0 && dy === 0) return center;
+  const halfWidth = shape.width / 2 + 2;
+  const halfHeight = shape.height / 2 + 2;
+  const t = Math.min(
+    dx !== 0 ? halfWidth / Math.abs(dx) : Infinity,
+    dy !== 0 ? halfHeight / Math.abs(dy) : Infinity,
+  );
+  return { x: center.x + dx * t, y: center.y + dy * t };
+}
+
+/**
+ * Connection endpoints from the CURRENT shape centers, cropped at the rectangle boundary
+ * (line ends at the sticky's edge, arrowhead visible — independent of z-order, and correct
+ * after moving, since recomputed on every render).
+ */
+export function connectionEndpoints(connection: EventStormingConnection): [Point, Point] {
+  const source = connection.source as unknown as EventStormingShape | undefined;
+  const target = connection.target as unknown as EventStormingShape | undefined;
+  const waypoints = connection.waypoints;
+  if (!source || !target) {
+    const first = waypoints[0] ?? { x: 0, y: 0 };
+    return [first, waypoints[waypoints.length - 1] ?? first];
+  }
+  const sourceCenter = centerOf(source);
+  const targetCenter = centerOf(target);
+  const start = rectBoundaryPoint(source, targetCenter);
+  const end = rectBoundaryPoint(target, sourceCenter);
+  // Overlapping stickies: fall back to the raw centers instead of crossed-over crop points.
+  const along =
+    (targetCenter.x - sourceCenter.x) * (end.x - start.x) +
+    (targetCenter.y - sourceCenter.y) * (end.y - start.y);
+  if (along <= 0) return [sourceCenter, targetCenter];
+  return [start, end];
+}
+
+/** Where the arrow annotation's baseline is centred. */
+export function linkLabelAnchor(connection: EventStormingConnection): Point {
+  const [start, end] = connectionEndpoints(connection);
+  return { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 - LINK_LABEL_RISE };
+}
+
+/** The box a shape covers on the canvas: a hotspot's tilt reaches past its own box. */
+export function drawnShapeBox(shape: PositionedShape): DrawnBox {
+  if (shape.eventStormingType !== 'hotspot') {
+    return { x: shape.x, y: shape.y, width: shape.width, height: shape.height };
+  }
+  const angle = Math.abs((HOTSPOT_ROTATION_DEG * Math.PI) / 180);
+  const width = shape.width * Math.cos(angle) + shape.height * Math.sin(angle);
+  const height = shape.width * Math.sin(angle) + shape.height * Math.cos(angle);
+  const center = centerOf(shape);
+  return { x: center.x - width / 2, y: center.y - height / 2, width, height };
+}
+
+/** The box of an arrow's annotation, `undefined` for an arrow without one. */
+export function linkLabelBox(connection: EventStormingConnection): DrawnBox | undefined {
+  if (!connection.linkLabel) return undefined;
+  const anchor = linkLabelAnchor(connection);
+  const { width, ascent, descent } = linkLabelMetrics(connection.linkLabel);
+  return { x: anchor.x - width / 2, y: anchor.y - ascent, width, height: ascent + descent };
+}
+
+interface TextMetrics {
+  width: number;
+  ascent: number;
+  descent: number;
+}
+
+let measuringContext: CanvasRenderingContext2D | null | undefined;
+
+function canvasContext(): CanvasRenderingContext2D | null {
+  // jsdom has no canvas and logs an error for every getContext call: ask only a real browser.
+  measuringContext ??=
+    typeof document !== 'undefined' && typeof CanvasRenderingContext2D !== 'undefined'
+      ? document.createElement('canvas').getContext('2d')
+      : null;
+  return measuringContext;
+}
+
+/**
+ * Measured on a 2D canvas, which lays text out at the given size whatever the zoom: Chromium lays
+ * SVG text out at the scaled font size, so a box measured on the canvas's SVG would change with
+ * every zoom.
+ */
+function linkLabelMetrics(text: string): TextMetrics {
+  const collapsed = text.replace(/\s+/g, ' ').trim();
+  const context = canvasContext();
+  if (!context) {
+    return {
+      width: collapsed.length * LINK_LABEL_FONT_SIZE * (STICKY_CHAR_WIDTH / FONT.label),
+      ascent: LINK_LABEL_FONT_SIZE,
+      descent: LINK_LABEL_FONT_SIZE / 4,
+    };
+  }
+  context.font = LINK_LABEL_FONT;
+  const metrics = context.measureText(collapsed);
+  return {
+    width: metrics.width,
+    ascent: metrics.fontBoundingBoxAscent,
+    descent: metrics.fontBoundingBoxDescent,
+  };
+}

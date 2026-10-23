@@ -59,7 +59,7 @@ interface ScreenBox {
 }
 
 interface FitFacts {
-  /** The box around every shape on the board through the current viewbox, in container px. */
+  /** The box around everything the board draws, in container px. */
   content: ScreenBox;
   /** The container minus the shell's fit insets. */
   free: ScreenBox;
@@ -72,47 +72,43 @@ interface FitPage {
   __eventStormingViewer?: FitDiagram;
   __eventStormingApp?: { shell: FitShell };
 }
-interface FitShape {
-  parent?: unknown;
-  waypoints?: unknown;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
 interface FitDiagram {
-  get(name: 'elementRegistry'): { getAll(): FitShape[] };
   get(name: 'canvas'): {
-    viewbox(): { x: number; y: number; scale: number };
+    viewbox(): { scale: number };
     getSize(): { width: number; height: number };
+    getContainer(): HTMLElement;
   };
 }
 interface FitShell {
   fitInsets(): { top: number; right: number; bottom: number; left: number };
 }
 
-/** Where the board's shapes stand in the free rectangle, in the webview or the web app. */
+/**
+ * Where the board stands in the free rectangle, in the webview or the web app. The content is
+ * read from what the canvas draws, not from the shapes: an arrow annotation can reach past every
+ * sticky.
+ */
 async function fitFacts(page: Page): Promise<FitFacts> {
   return page.evaluate(() => {
     const host = window as unknown as FitPage;
     const diagram = host.modeler?.diagram ?? host.__eventStormingViewer;
     const shell = host.shell ?? host.__eventStormingApp?.shell;
     if (!diagram || !shell) throw new Error('no board and no shell on the page');
-    const shapes = diagram
-      .get('elementRegistry')
-      .getAll()
-      .filter((element) => element.parent && !element.waypoints);
-    if (shapes.length === 0) throw new Error('the board has no shape');
     const canvas = diagram.get('canvas');
-    const { x, y, scale } = canvas.viewbox();
+    const container = canvas.getContainer();
+    const origin = container.getBoundingClientRect();
+    const drawn = [
+      ...container.querySelectorAll('.djs-shape > .djs-visual, .djs-connection > .djs-visual'),
+    ].map((visual) => visual.getBoundingClientRect());
+    if (drawn.length === 0) throw new Error('the board draws nothing');
     const size = canvas.getSize();
     const insets = shell.fitInsets();
     return {
       content: {
-        left: (Math.min(...shapes.map((shape) => shape.x)) - x) * scale,
-        top: (Math.min(...shapes.map((shape) => shape.y)) - y) * scale,
-        right: (Math.max(...shapes.map((shape) => shape.x + shape.width)) - x) * scale,
-        bottom: (Math.max(...shapes.map((shape) => shape.y + shape.height)) - y) * scale,
+        left: Math.min(...drawn.map((box) => box.left)) - origin.left,
+        top: Math.min(...drawn.map((box) => box.top)) - origin.top,
+        right: Math.max(...drawn.map((box) => box.right)) - origin.left,
+        bottom: Math.max(...drawn.map((box) => box.bottom)) - origin.top,
       },
       free: {
         left: insets.left,
@@ -120,7 +116,7 @@ async function fitFacts(page: Page): Promise<FitFacts> {
         right: size.width - insets.right,
         bottom: size.height - insets.bottom,
       },
-      zoom: scale,
+      zoom: canvas.viewbox().scale,
     };
   });
 }

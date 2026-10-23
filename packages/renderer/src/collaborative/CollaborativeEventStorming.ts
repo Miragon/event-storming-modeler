@@ -45,7 +45,10 @@ export type EventStormingElementsSurface = ElementsSurface &
 
 /** The contract surface plus the wrapped diagram for host-specific wiring. */
 export interface CollaborativeEventStormingModeler extends CollaborativeModeler {
-  /** The tight box around the board, `undefined` while it has no element (contract 1.3). */
+  /**
+   * The tight box around what the board draws, arrow annotations and a hotspot's tilt included;
+   * `undefined` while it has no element (contract 1.3).
+   */
   contentBounds(): ElementBounds | undefined;
   readonly elements: EventStormingElementsSurface;
   readonly diagram: Modeler | NavigatedViewer;

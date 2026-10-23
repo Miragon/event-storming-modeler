@@ -25,6 +25,15 @@ const BROKEN_BOARD = [
   'A -> Nowhere',
 ].join('\n');
 
+/** The annotation stands between the two stickies on the left and reaches past both. */
+const ANNOTATED_BOARD = [
+  'title Annotated',
+  'command Place Order [100, 100]',
+  'event Order Placed [100, 400]',
+  'aggregate Far Right [1500, 250]',
+  'Place Order -> Order Placed; a very long arrow annotation that runs far wider than either sticky',
+].join('\n');
+
 /** Issue #50: valid in every field, but `event_b` lies beyond what the canvas can draw. */
 const HUGE_BOARD =
   '{"schemaVersion":1,"config":{"title":"Huge"},"elements":[' +
@@ -113,6 +122,20 @@ test.describe('webapp: the shell web chrome and the app behind it', () => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await openLink(page, EXAMPLE_BOARD);
     await expectFittedToContentBounds(page);
+  });
+
+  test('Fit to view frames an arrow annotation that reaches past every sticky', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await openLink(page, ANNOTATED_BOARD);
+    // The fit on opening can run before Geist has loaded, and the annotation is set in it.
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+    });
+    await page.locator('[data-chrome="zoom"] [data-zoom="fit"]').click();
+    await expect(() => expectFittedToContentBounds(page)).toPass();
   });
 
   test('a link cut off when it was copied shows a danger toast on the start screen', async ({

@@ -306,6 +306,70 @@ describe('the content bounds (modeler-api 1.3)', () => {
     expect(readOnly.contentBounds()).toEqual(editing.contentBounds());
     expect(readOnly.contentBounds()).toEqual(shapeBox(readOnly));
   });
+
+  /**
+   * The union of what every element draws, read from the SVG at 100 %: strokes and the sticky
+   * shadow aside, as `getBBox` leaves them out.
+   */
+  function drawnBox(modeler: CollaborativeEventStormingModeler) {
+    const registry = modeler.diagram.get<ElementRegistry>('elementRegistry');
+    const root = modeler.diagram.get<Canvas>('canvas').getRootElement();
+    let left = Infinity;
+    let top = Infinity;
+    let right = -Infinity;
+    let bottom = -Infinity;
+    for (const element of registry.getAll()) {
+      if (element === root) continue;
+      const visual = registry.getGraphics(element).querySelector<SVGGElement>('.djs-visual')!;
+      const box = visual.getBBox();
+      const origin = 'waypoints' in element ? { x: 0, y: 0 } : (element as Shape);
+      left = Math.min(left, origin.x + box.x);
+      top = Math.min(top, origin.y + box.y);
+      right = Math.max(right, origin.x + box.x + box.width);
+      bottom = Math.max(bottom, origin.y + box.y + box.height);
+    }
+    return { x: left, y: top, width: right - left, height: bottom - top };
+  }
+
+  // The annotation stands centred between two stickies and reaches past both on the left; the
+  // tilted hotspot is the board's right and bottom edge.
+  const annotatedBoard = `title Annotated
+command Place Order [100, 100]
+event Order Placed [100, 400]
+hotspot Double payment on retry? [400, 400]
+Place Order -> Order Placed; a very long arrow annotation that runs far wider than either sticky
+`;
+
+  it('cover an arrow annotation and the tilt of a hotspot, as drawn, at any zoom', async () => {
+    for (const modeler of [editor(), viewer()]) {
+      await modeler.importText(annotatedBoard);
+      const canvas = modeler.diagram.get<Canvas>('canvas');
+      canvas.zoom(1);
+      const drawn = drawnBox(modeler);
+      const box = modeler.contentBounds()!;
+      expect(drawn.x).toBeLessThan(0);
+      expect(box.x).toBeCloseTo(drawn.x, 0);
+      expect(box.y).toBeCloseTo(drawn.y, 0);
+      expect(box.x + box.width).toBeCloseTo(drawn.x + drawn.width, 0);
+      expect(box.y + box.height).toBeCloseTo(drawn.y + drawn.height, 0);
+      expect(box.x + box.width).toBeGreaterThan(465);
+      expect(box.y + box.height).toBeGreaterThan(445);
+
+      canvas.zoom(0.37);
+      canvas.scroll({ dx: -420, dy: 130 });
+      expect(modeler.contentBounds()).toEqual(box);
+      canvas.zoom(3.1);
+      expect(modeler.contentBounds()).toEqual(box);
+
+      const { svg } = await modeler.diagram.saveSVG();
+      const viewBox = /viewBox="([^"]+)"/.exec(svg)?.[1] ?? '';
+      const [x = NaN, y = NaN, width = NaN, height = NaN] = viewBox.split(/\s+/).map(Number);
+      expect(x).toBeLessThanOrEqual(box.x);
+      expect(y).toBeLessThanOrEqual(box.y);
+      expect(x + width).toBeGreaterThanOrEqual(box.x + box.width);
+      expect(y + height).toBeGreaterThanOrEqual(box.y + box.height);
+    }
+  });
 });
 
 describe('a remote import while the user types a label', () => {

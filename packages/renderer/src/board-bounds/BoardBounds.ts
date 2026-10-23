@@ -1,6 +1,7 @@
 import type ElementRegistry from 'diagram-js/lib/core/ElementRegistry';
 import { DEFAULT_BOARD_SIZE } from '@miragon/event-storming-schema-model';
-import { ROOT_ID } from '../model/di-types.js';
+import { ROOT_ID, isEventStormingConnection } from '../model/di-types.js';
+import { drawnShapeBox, linkLabelBox } from '../draw/index.js';
 
 export interface Bounds {
   x: number;
@@ -16,6 +17,7 @@ interface ShapeLikeElement {
   width?: unknown;
   height?: unknown;
   waypoints?: unknown;
+  eventStormingType?: unknown;
 }
 
 function isPositionedShape(
@@ -32,9 +34,9 @@ function isPositionedShape(
 }
 
 /**
- * Content bounds of the free Event Storming canvas — no rendering, no constraint. The single
- * bounds source for the SVG export viewBox and the apps' fitView (connections always run
- * between shapes, so the shape bbox covers everything).
+ * Content bounds of the free Event Storming canvas: every shape, a hotspot with its tilt, and every
+ * arrow's annotation, which stands between two stickies and can reach far past both. The single
+ * bounds source for the SVG export viewBox, the importer's fit and `contentBounds()`.
  */
 export default class BoardBounds {
   static $inject = ['elementRegistry'];
@@ -42,17 +44,17 @@ export default class BoardBounds {
   constructor(private readonly elementRegistry: ElementRegistry) {}
 
   /**
-   * Bounding box over all elements, padded on every side. An empty board falls back to the
-   * schema-model default framing so fitView/export behave sensibly before the first sticky.
+   * Bounding box over everything the board draws, padded on every side. An empty board falls back
+   * to the schema-model default framing so fitView/export behave sensibly before the first sticky.
    */
   contentBounds(padding = 120): Bounds {
-    const shapes = this.positionedShapes();
-    if (!shapes.length) return { x: 0, y: 0, ...DEFAULT_BOARD_SIZE };
+    const boxes = this.drawnBoxes();
+    if (!boxes.length) return { x: 0, y: 0, ...DEFAULT_BOARD_SIZE };
 
-    const minX = Math.min(...shapes.map((s) => s.x));
-    const minY = Math.min(...shapes.map((s) => s.y));
-    const maxX = Math.max(...shapes.map((s) => s.x + s.width));
-    const maxY = Math.max(...shapes.map((s) => s.y + s.height));
+    const minX = Math.min(...boxes.map((box) => box.x));
+    const minY = Math.min(...boxes.map((box) => box.y));
+    const maxX = Math.max(...boxes.map((box) => box.x + box.width));
+    const maxY = Math.max(...boxes.map((box) => box.y + box.height));
     return {
       x: minX - padding,
       y: minY - padding,
@@ -64,6 +66,16 @@ export default class BoardBounds {
   /** No element on the board: `contentBounds` is only the default framing then. */
   isEmpty(): boolean {
     return this.positionedShapes().length === 0;
+  }
+
+  private drawnBoxes(): Bounds[] {
+    const boxes: Bounds[] = this.positionedShapes().map(drawnShapeBox);
+    for (const element of this.elementRegistry.getAll()) {
+      if (!isEventStormingConnection(element)) continue;
+      const label = linkLabelBox(element);
+      if (label) boxes.push(label);
+    }
+    return boxes;
   }
 
   private positionedShapes() {

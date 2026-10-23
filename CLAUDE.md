@@ -132,10 +132,11 @@ libraries to npm (with provenance) and the VS Code extension
   back whenever the parser would not derive the same id at that line; notes, drawings and arrows
   have no id grammar yet. New sticky ids are `<prefix>_<8 random [0-9a-z]>` (`allocateId`, e.g.
   `event_k3x9q2ab`), so stickies two peers add at the same time do not collide. `contentBounds()`
-  (on the contract instances and on `Modeler`/`Viewer`/`NavigatedViewer`) is the board's tight
-  box, `boardBounds.contentBounds(0)`, or `undefined` while the board has no element. A view change
-  (`setViewState`, a host's fit, scroll, zoom) never commits an open label editor: it stays open
-  and follows its element (contract L5).
+  (on the contract instances and on `Modeler`/`Viewer`/`NavigatedViewer`) is the tight box around
+  what the board draws, `boardBounds.contentBounds(0)` (every shape, a hotspot's tilt and every
+  arrow annotation, measured on a 2D canvas so no zoom changes it), or `undefined` while the board
+  has no element. A view change (`setViewState`, a host's fit, scroll, zoom) never commits an open
+  label editor: it stays open and follows its element (contract L5).
 - CI: the job `ci-ok` in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) is the merge gate;
   it fails unless every other job succeeded, so **a new CI job goes into its `needs`**. `ci-ok` and
   the PR-title check are the checks for the `main` ruleset to require, not the single jobs (see
