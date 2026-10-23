@@ -50,3 +50,96 @@ export async function typeIntoStickyLabel(page: Page): Promise<string> {
   await expect(field).toHaveValue(typed);
   return typed;
 }
+
+interface ScreenBox {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+interface FitFacts {
+  /** The box around every shape on the board through the current viewbox, in container px. */
+  content: ScreenBox;
+  /** The container minus the shell's fit insets. */
+  free: ScreenBox;
+  zoom: number;
+}
+
+interface FitPage {
+  modeler?: { diagram: FitDiagram };
+  shell?: FitShell;
+  __eventStormingViewer?: FitDiagram;
+  __eventStormingApp?: { shell: FitShell };
+}
+interface FitShape {
+  parent?: unknown;
+  waypoints?: unknown;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+interface FitDiagram {
+  get(name: 'elementRegistry'): { getAll(): FitShape[] };
+  get(name: 'canvas'): {
+    viewbox(): { x: number; y: number; scale: number };
+    getSize(): { width: number; height: number };
+  };
+}
+interface FitShell {
+  fitInsets(): { top: number; right: number; bottom: number; left: number };
+}
+
+/** Where the board's shapes stand in the free rectangle, in the webview or the web app. */
+async function fitFacts(page: Page): Promise<FitFacts> {
+  return page.evaluate(() => {
+    const host = window as unknown as FitPage;
+    const diagram = host.modeler?.diagram ?? host.__eventStormingViewer;
+    const shell = host.shell ?? host.__eventStormingApp?.shell;
+    if (!diagram || !shell) throw new Error('no board and no shell on the page');
+    const shapes = diagram
+      .get('elementRegistry')
+      .getAll()
+      .filter((element) => element.parent && !element.waypoints);
+    if (shapes.length === 0) throw new Error('the board has no shape');
+    const canvas = diagram.get('canvas');
+    const { x, y, scale } = canvas.viewbox();
+    const size = canvas.getSize();
+    const insets = shell.fitInsets();
+    return {
+      content: {
+        left: (Math.min(...shapes.map((shape) => shape.x)) - x) * scale,
+        top: (Math.min(...shapes.map((shape) => shape.y)) - y) * scale,
+        right: (Math.max(...shapes.map((shape) => shape.x + shape.width)) - x) * scale,
+        bottom: (Math.max(...shapes.map((shape) => shape.y + shape.height)) - y) * scale,
+      },
+      free: {
+        left: insets.left,
+        top: insets.top,
+        right: size.width - insets.right,
+        bottom: size.height - insets.bottom,
+      },
+      zoom: scale,
+    };
+  });
+}
+
+/**
+ * Guide §5.9: the fitted board stands centred in the free rectangle and, below 100 %, touches it
+ * on one axis, so the shell's insets are its only margin (content bounds with a padding would
+ * leave a gap).
+ */
+export async function expectFittedToContentBounds(page: Page): Promise<void> {
+  const { content, free, zoom } = await fitFacts(page);
+  expect(content.left).toBeGreaterThanOrEqual(free.left - 1);
+  expect(content.top).toBeGreaterThanOrEqual(free.top - 1);
+  expect(content.right).toBeLessThanOrEqual(free.right + 1);
+  expect(content.bottom).toBeLessThanOrEqual(free.bottom + 1);
+  expect(Math.abs(content.left + content.right - free.left - free.right)).toBeLessThan(2);
+  expect(Math.abs(content.top + content.bottom - free.top - free.bottom)).toBeLessThan(2);
+  if (zoom < 0.999) {
+    const gap = Math.min(content.left - free.left, content.top - free.top);
+    expect(gap).toBeLessThan(1);
+  }
+}

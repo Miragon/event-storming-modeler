@@ -10,7 +10,6 @@ import {
   boardMenu,
   createShortcutsDialog,
   importWarningText,
-  type BoardBounds,
   type BoardLevels,
   type ImportWarning,
   type TypeCaptions,
@@ -90,7 +89,6 @@ const registry = modeler.get<ElementRegistryLike>('elementRegistry');
 const commandStack = modeler.get<{ canUndo(): boolean }>('commandStack');
 const selection = modeler.get<SelectionLike>('selection');
 const canvas = modeler.get<CanvasLike>('canvas');
-const boardBounds = modeler.get<BoardBounds>('boardBounds');
 const levels = modeler.get<BoardLevels>('eventStormingModeling');
 const typeCaptions = modeler.get<TypeCaptions>('eventStormingViewOptions');
 // A view preference of this browser: applied before the first import, never part of the link.
@@ -152,14 +150,10 @@ const shell = mountShell(app, {
 const shortcutsDialog = createShortcutsDialog(shell, { fileKeys: true });
 modeler.on('diagram.destroy', () => shortcutsDialog.destroy());
 
-// 3. Viewport, palette skin, keys. Cheap tests only: the chrome asks on every content change.
+// 3. Viewport, palette skin, keys. A cheap test only: the chrome asks on every content change.
 const isEmpty = (): boolean =>
   !registry.getAll().some((element) => element.parent && !element.waypoints);
-const connection = connectDiagramJs(shell, modeler, {
-  isEmpty,
-  // No padding of its own: the chrome's fit insets are the only margin (guide §5.9).
-  contentBounds: () => (isEmpty() ? undefined : boardBounds.contentBounds(0)),
-});
+const connection = connectDiagramJs(shell, modeler, { modeler, isEmpty });
 const { viewport } = connection;
 
 // ---------------------------------------------------------------------------

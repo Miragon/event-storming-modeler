@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { ICONS, type ShellIconName } from '@miragon/modeler-shell';
 import { EMPTY_BOARD, withExampleInserted } from '../../../apps/vscode/src/examples.js';
+import { expectFittedToContentBounds } from '../support/shell-kit.js';
 import {
   openWebview,
   postFromHost,
@@ -263,6 +264,11 @@ test.describe('VS Code webview: protocol and chrome', () => {
 
     await postFromHost(page, { type: 'problems', count: 0, errors: 0 });
     await expect(pill).toBeHidden();
+  });
+
+  test('the board opens fitted, the fit insets its only margin', async ({ page }) => {
+    await openWebview(page);
+    await expectFittedToContentBounds(page);
   });
 
   test('the fitView command fits the board again after a zoom', async ({ page }) => {

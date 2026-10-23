@@ -5,7 +5,6 @@ import {
   boardMenu,
   createCollaborativeModeler,
   createShortcutsDialog,
-  type BoardBounds,
   type BoardLevels,
   type CollaborativeEventStormingModeler,
   type EventStormingReadOnly,
@@ -68,7 +67,6 @@ const modeler = collaborative.diagram;
 modeler.get('canvas');
 const registry = modeler.get<ElementRegistryLike>('elementRegistry');
 const selection = modeler.get<SelectionLike>('selection');
-const boardBounds = modeler.get<BoardBounds>('boardBounds');
 const typeCaptions = modeler.get<TypeCaptions>('eventStormingViewOptions');
 const levels = modeler.get<BoardLevels>('eventStormingModeling');
 const canvasLock = modeler.get<EventStormingReadOnly>('eventStormingReadOnly');
@@ -100,14 +98,10 @@ const shell = mountVsCodeShell(app, {
 const shortcutsDialog = createShortcutsDialog(shell);
 modeler.on('diagram.destroy', () => shortcutsDialog.destroy());
 
-// Cheap tests only: the shell asks on every content change, and exportMap() validates the board.
+// A cheap test only: the shell asks on every content change, and exportMap() validates the board.
 const isEmpty = (): boolean =>
   !registry.getAll().some((element) => element.parent && !element.waypoints);
-const connection = connectDiagramJs(shell, modeler, {
-  isEmpty,
-  // No padding of its own: the shell's fit insets are the only margin.
-  contentBounds: () => (isEmpty() ? undefined : boardBounds.contentBounds(0)),
-});
+const connection = connectDiagramJs(shell, modeler, { modeler: collaborative, isEmpty });
 const { viewport } = connection;
 persistView(vscode, viewport);
 

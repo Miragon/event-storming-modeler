@@ -193,7 +193,9 @@ shell-skinned palette wears the shell's look alone. **Renderers never import the
 the apps (and `e2e/`) do; `packages/*` reaching `@miragon/modeler-shell` fails ESLint and
 dependency-cruiser. Both pass the shell's fit insets as `freeArea: { insets }` (the modeler-api
 factory option, for keyboard creation from the palette; `freeRectInsets` is its deprecated
-alias); the webview runs on `createCollaborativeModeler` (the tested contract path) and toggles
+alias) and connect with `connectDiagramJs(shell, diagram, { modeler, isEmpty })`, so the shell
+fits to the renderer's `contentBounds()` (the webview passes its contract instance, the web app
+its `Modeler`); the webview runs on `createCollaborativeModeler` (the tested contract path) and toggles
 the renderer's `eventStormingReadOnly` lock together with `shell.setReadOnly`, the web app keeps
 the canvas's undo keys and replaces a board with an undo toast instead of a confirmation. The
 VSIX ships `apps/vscode/THIRD_PARTY_NOTICES.md`, generated from the bundles

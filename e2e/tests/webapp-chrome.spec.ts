@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { EXAMPLE_BOARD } from '../../apps/webapp/src/example.js';
 import { encodeMapCompressed } from '../../apps/webapp/src/share.js';
+import { expectFittedToContentBounds } from './support/shell-kit.js';
 import {
   exportBoard,
   exportDSL,
@@ -104,6 +105,14 @@ test.describe('webapp: the shell web chrome and the app behind it', () => {
     await expect(startScreen(page)).toBeHidden();
     expect((await exportBoard(page)).config.title).toBe('Order Checkout');
     await expect(page.locator('[data-chrome="primary"]')).toBeVisible();
+  });
+
+  test('a shared link opens fitted to the board, the fit insets its only margin', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await openLink(page, EXAMPLE_BOARD);
+    await expectFittedToContentBounds(page);
   });
 
   test('a link cut off when it was copied shows a danger toast on the start screen', async ({
