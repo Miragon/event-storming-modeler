@@ -136,9 +136,10 @@ libraries to npm (with provenance) and the VS Code extension
   what the board draws, `boardBounds.contentBounds(0)` (every shape, a hotspot's tilt and every
   arrow annotation, measured on a 2D canvas so no zoom changes it, and drawn with
   `text-rendering: geometricPrecision` so that the drawn text does not change with the zoom either),
-  or `undefined` while the board has no element. A view change (`setViewState`, a host's fit,
-  scroll, zoom) never commits an open label editor: it stays open and follows its element
-  (contract L5).
+  or `undefined` while the board has no element. An annotated board is imported only once the
+  annotation font has loaded, imports staying in call order, so every fit on import measures it in
+  that font. A view change (`setViewState`, a host's fit, scroll, zoom) never commits an open label
+  editor: it stays open and follows its element (contract L5).
 - CI: the job `ci-ok` in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) is the merge gate;
   it fails unless every other job succeeded, so **a new CI job goes into its `needs`**. `ci-ok` and
   the PR-title check are the checks for the `main` ruleset to require, not the single jobs (see

@@ -1,7 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 import { EXAMPLE_BOARD } from '../../apps/webapp/src/example.js';
 import { encodeMapCompressed } from '../../apps/webapp/src/share.js';
-import { expectFittedToContentBounds } from './support/shell-kit.js';
+import {
+  ANNOTATED_BOARD,
+  delayGeist,
+  expectFittedToContentBounds,
+  geistDrawsAnnotations,
+} from './support/shell-kit.js';
 import {
   exportBoard,
   exportDSL,
@@ -23,20 +28,6 @@ const BROKEN_BOARD = [
   'event A [100, 100]',
   'event B [abc, 20]',
   'A -> Nowhere',
-].join('\n');
-
-/**
- * Each annotation stands between two stickies and reaches past both: the board's left edge, and its
- * right edge, where the slant of the italic is the last thing drawn.
- */
-const ANNOTATED_BOARD = [
-  'title Annotated',
-  'command Place Order [100, 100]',
-  'event Order Placed [100, 400]',
-  'command Ship Order [1500, 100]',
-  'event Order Shipped [1500, 400]',
-  'Place Order -> Order Placed; a very long arrow annotation that runs far wider than either sticky',
-  'Ship Order -> Order Shipped; another long annotation that is the right edge of the whole board',
 ].join('\n');
 
 /** Issue #50: valid in every field, but `event_b` lies beyond what the canvas can draw. */
@@ -129,16 +120,25 @@ test.describe('webapp: the shell web chrome and the app behind it', () => {
     await expectFittedToContentBounds(page);
   });
 
+  test('a shared link opens fitted to its arrow annotations, though Geist arrives late', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.setViewportSize({ width: 1280, height: 800 });
+    const delayedFonts = await delayGeist(page);
+    await openLink(page, ANNOTATED_BOARD);
+    expect(delayedFonts()).toBeGreaterThan(0);
+    expect(await geistDrawsAnnotations(page)).toBe(true);
+    await expectFittedToContentBounds(page);
+  });
+
   test('Fit to view frames the arrow annotations that reach past every sticky', async ({
     page,
   }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.setViewportSize({ width: 1280, height: 800 });
     await openLink(page, ANNOTATED_BOARD);
-    // The fit on opening can run before Geist has loaded, and the annotation is set in it.
-    await page.evaluate(async () => {
-      await document.fonts.ready;
-    });
+    await page.locator('[data-chrome="zoom"] [data-zoom="in"]').click();
     await page.locator('[data-chrome="zoom"] [data-zoom="fit"]').click();
     await expect(() => expectFittedToContentBounds(page)).toPass();
   });

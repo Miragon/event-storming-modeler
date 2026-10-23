@@ -13,6 +13,7 @@ import type BoardBounds from './board-bounds/BoardBounds.js';
 import type { Bounds } from './board-bounds/BoardBounds.js';
 import type EventStormingLabelEditing from './label-editing/EventStormingLabelEditing.js';
 import { ROOT_ID, type ImportWarning } from './io/types.js';
+import { linkLabelFontLoading } from './draw/extent.js';
 import {
   resolveFreeArea,
   type FreeArea,
@@ -65,6 +66,10 @@ function assertNoEngineIds(board: EventStormingBoard): void {
   }
 }
 
+function annotationTexts(board: EventStormingBoard): string[] {
+  return board.edges.flatMap((edge) => (edge.label ? [edge.label] : []));
+}
+
 function sizeToCss(value: number | string): string {
   return typeof value === 'number' ? `${value}px` : value;
 }
@@ -82,6 +87,8 @@ export abstract class EventStormingBaseViewer {
   private _diagram: Diagram | undefined;
   private readonly _container: HTMLElement;
   private readonly _options: EventStormingViewerOptions;
+  /** The last import still waiting for its turn; a later one queues behind it. */
+  private _waitingImport: Promise<unknown> | undefined;
 
   constructor(options: EventStormingViewerOptions = {}) {
     this._options = options;
@@ -122,7 +129,10 @@ export abstract class EventStormingBaseViewer {
     this.get<EventBus>('eventBus').off(event, callback);
   }
 
-  /** Load a board into the canvas (replaces existing content). */
+  /**
+   * Load a board into the canvas (replaces existing content). Resolves once the board stands
+   * fitted on its final content box: an annotated board waits for its annotations' font first.
+   */
   async importMap(board: EventStormingBoard): Promise<{ warnings: ImportWarning[] }> {
     const diagram = this._ensureDiagram();
     const eventBus = diagram.get<EventBus>('eventBus');
@@ -131,6 +141,12 @@ export abstract class EventStormingBaseViewer {
     // A board straight from code skips loadBoard; its import would stop at the first shape the SVG
     // transforms cannot hold, after the previous board was cleared.
     assertDrawable(board);
+    const turn = this._importTurn(board);
+    if (turn) {
+      await turn;
+      if (this._waitingImport === turn) this._waitingImport = undefined;
+      if (this._diagram !== diagram) throw new Error('The viewer was destroyed during the import.');
+    }
     const labelEditing = diagram.get<EventStormingLabelEditing>('eventStormingLabelEditing', false);
     labelEditing?.suspend();
     diagram.get<PopupMenu>('popupMenu', false)?.close();
@@ -144,6 +160,22 @@ export abstract class EventStormingBaseViewer {
     eventBus.fire('import.done', { warnings });
     labelEditing?.resumeAfterImport();
     return { warnings };
+  }
+
+  /**
+   * What an import waits for, `undefined` when it can run at once. The fit on import (the
+   * importer's and every host's after it) frames the annotations as measured, so they are measured
+   * in their own font, not in the fallback a board opened before it loaded would get; imports
+   * still run in call order, the waiting one before a later one that would not have to wait.
+   */
+  private _importTurn(board: EventStormingBoard): Promise<unknown> | undefined {
+    const waits = [this._waitingImport, linkLabelFontLoading(annotationTexts(board))].filter(
+      (wait) => wait !== undefined,
+    );
+    if (waits.length === 0) return undefined;
+    const turn = Promise.all(waits);
+    this._waitingImport = turn;
+    return turn;
   }
 
   /** Load `.storm` DSL text (internally parse -> importMap). Parser findings land in the warnings. */

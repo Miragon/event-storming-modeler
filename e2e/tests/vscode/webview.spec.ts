@@ -1,7 +1,12 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { ICONS, type ShellIconName } from '@miragon/modeler-shell';
 import { EMPTY_BOARD, withExampleInserted } from '../../../apps/vscode/src/examples.js';
-import { expectFittedToContentBounds } from '../support/shell-kit.js';
+import {
+  ANNOTATED_BOARD,
+  delayGeist,
+  expectFittedToContentBounds,
+  geistDrawsAnnotations,
+} from '../support/shell-kit.js';
 import {
   openWebview,
   postFromHost,
@@ -268,6 +273,16 @@ test.describe('VS Code webview: protocol and chrome', () => {
 
   test('the board opens fitted, the fit insets its only margin', async ({ page }) => {
     await openWebview(page);
+    await expectFittedToContentBounds(page);
+  });
+
+  test('a board opens fitted to its arrow annotations, though Geist arrives late', async ({
+    page,
+  }) => {
+    const delayedFonts = await delayGeist(page);
+    await openWebview(page, { text: ANNOTATED_BOARD });
+    expect(delayedFonts()).toBeGreaterThan(0);
+    expect(await geistDrawsAnnotations(page)).toBe(true);
     await expectFittedToContentBounds(page);
   });
 

@@ -377,6 +377,45 @@ Ship Order -> Order Shipped; another long annotation that is the right edge of t
   });
 });
 
+describe('an annotated board imported while its font loads', () => {
+  const faces: FontFace[] = [];
+
+  afterEach(() => {
+    for (const face of faces.splice(0)) document.fonts.delete(face);
+  });
+
+  /** No font at all: it fails to load, as a blocked or broken file would. */
+  function loadingAnnotationFont(): FontFace {
+    const face = new FontFace('Geist Variable', 'url(data:font/woff2;base64,AAAA)');
+    document.fonts.add(face);
+    faces.push(face);
+    return face;
+  }
+
+  it('waits until the font has settled, even failed, and later imports wait their turn', async () => {
+    const face = loadingAnnotationFont();
+    const modeler = editor();
+    const fontAtImport: string[] = [];
+    modeler.diagram.on('import.done', () => fontAtImport.push(face.status));
+
+    const annotated = modeler.importText(orderCheckout);
+    const plain = modeler.importText('title Plain\nevent Only [0, 0]\n');
+    expect(ids(modeler)).toEqual([]);
+    await Promise.all([annotated, plain]);
+
+    expect(fontAtImport).toEqual(['error', 'error']);
+    expect(modeler.exportText()).toMatch(/^title Plain$/m);
+  });
+
+  it('rejects when the modeler is destroyed while the import waits', async () => {
+    loadingAnnotationFont();
+    const modeler = editor();
+    const importing = modeler.importText(orderCheckout);
+    modeler.destroy();
+    await expect(importing).rejects.toThrow('destroyed');
+  });
+});
+
 describe('a remote import while the user types a label', () => {
   it('reopens the label editor with the typed text on the same element', async () => {
     const modeler = editor();

@@ -71,7 +71,10 @@ listener already handled (`defaultPrevented`) and keys typed into text fields ar
 the canvas container gets no `tabindex` of its own. Cmd/Ctrl+A selects the whole board. An import
 erases the undo history without firing `commandStack.changed`, and fires `import.parse.start`,
 `import.render.start` and `import.done` in that order. It frames the content centred at the
-largest zoom that shows all of it, never above 100%; an empty board shows at 100%. A label being
+largest zoom that shows all of it, never above 100%; an empty board shows at 100%. A board with
+arrow annotations is imported once the font they are set in has loaded (or failed to), so that the
+fit on import, and a host's fit after the import resolves, frame them as drawn and not as the
+fallback font would set them; imports still run in the order they were called. A label being
 typed when an import arrives is reopened on the same element afterwards, with the typed text.
 
 `contentBounds()` gives the tight box around what the board draws (`{ x, y, width, height }` in

@@ -51,6 +51,39 @@ export async function typeIntoStickyLabel(page: Page): Promise<string> {
   return typed;
 }
 
+/**
+ * Each annotation stands between two stickies and reaches past both: the board's left edge, and its
+ * right edge, where the slant of the italic is the last thing drawn.
+ */
+export const ANNOTATED_BOARD = [
+  'title Annotated',
+  'command Place Order [100, 100]',
+  'event Order Placed [100, 400]',
+  'command Ship Order [1500, 100]',
+  'event Order Shipped [1500, 400]',
+  'Place Order -> Order Placed; a very long arrow annotation that runs far wider than either sticky',
+  'Ship Order -> Order Shipped; another long annotation that is the right edge of the whole board',
+].join('\n');
+
+/**
+ * Holds every Geist file the page asks for back by a second, as a slow network would, so that a
+ * board opens before the font it measures its annotations in. Gives how many it held back.
+ */
+export async function delayGeist(page: Page): Promise<() => number> {
+  let delayed = 0;
+  await page.route(/geist.*\.woff2/i, async (route) => {
+    delayed += 1;
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await route.continue();
+  });
+  return () => delayed;
+}
+
+/** Whether the annotations are drawn in Geist by now, not in the fallback. */
+export function geistDrawsAnnotations(page: Page): Promise<boolean> {
+  return page.evaluate(() => document.fonts.check('italic 11px "Geist Variable"', 'annotation'));
+}
+
 interface ScreenBox {
   left: number;
   top: number;

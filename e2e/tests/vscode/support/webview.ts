@@ -27,6 +27,8 @@ export interface OpenOptions {
   size?: { width: number; height: number };
   requested?: Appearance;
   board?: 'example' | 'empty';
+  /** A document text of its own instead of `board`. */
+  text?: string;
 }
 
 /** Opens the webview as VS Code would and resolves once the first `init` import has settled. */
@@ -34,6 +36,7 @@ export async function openWebview(page: Page, options: OpenOptions = {}): Promis
   await page.setViewportSize(options.size ?? WIDE);
   const search = new URLSearchParams(vsCodeStubSearch(options.requested ?? LIGHT));
   if (options.board === 'empty') search.set('board', 'empty');
+  if (options.text !== undefined) search.set('text', options.text);
   await page.goto(`/webview-test.html?${search.toString()}`);
   await page.waitForFunction(() => window.webviewReady === true);
 }

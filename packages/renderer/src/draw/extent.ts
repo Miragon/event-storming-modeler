@@ -124,6 +124,23 @@ function canvasContext(): CanvasRenderingContext2D | null {
 }
 
 /**
+ * Resolves once the font faces the annotations `texts` are set in have loaded (or failed to);
+ * `undefined` when none is pending. Their box is measured in that font: before it arrives, the
+ * fallback's widths, several px off, would be what a fit frames.
+ */
+export function linkLabelFontLoading(texts: readonly string[]): Promise<void> | undefined {
+  if (texts.length === 0 || typeof document === 'undefined' || !('fonts' in document)) {
+    return undefined;
+  }
+  const sample = texts.join(' ');
+  if (document.fonts.check(LINK_LABEL_FONT, sample)) return undefined;
+  return document.fonts.load(LINK_LABEL_FONT, sample).then(
+    () => undefined,
+    () => undefined,
+  );
+}
+
+/**
  * Measured on a 2D canvas, which needs no drawn element. The ink counts beside the advance: an
  * italic the browser slants from an upright face (Geist's default import has no italic) leans
  * about 2px past the last advance, and the SVG draws that lean.
