@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/Miragon/event-storming-modeler/compare/webapp-v0.6.0...webapp-v0.6.1) (2026-10-23)
+
+
+### Bug Fixes
+
+* **deps:** adopt modeler-shell 0.4.1, whose VS Code driver retries a missed theme switch ([#62](https://github.com/Miragon/event-storming-modeler/issues/62)) ([e564e9d](https://github.com/Miragon/event-storming-modeler/commit/e564e9dbb54ad48168d467240a4e4eb23a17f76b))
+
 ## [0.6.0](https://github.com/Miragon/event-storming-modeler/compare/webapp-v0.5.1...webapp-v0.6.0) (2026-10-23)
 
 
