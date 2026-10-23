@@ -185,8 +185,8 @@ run passes again. The release smokes the VSIX it is about to upload: each job th
 VS Code Marketplace or Open VSX packages the extension, runs `npm run test:vscode` under
 `xvfb-run -a` with `VSCODE_SMOKE_VSIX` set to that file (newest stable VS Code), and publishes only
 when it passes; the release workflow's dry run does the same. When that smoke fails, its screenshots
-and VS Code's logs are uploaded as the artifact `release-smoke-vscode-marketplace`,
-`release-smoke-open-vsx` or `release-smoke-dry-run`.
+and VS Code's logs are uploaded as the artifact `vscode-smoke-marketplace`, `vscode-smoke-open-vsx`
+or `vscode-smoke-dry-run`.
 
 ## CI and the merge gate
 
