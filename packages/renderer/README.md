@@ -57,7 +57,7 @@ chrome covers, or `{ center: () => ({ x, y }) }`, the free centre in diagram coo
 (`undefined` while there is none). `freeArea`, `fitOnImport` and `undoRedoKeys` are the names of
 the [`@miragon/modeler-api`](https://www.npmjs.com/package/@miragon/modeler-api) factory options
 (contract 1.2), the same for every Miragon renderer. `freeRectInsets: () => insets`, the earlier
-name of `freeArea: { insets }`, is deprecated and still accepted until the next minor release;
+name of `freeArea: { insets }`, is deprecated: still accepted through 0.5.x and removed in 0.6.0;
 given both, `freeArea` wins. Pass `fitOnImport: false` when the host sets the view after every
 import itself.
 
@@ -153,7 +153,8 @@ const viewer = createCollaborativeViewer(); // meta.editable: false, never chang
 - `diagram` is the wrapped `Modeler` or `NavigatedViewer`, for everything outside the contract.
   `createCollaborativeModeler` and `createCollaborativeViewer` accept the same options:
   `additionalModules`, `fitOnImport`, and for the modeler `undoRedoKeys` and `freeArea` (the
-  viewer ignores those two); the deprecated `freeRectInsets` still works for one minor release.
+  viewer ignores those two); the deprecated `freeRectInsets` still works through 0.5.x and goes
+  in 0.6.0.
 - After `destroy()`, `exportText()` returns the last state and `importText()` rejects.
 
 #### Migrating a host

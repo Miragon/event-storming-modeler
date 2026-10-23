@@ -39,8 +39,8 @@ export interface EventStormingViewerOptions {
    */
   freeArea?: FreeArea | undefined;
   /**
-   * @deprecated Pass `freeArea: { insets }` instead. Accepted until the next minor release;
-   * `freeArea` wins when both are given.
+   * @deprecated Pass `freeArea: { insets }` instead. Accepted through renderer 0.5.x and removed
+   * in 0.6.0; `freeArea` wins when both are given.
    */
   freeRectInsets?: (() => FreeRectInsets) | undefined;
   /**
