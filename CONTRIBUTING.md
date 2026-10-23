@@ -170,12 +170,12 @@ job of the same name runs on `ubuntu-24.04` under `xvfb-run -a` (VS Code needs a
 against the floor of `engines.vscode` (read from `apps/vscode/package.json` at run time) and once
 against the newest stable release, passing each version as `VSCODE_VERSION`. The download is
 cached per VS Code version. The screenshots are uploaded as the artifacts `vscode-smoke-minimum` and
-`vscode-smoke-stable`, and VS Code's logs (the job runs with `VSCODE_SMOKE_KEEP=1`) as
-`vscode-smoke-minimum-logs` and `vscode-smoke-stable-logs`, each for 7 days. It calls
-`npm run test:vscode` on the runner, not the Docker command: the runner already has an X server and
-VS Code's libraries, and `actions/cache` keeps each VS Code version between runs, while the Docker
-command would build its image, install the dependencies a second time and download VS Code again on
-every run, since a hosted runner keeps neither images nor volumes.
+`vscode-smoke-stable`, and, when a run failed, VS Code's logs (the job runs with
+`VSCODE_SMOKE_KEEP=1`) as `vscode-smoke-logs-minimum` or `vscode-smoke-logs-stable`, each for 7
+days. It calls `npm run test:vscode` on the runner, not the Docker command: the runner already has
+an X server and VS Code's libraries, and `actions/cache` keeps each VS Code version between runs,
+while the Docker command would build its image, install the dependencies a second time and download
+VS Code again on every run, since a hosted runner keeps neither images nor volumes.
 
 [`.github/workflows/vscode-smoke-weekly.yml`](.github/workflows/vscode-smoke-weekly.yml) calls the
 same workflow every Monday, because a new VS Code arrives without a commit here, and on demand
@@ -209,9 +209,10 @@ and starts VS Code only when one of these paths changed: `package-lock.json`, an
 `apps/vscode/**`, `packages/**` (the extension bundles the packages' sources),
 `tsconfig.base.json` (esbuild compiles both bundles with its options), `vitest.config.ts` (the
 smoke's Vitest project), `.github/actions/setup/**`, `ci.yml`, `vscode-smoke.yml` or
-`vscode-smoke-weekly.yml`. A missing or all-zero base, a base it cannot fetch, the weekly schedule
-and a manual run always start it. When it skips VS Code, the job `skipped` succeeds with a notice
-that says why, so `ci-ok` sees `vscode-smoke` succeed or fail, never skip.
+`vscode-smoke-weekly.yml`. A moved file counts under its old and its new path, so moving a file out
+of `apps/vscode/**` starts it too. A missing or all-zero base, a base it cannot fetch, the weekly
+schedule and a manual run always start it. When it skips VS Code, the job `skipped` succeeds with a
+notice, so `ci-ok` sees `vscode-smoke` succeed or fail, never skip.
 
 Dependabot groups minor and patch updates of npm packages and auto-merges them once the checks
 pass, except updates of `@miragon/modeler-*` (the group `modeler-platform`): a 0.x minor of the

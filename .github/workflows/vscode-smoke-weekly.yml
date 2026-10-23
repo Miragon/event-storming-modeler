@@ -1,8 +1,7 @@
 name: VS Code smoke weekly
 
-# A new VS Code release lands without a commit here, so nothing else would start the smoke against
-# it. A failed run opens a tracking issue (or comments on the open one): a scheduled run's failure
-# mails nobody but the person who last edited the cron.
+# A new VS Code release can break the extension without any change here, and GitHub tells only the
+# last editor of the cron line about a failed scheduled run, so a failure opens a tracking issue.
 on:
   schedule:
     - cron: '41 5 * * 1'
@@ -20,8 +19,9 @@ jobs:
     if: failure()
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # Here and not in the called workflow: GitHub rejects a called workflow whose jobs ask for more
-    # than the caller grants, even when the job would be skipped.
+    # Here and not in vscode-smoke.yml: GitHub rejects a called workflow whose jobs ask for more
+    # permissions than the caller grants, even for a job that would be skipped, and CI grants only
+    # contents: read.
     permissions:
       issues: write
     steps:
@@ -34,15 +34,15 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
-          number="$(gh issue list --state open --limit 500 --json number,title |
-            jq -r --arg title "$TITLE" 'map(select(.title == $title)) | first | .number // empty')"
+          number=$(gh issue list --state open --limit 500 --json number,title \
+            --jq 'map(select(.title == env.TITLE)) | first | .number // empty')
           if [[ -n "$number" ]]; then
-            gh issue comment "$number" --body "The weekly VS Code smoke failed again: $RUN_URL"
+            gh issue comment "$number" --body "The weekly run failed again: $RUN_URL"
             echo "Commented on #$number"
           else
-            body="$(printf '%s\n\n%s\n\n%s' \
+            body=$(printf '%s\n\n%s\n\n%s' \
               "The weekly VS Code smoke failed: $RUN_URL" \
-              "It runs the packaged extension in the newest stable VS Code and in the oldest one engines.vscode accepts. The run's artifacts hold the screenshots and VS Code's logs of both versions." \
-              "Close this issue once a run passes again; the next failure opens a new one.")"
+              "It runs the packaged extension in the newest stable VS Code and in the oldest one engines.vscode accepts. The run's artifacts hold a screenshot per theme and, for a failed run, VS Code's logs." \
+              "Close this issue once the smoke passes again; the next failure opens a new one.")
             gh issue create --title "$TITLE" --body "$body"
           fi

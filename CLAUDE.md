@@ -66,7 +66,8 @@ portless service install` — see [`CONTRIBUTING.md`](CONTRIBUTING.md)). `npm ru
   save is not retried (the driver, shell 0.3.2, reads it only once the tab is clean); only a run
   whose sole failures are missed theme switches gets one retry, shown as `(retry x1)`. In CI the
   reusable [`.github/workflows/vscode-smoke.yml`](.github/workflows/vscode-smoke.yml) runs it
-  (`xvfb-run -a`, engines floor and newest stable; screenshots and VS Code's logs as artifacts):
+  (`xvfb-run -a`, engines floor and newest stable; screenshots and, for a failed run, VS Code's
+  logs as artifacts):
   as the CI job `vscode-smoke`, which starts VS Code only when a path the VSIX or the smoke
   depends on changed, weekly through `vscode-smoke-weekly.yml` (a failure opens a tracking
   issue), and in the release on the VSIX it publishes. Details in
