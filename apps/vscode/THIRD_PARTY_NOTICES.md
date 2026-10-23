@@ -245,7 +245,7 @@ FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
 OTHER DEALINGS IN THE FONT SOFTWARE.
 ```
 
-## @miragon/modeler-api 1.2.0 (MIT)
+## @miragon/modeler-api 1.3.0 (MIT)
 
 ```text
 MIT License
@@ -271,7 +271,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @miragon/modeler-shell 0.3.2 (MIT)
+## @miragon/modeler-shell 0.4.0 (MIT)
 
 ```text
 MIT License

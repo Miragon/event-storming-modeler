@@ -19,3 +19,4 @@ export {
   type NoteLine,
   type NoteRun,
 } from './note-markdown.js';
+export { drawnShapeBox, linkLabelBox, type DrawnBox } from './extent.js';

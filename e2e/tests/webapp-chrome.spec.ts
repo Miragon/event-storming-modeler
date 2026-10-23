@@ -2,6 +2,12 @@ import { expect, test, type Page } from '@playwright/test';
 import { EXAMPLE_BOARD } from '../../apps/webapp/src/example.js';
 import { encodeMapCompressed } from '../../apps/webapp/src/share.js';
 import {
+  ANNOTATED_BOARD,
+  delayGeist,
+  expectFittedToContentBounds,
+  geistDrawsAnnotations,
+} from './support/shell-kit.js';
+import {
   exportBoard,
   exportDSL,
   openExample,
@@ -104,6 +110,37 @@ test.describe('webapp: the shell web chrome and the app behind it', () => {
     await expect(startScreen(page)).toBeHidden();
     expect((await exportBoard(page)).config.title).toBe('Order Checkout');
     await expect(page.locator('[data-chrome="primary"]')).toBeVisible();
+  });
+
+  test('a shared link opens fitted to the board, the fit insets its only margin', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await openLink(page, EXAMPLE_BOARD);
+    await expectFittedToContentBounds(page);
+  });
+
+  test('a shared link opens fitted to its arrow annotations, though Geist arrives late', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.setViewportSize({ width: 1280, height: 800 });
+    const delayedFonts = await delayGeist(page);
+    await openLink(page, ANNOTATED_BOARD);
+    expect(delayedFonts()).toBeGreaterThan(0);
+    expect(await geistDrawsAnnotations(page)).toBe(true);
+    await expectFittedToContentBounds(page);
+  });
+
+  test('Fit to view frames the arrow annotations that reach past every sticky', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await openLink(page, ANNOTATED_BOARD);
+    await page.locator('[data-chrome="zoom"] [data-zoom="in"]').click();
+    await page.locator('[data-chrome="zoom"] [data-zoom="fit"]').click();
+    await expect(() => expectFittedToContentBounds(page)).toPass();
   });
 
   test('a link cut off when it was copied shows a danger toast on the start screen', async ({

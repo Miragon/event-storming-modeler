@@ -33,8 +33,8 @@ export interface CollaborativeEventStormingOptions extends CollaborativeModelerO
   /** Appended to the renderer's own modules (e.g. a host's chrome module). */
   additionalModules?: ModuleDeclaration[] | undefined;
   /**
-   * @deprecated Pass `freeArea: { insets }` instead. Accepted until the next minor release;
-   * `freeArea` wins when both are given.
+   * @deprecated Pass `freeArea: { insets }` instead. Accepted through renderer 0.5.x and removed
+   * in 0.6.0; `freeArea` wins when both are given.
    */
   freeRectInsets?: (() => FreeRectInsets) | undefined;
 }
@@ -45,6 +45,11 @@ export type EventStormingElementsSurface = ElementsSurface &
 
 /** The contract surface plus the wrapped diagram for host-specific wiring. */
 export interface CollaborativeEventStormingModeler extends CollaborativeModeler {
+  /**
+   * The tight box around what the board draws, arrow annotations and a hotspot's tilt included;
+   * `undefined` while it has no element (contract 1.3).
+   */
+  contentBounds(): ElementBounds | undefined;
   readonly elements: EventStormingElementsSurface;
   readonly diagram: Modeler | NavigatedViewer;
 }
@@ -190,6 +195,9 @@ function collaborative(
     setViewState(state) {
       if (destroyed || !isViewState(state)) return;
       canvas.viewbox({ x: state.x, y: state.y, width: state.width, height: state.height });
+    },
+    contentBounds() {
+      return diagram.contentBounds();
     },
     destroy() {
       if (destroyed) return;

@@ -63,7 +63,7 @@ portless service install` — see [`CONTRIBUTING.md`](CONTRIBUTING.md)). `npm ru
   window opens for ~5 s and takes the focus, the first run downloads VS Code into the OS cache;
   `VSCODE_VERSION=1.96.0` for another version, `VSCODE_SMOKE_KEEP=1` keeps VS Code's profile
   and logs, `VSCODE_SMOKE_VSIX=<file>` smokes a packaged VSIX instead of packing one. A failed
-  save is not retried (the driver, shell 0.3.2, reads it only once the tab is clean); only a run
+  save is not retried (the driver, shell 0.4.0, reads it only once the tab is clean); only a run
   whose sole failures are missed theme switches gets one retry, shown as `(retry x1)`. In CI the
   reusable [`.github/workflows/vscode-smoke.yml`](.github/workflows/vscode-smoke.yml) runs it
   (`xvfb-run -a`, engines floor and newest stable; screenshots and, for a failed run, VS Code's
@@ -120,7 +120,7 @@ libraries to npm (with provenance) and the VS Code extension
   diagnostics). Install once with `/plugin marketplace add Miragon/event-storming-modeler` and
   `/plugin install event-storming-modeler@event-storming`; the skill files are readable directly
   under `plugins/event-storming-modeler/skills/` either way.
-- The renderer implements the collaborative-modeler contract 1.2
+- The renderer implements the collaborative-modeler contract 1.3
   [`@miragon/modeler-api`](https://www.npmjs.com/package/@miragon/modeler-api)
   (`createCollaborativeModeler` / `createCollaborativeViewer`, notation `event-storming`, in
   [`packages/renderer/src/collaborative/`](packages/renderer/src/collaborative/)); its conformance
@@ -131,9 +131,15 @@ libraries to npm (with provenance) and the VS Code extension
   (`elements.bounds`): their ids survive a save and re-open because the serializer writes `(id …)`
   back whenever the parser would not derive the same id at that line; notes, drawings and arrows
   have no id grammar yet. New sticky ids are `<prefix>_<8 random [0-9a-z]>` (`allocateId`, e.g.
-  `event_k3x9q2ab`), so stickies two peers add at the same time do not collide. A view change
-  (`setViewState`, a host's fit, scroll, zoom) never commits an open label editor: it stays open
-  and follows its element (contract L5).
+  `event_k3x9q2ab`), so stickies two peers add at the same time do not collide. `contentBounds()`
+  (on the contract instances and on `Modeler`/`Viewer`/`NavigatedViewer`) is the tight box around
+  what the board draws, `boardBounds.contentBounds(0)` (every shape, a hotspot's tilt and every
+  arrow annotation, measured on a 2D canvas so no zoom changes it, and drawn with
+  `text-rendering: geometricPrecision` so that the drawn text does not change with the zoom either),
+  or `undefined` while the board has no element. An annotated board is imported only once the
+  annotation font has loaded, imports staying in call order, so every fit on import measures it in
+  that font. A view change (`setViewState`, a host's fit, scroll, zoom) never commits an open label
+  editor: it stays open and follows its element (contract L5).
 - CI: the job `ci-ok` in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) is the merge gate;
   it fails unless every other job succeeded, so **a new CI job goes into its `needs`**. `ci-ok` and
   the PR-title check are the checks for the `main` ruleset to require, not the single jobs (see
@@ -191,7 +197,9 @@ shell-skinned palette wears the shell's look alone. **Renderers never import the
 the apps (and `e2e/`) do; `packages/*` reaching `@miragon/modeler-shell` fails ESLint and
 dependency-cruiser. Both pass the shell's fit insets as `freeArea: { insets }` (the modeler-api
 factory option, for keyboard creation from the palette; `freeRectInsets` is its deprecated
-alias); the webview runs on `createCollaborativeModeler` (the tested contract path) and toggles
+alias) and connect with `connectDiagramJs(shell, diagram, { modeler, isEmpty })`, so the shell
+fits to the renderer's `contentBounds()` (the webview passes its contract instance, the web app
+its `Modeler`); the webview runs on `createCollaborativeModeler` (the tested contract path) and toggles
 the renderer's `eventStormingReadOnly` lock together with `shell.setReadOnly`, the web app keeps
 the canvas's undo keys and replaces a board with an undo toast instead of a confirmation. The
 VSIX ships `apps/vscode/THIRD_PARTY_NOTICES.md`, generated from the bundles

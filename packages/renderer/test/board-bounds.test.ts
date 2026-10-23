@@ -49,4 +49,63 @@ describe('BoardBounds.contentBounds', () => {
     ]).contentBounds(0);
     expect(bounds).toEqual({ x: -300, y: -100, width: 130, height: 90 });
   });
+
+  it('covers the tilt of a hotspot, which reaches past its own box', () => {
+    const bounds = boundsFor([
+      { id: 'hotspot_a', eventStormingType: 'hotspot', x: 0, y: 0, width: 130, height: 90 },
+    ]).contentBounds(0);
+    const angle = (3 * Math.PI) / 180;
+    const width = 130 * Math.cos(angle) + 90 * Math.sin(angle);
+    const height = 130 * Math.sin(angle) + 90 * Math.cos(angle);
+    expect(bounds.x).toBeCloseTo(65 - width / 2, 9);
+    expect(bounds.y).toBeCloseTo(45 - height / 2, 9);
+    expect(bounds.width).toBeCloseTo(width, 9);
+    expect(bounds.height).toBeCloseTo(height, 9);
+    expect(bounds.width).toBeGreaterThan(130);
+    expect(bounds.height).toBeGreaterThan(90);
+  });
+
+  it('covers an arrow annotation wider than the stickies it runs between', () => {
+    const command = {
+      id: 'command_a',
+      eventStormingType: 'command',
+      x: 0,
+      y: 0,
+      width: 130,
+      height: 90,
+    };
+    const event = {
+      id: 'event_b',
+      eventStormingType: 'event',
+      x: 0,
+      y: 300,
+      width: 130,
+      height: 90,
+    };
+    const annotated = {
+      id: 'arrow_1',
+      eventStormingType: 'arrow',
+      waypoints: [
+        { x: 65, y: 45 },
+        { x: 65, y: 345 },
+      ],
+      source: command,
+      target: event,
+      linkLabel: 'a very long arrow annotation that runs far wider than either sticky',
+    };
+    const bounds = boundsFor([command, event, annotated]).contentBounds(0);
+    expect(bounds.x).toBeLessThan(0);
+    expect(bounds.x + bounds.width).toBeGreaterThan(130);
+    expect(bounds.x + bounds.width / 2).toBeCloseTo(65, 9);
+    expect(bounds.y).toBe(0);
+    expect(bounds.y + bounds.height).toBe(390);
+
+    const plain = { ...annotated, linkLabel: undefined };
+    expect(boundsFor([command, event, plain]).contentBounds(0)).toEqual({
+      x: 0,
+      y: 0,
+      width: 130,
+      height: 390,
+    });
+  });
 });

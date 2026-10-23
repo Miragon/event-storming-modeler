@@ -246,6 +246,192 @@ describe('the elements surface', () => {
   });
 });
 
+describe('the content bounds (modeler-api 1.3)', () => {
+  /** The tight box around every shape on the canvas, read from the registry. */
+  function shapeBox(modeler: CollaborativeEventStormingModeler) {
+    const root = modeler.diagram.get<Canvas>('canvas').getRootElement();
+    const shapes = modeler.diagram
+      .get<ElementRegistry>('elementRegistry')
+      .filter((element) => element !== root && !('waypoints' in element)) as Shape[];
+    const left = Math.min(...shapes.map((shape) => shape.x));
+    const top = Math.min(...shapes.map((shape) => shape.y));
+    const right = Math.max(...shapes.map((shape) => shape.x + shape.width));
+    const bottom = Math.max(...shapes.map((shape) => shape.y + shape.height));
+    return { x: left, y: top, width: right - left, height: bottom - top };
+  }
+
+  // The fixture's dashed frame and its note reach further than any sticky: the box is the whole
+  // board, not only what `elements` lists, and without padding, since the host's fit adds the
+  // only margin.
+  it('frame every shape tightly, live after a new sticky, whatever the zoom', async () => {
+    const modeler = editor();
+    expect(modeler.contentBounds()).toBeUndefined();
+    await modeler.importText(orderCheckout);
+    const imported = shapeBox(modeler);
+    expect(modeler.contentBounds()).toEqual(imported);
+    expect(imported.x).toBe(40);
+    for (const { id } of modeler.elements.list()) {
+      const box = modeler.elements.bounds(id)!;
+      expect(box.x).toBeGreaterThanOrEqual(imported.x);
+      expect(box.y).toBeGreaterThanOrEqual(imported.y);
+      expect(box.x + box.width).toBeLessThanOrEqual(imported.x + imported.width);
+      expect(box.y + box.height).toBeLessThanOrEqual(imported.y + imported.height);
+    }
+
+    const created = addDomainEvent(modeler);
+    const grown = shapeBox(modeler);
+    expect(grown).not.toEqual(imported);
+    expect(modeler.contentBounds()).toEqual(grown);
+    expect(grown.x + grown.width).toBe(created.x + created.width);
+    expect(grown.y + grown.height).toBe(created.y + created.height);
+
+    const canvas = modeler.diagram.get<Canvas>('canvas');
+    canvas.zoom(2.5);
+    canvas.scroll({ dx: 300, dy: -120 });
+    expect(modeler.contentBounds()).toEqual(grown);
+    modeler.setViewState({ x: 120, y: 80, width: 640, height: 480 });
+    expect(modeler.contentBounds()).toEqual(grown);
+  });
+
+  it('report none for a board without elements, and the viewer the same box', async () => {
+    const modeler = editor();
+    await modeler.importText(orderCheckout);
+    await modeler.importText('title Empty\nlevel process\n');
+    expect(modeler.contentBounds()).toBeUndefined();
+
+    const readOnly = viewer();
+    await readOnly.importText(orderCheckout);
+    const editing = editor();
+    await editing.importText(orderCheckout);
+    expect(readOnly.contentBounds()).toEqual(editing.contentBounds());
+    expect(readOnly.contentBounds()).toEqual(shapeBox(readOnly));
+  });
+
+  /**
+   * The union of what every element draws, read from the SVG in board coordinates, whatever the
+   * zoom: strokes and the sticky shadow aside, as `getBBox` leaves them out.
+   */
+  function drawnBox(modeler: CollaborativeEventStormingModeler) {
+    const registry = modeler.diagram.get<ElementRegistry>('elementRegistry');
+    const root = modeler.diagram.get<Canvas>('canvas').getRootElement();
+    let left = Infinity;
+    let top = Infinity;
+    let right = -Infinity;
+    let bottom = -Infinity;
+    for (const element of registry.getAll()) {
+      if (element === root) continue;
+      const visual = registry.getGraphics(element).querySelector<SVGGElement>('.djs-visual')!;
+      const box = visual.getBBox();
+      const origin = 'waypoints' in element ? { x: 0, y: 0 } : (element as Shape);
+      left = Math.min(left, origin.x + box.x);
+      top = Math.min(top, origin.y + box.y);
+      right = Math.max(right, origin.x + box.x + box.width);
+      bottom = Math.max(bottom, origin.y + box.y + box.height);
+    }
+    return { x: left, y: top, width: right - left, height: bottom - top };
+  }
+
+  // One annotation reaches past both stickies on the left, the other is the board's right edge,
+  // where the slant of its italic is the last thing drawn; the tilted hotspot is the bottom edge.
+  const annotatedBoard = `title Annotated
+command Place Order [100, 100]
+event Order Placed [100, 400]
+hotspot Double payment on retry? [400, 400]
+command Ship Order [700, 100]
+event Order Shipped [700, 400]
+Place Order -> Order Placed; a very long arrow annotation that runs far wider than either sticky
+Ship Order -> Order Shipped; another long annotation that is the right edge of the whole board
+`;
+
+  it('cover arrow annotations and the tilt of a hotspot, as drawn, at any zoom', async () => {
+    for (const modeler of [editor(), viewer()]) {
+      await modeler.importText(annotatedBoard);
+      const canvas = modeler.diagram.get<Canvas>('canvas');
+      canvas.zoom(1);
+      const box = modeler.contentBounds()!;
+      expect(box.x).toBeLessThan(0);
+      expect(box.x + box.width).toBeGreaterThan(765);
+      expect(box.y + box.height).toBeGreaterThan(445);
+
+      // Chromium lays SVG text out at the zoomed font size unless told otherwise, and on Linux
+      // with whole-pixel advances: an annotation drawn that way leaves the box at most zooms.
+      for (const zoom of [1, 0.37, 0.745, 3.1]) {
+        canvas.zoom(zoom);
+        canvas.scroll({ dx: -42, dy: 13 });
+        expect(modeler.contentBounds()).toEqual(box);
+        const drawn = drawnBox(modeler);
+        expect(box.x).toBeCloseTo(drawn.x, 1);
+        expect(box.y).toBeCloseTo(drawn.y, 1);
+        expect(box.x + box.width).toBeCloseTo(drawn.x + drawn.width, 1);
+        expect(box.y + box.height).toBeCloseTo(drawn.y + drawn.height, 1);
+      }
+
+      const { svg } = await modeler.diagram.saveSVG();
+      const viewBox = /viewBox="([^"]+)"/.exec(svg)?.[1] ?? '';
+      const [x = NaN, y = NaN, width = NaN, height = NaN] = viewBox.split(/\s+/).map(Number);
+      expect(x).toBeLessThanOrEqual(box.x);
+      expect(y).toBeLessThanOrEqual(box.y);
+      expect(x + width).toBeGreaterThanOrEqual(box.x + box.width);
+      expect(y + height).toBeGreaterThanOrEqual(box.y + box.height);
+    }
+  });
+
+  // SVG collapses only spaces, tabs and line breaks: a no-break or an ideographic space is drawn at
+  // its full width, and here the annotation of them is the board's widest thing.
+  it('measure the no-break and ideographic spaces of an annotation as drawn', async () => {
+    const modeler = editor();
+    await modeler.importText(`title Spaced
+command Place Order [100, 100]
+event Order Placed [100, 400]
+Place Order -> Order Placed; ideographic\u3000\u3000\u3000\u3000\u3000\u3000and no-break\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0spaces
+`);
+    const box = modeler.contentBounds()!;
+    const drawn = drawnBox(modeler);
+    expect(box.x).toBeLessThan(100);
+    expect(box.x).toBeCloseTo(drawn.x, 1);
+    expect(box.x + box.width).toBeCloseTo(drawn.x + drawn.width, 1);
+  });
+});
+
+describe('an annotated board imported while its font loads', () => {
+  const faces: FontFace[] = [];
+
+  afterEach(() => {
+    for (const face of faces.splice(0)) document.fonts.delete(face);
+  });
+
+  /** No font at all: it fails to load, as a blocked or broken file would. */
+  function loadingAnnotationFont(): FontFace {
+    const face = new FontFace('Geist Variable', 'url(data:font/woff2;base64,AAAA)');
+    document.fonts.add(face);
+    faces.push(face);
+    return face;
+  }
+
+  it('waits until the font has settled, even failed, and later imports wait their turn', async () => {
+    const face = loadingAnnotationFont();
+    const modeler = editor();
+    const fontAtImport: string[] = [];
+    modeler.diagram.on('import.done', () => fontAtImport.push(face.status));
+
+    const annotated = modeler.importText(orderCheckout);
+    const plain = modeler.importText('title Plain\nevent Only [0, 0]\n');
+    expect(ids(modeler)).toEqual([]);
+    await Promise.all([annotated, plain]);
+
+    expect(fontAtImport).toEqual(['error', 'error']);
+    expect(modeler.exportText()).toMatch(/^title Plain$/m);
+  });
+
+  it('rejects when the modeler is destroyed while the import waits', async () => {
+    loadingAnnotationFont();
+    const modeler = editor();
+    const importing = modeler.importText(orderCheckout);
+    modeler.destroy();
+    await expect(importing).rejects.toThrow('destroyed');
+  });
+});
+
 describe('a remote import while the user types a label', () => {
   it('reopens the label editor with the typed text on the same element', async () => {
     const modeler = editor();

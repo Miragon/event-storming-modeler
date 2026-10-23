@@ -39,7 +39,7 @@ export type { FreeArea };
 
 export interface EventStormingPaletteConfig {
   freeArea?: FreeArea | undefined;
-  /** @deprecated Pass `freeArea: { insets }` instead; accepted until the next minor release. */
+  /** @deprecated Pass `freeArea: { insets }` instead; accepted through 0.5.x, removed in 0.6.0. */
   freeRectInsets?: (() => FreeRectInsets) | undefined;
 }
 

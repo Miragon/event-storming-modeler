@@ -63,13 +63,20 @@ package sources (no build needed):
 | `vscode-webview` | the VS Code webview inside the shell's VS Code stub (`e2e/webview/`) | 5190 (`E2E_WEBVIEW_PORT`) |
 
 Both projects run `@miragon/modeler-shell`'s conformance kit: `vscode-webview` on the `ide` host
-(geometry, ARIA, keys, the focus hand-back after a pointer click on chrome, keyboard creation,
-the read-only lock of an invalid file, appearance, cleanup), `webapp` on the `web` host (the same
-plus primary action, legal line, start screen, toasts, problems list and drop zone). The harnesses
-declare what Event Storming lacks `absent` (the legend and the inspector; in the web app also the
-invalid-file state), and any skip fails the suite. Next to the kit run the webview's protocol and
-chrome specs and the web app's own (`webapp-chrome.spec.ts`: share link, replace with undo, open,
-drop, exports, app keys, Delete after a click on + or a palette entry). Run one project with
+(geometry, the legend's start state, ARIA, keys, the focus hand-back after a pointer click on
+chrome, keyboard creation, a sticky's label editor that the shell's zoom, fit and refit leave open
+and uncommitted, the read-only lock of an invalid file, appearance, cleanup), `webapp` on the `web`
+host (the same plus the focus after a File action, primary action, legal line, start screen,
+toasts, problems list and drop zone). The harnesses declare what Event Storming lacks `absent`
+(the legend and the inspector; in the web app also the invalid-file state and a problem row that
+selects an element, since its problems name lines, never elements; in the webview a menu action
+that hands the focus to the canvas, since its Model group holds only the Level radios and the Type
+captions checkbox), and any skip fails the suite. Both lead the kit's sizes with 1600 × 900, where
+the example fits whole at 100 % (the reason is in
+[`e2e/tests/support/shell-kit.ts`](e2e/tests/support/shell-kit.ts)). Next to the kit run the
+webview's protocol and chrome specs and the web app's own (`webapp-chrome.spec.ts`: share link,
+the fit to what the board draws, replace with undo, open, drop, exports, app keys, Delete after a
+click on + or a palette entry). Run one project with
 `npm run test:e2e -- --project=vscode-webview`. Locally an already running server on a port is
 reused, so pick free ports (`E2E_PORT=5387 E2E_WEBVIEW_PORT=5397 npm run test:e2e`) when another
 app occupies 5180 or 5190.
@@ -151,7 +158,7 @@ them, it shows only in the webview's developer tools (**Developer: Open Webview 
 while the extension runs in VS Code). Keep `playwright-core` in `apps/vscode/package.json` at the
 root `playwright` version.
 
-A failed save is not retried. The driver's save step (`@miragon/modeler-shell` 0.3.2) reads the
+A failed save is not retried. The driver's save step (`@miragon/modeler-shell` 0.4.0) reads the
 file only after the editor tab turned clean, which VS Code does once its write has finished, and
 only when two reads 100 ms apart agree. The parse check accepts only the fixture's board with one
 sticky more, since an empty or cut-short `.storm` file can parse without a diagnostic; anything else

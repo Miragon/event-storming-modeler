@@ -31,6 +31,7 @@ Place Order -> Order Placed`);
 const board = viewer.exportMap(); // canonical JSON model
 const dsl = viewer.exportDSL(); // back to .storm text
 const { svg } = await viewer.saveSVG();
+const box = viewer.contentBounds(); // the board's tight box, undefined while it is empty
 ```
 
 Swap `NavigatedViewer` for `Modeler` to get the editable board (sticky palette, context pad,
@@ -56,7 +57,7 @@ chrome covers, or `{ center: () => ({ x, y }) }`, the free centre in diagram coo
 (`undefined` while there is none). `freeArea`, `fitOnImport` and `undoRedoKeys` are the names of
 the [`@miragon/modeler-api`](https://www.npmjs.com/package/@miragon/modeler-api) factory options
 (contract 1.2), the same for every Miragon renderer. `freeRectInsets: () => insets`, the earlier
-name of `freeArea: { insets }`, is deprecated and still accepted until the next minor release;
+name of `freeArea: { insets }`, is deprecated: still accepted through 0.5.x and removed in 0.6.0;
 given both, `freeArea` wins. Pass `fitOnImport: false` when the host sets the view after every
 import itself.
 
@@ -70,8 +71,23 @@ listener already handled (`defaultPrevented`) and keys typed into text fields ar
 the canvas container gets no `tabindex` of its own. Cmd/Ctrl+A selects the whole board. An import
 erases the undo history without firing `commandStack.changed`, and fires `import.parse.start`,
 `import.render.start` and `import.done` in that order. It frames the content centred at the
-largest zoom that shows all of it, never above 100%; an empty board shows at 100%. A label being
+largest zoom that shows all of it, never above 100%; an empty board shows at 100%. A board with
+arrow annotations is imported once the font they are set in has loaded (or failed to), so that the
+fit on import, and a host's fit after the import resolves, frame them as drawn and not as the
+fallback font would set them; imports still run in the order they were called. A label being
 typed when an import arrives is reopened on the same element afterwards, with the typed text.
+
+`contentBounds()` gives the tight box around what the board draws (`{ x, y, width, height }` in
+board coordinates, which zoom and scroll leave alone): every sticky, note and drawing, a hotspot
+with its tilt, and every arrow's annotation, which can reach far past the two stickies it stands
+between. It reads the live canvas and measures the annotations on a 2D canvas, so a zoom never
+changes it, and gives `undefined` while the board has no element. The annotations are drawn with
+`text-rendering: geometricPrecision`, as they are measured: without it Chromium lays SVG text out
+at the zoomed font size, and where it rounds glyph advances to whole pixels (Linux) the drawn text
+grows and shrinks with the zoom. A host that fits the view itself fits to it and adds its own
+margins; the importer's fit and the SVG export frame the same box with padding. A sticky's label
+wider than the sticky can overhang it, since the wrapping goes by an estimated character width;
+that overhang is not part of the box.
 
 Enter or Space on a creating palette entry (a click without a pointer, `detail` 0) places the
 element in the centre of `freeArea` (the container minus the margins a host's chrome covers, or the
@@ -90,7 +106,7 @@ drawing keeps literal light colours in its SVG attributes, so exports look the s
 
 ### Collaborative hosts
 
-The package implements the collaborative-modeler contract 1.2 of
+The package implements the collaborative-modeler contract 1.3 of
 [`@miragon/modeler-api`](https://www.npmjs.com/package/@miragon/modeler-api) (notation
 `event-storming`) and runs its conformance kit in CI, every case and no advisory:
 
@@ -132,13 +148,19 @@ const viewer = createCollaborativeViewer(); // meta.editable: false, never chang
   top-left corner and the size, which zoom and scroll leave alone), read from the live canvas: a
   sticky created or moved in the session has its current box. Any other id gives `undefined`. The
   viewer answers it too.
+- `contentBounds()` (contract 1.3) is the board's tight box, as on the `Modeler` and the viewers
+  above: it covers every `elements.bounds` box, the notes and drawings, a hotspot's tilt and every
+  arrow's annotation, and is `undefined` for a board without elements, before the first import and
+  after `destroy()`. The modeler shell's `connectDiagramJs(shell, diagram, { modeler })` fits to
+  it. The viewer answers it too.
 - New sticky ids are random: a sticky created on the canvas (palette, keyboard, append, paste) gets
   `<prefix>_<8 characters of [0-9a-z]>`, such as `(id event_k3x9q2ab)`, so two peers that each add
   one at the same time do not pick the same id. Ids already in a text are read as they are.
 - `diagram` is the wrapped `Modeler` or `NavigatedViewer`, for everything outside the contract.
   `createCollaborativeModeler` and `createCollaborativeViewer` accept the same options:
   `additionalModules`, `fitOnImport`, and for the modeler `undoRedoKeys` and `freeArea` (the
-  viewer ignores those two); the deprecated `freeRectInsets` still works for one minor release.
+  viewer ignores those two); the deprecated `freeRectInsets` still works through 0.5.x and goes
+  in 0.6.0.
 - After `destroy()`, `exportText()` returns the last state and `importText()` rejects.
 
 #### Migrating a host

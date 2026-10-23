@@ -18,5 +18,12 @@ void webview.ready.then(() => {
   window.webviewReady = true;
 });
 
-const board = new URLSearchParams(location.search).get('board');
-window.postMessage({ type: 'init', text: board === 'empty' ? EMPTY_BOARD : EXAMPLE_BOARD }, '*');
+const search = new URLSearchParams(location.search);
+const board = search.get('board');
+window.postMessage(
+  {
+    type: 'init',
+    text: search.get('text') ?? (board === 'empty' ? EMPTY_BOARD : EXAMPLE_BOARD),
+  },
+  '*',
+);

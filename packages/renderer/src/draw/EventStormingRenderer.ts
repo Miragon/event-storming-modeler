@@ -17,6 +17,13 @@ import {
 } from './styles.js';
 import { parseNoteMarkdown, type NoteLine, type NoteRun } from './note-markdown.js';
 import {
+  HOTSPOT_ROTATION_DEG,
+  LINK_LABEL_FONT_SIZE,
+  LINK_LABEL_TEXT_RENDERING,
+  connectionEndpoints,
+  linkLabelAnchor,
+} from './extent.js';
+import {
   isEventStormingConnection,
   isEventStormingShape,
   isStickyKind,
@@ -27,9 +34,6 @@ import type EventStormingViewOptions from '../view-options/EventStormingViewOpti
 
 /** BaseRenderer default is 1000; 1500 wins the render.shape/render.connection event. */
 const RENDER_PRIORITY = 1500;
-
-/** Hotspots stand out with a slight tilt (rotated around the sticky center). */
-const HOTSPOT_ROTATION_DEG = -3;
 
 /** Class of the small kind caption at a sticky's bottom (selector contract for tests/e2e). */
 export const KIND_CAPTION_CLASS = 'event-storming-kind-caption';
@@ -193,7 +197,7 @@ export default class EventStormingRenderer extends BaseRenderer {
 
   override drawConnection(visuals: SVGElement, element: ConnectionLike): SVGElement {
     const conn = element as unknown as EventStormingConnection;
-    const [start, end] = endpoints(conn);
+    const [start, end] = connectionEndpoints(conn);
 
     const path = svgAttr(svgCreate('polyline'), {
       points: `${start.x},${start.y} ${end.x},${end.y}`,
@@ -207,14 +211,14 @@ export default class EventStormingRenderer extends BaseRenderer {
 
     // Arrow annotation (`; …`) at the midpoint.
     if (conn.linkLabel) {
-      const mx = (start.x + end.x) / 2;
-      const my = (start.y + end.y) / 2;
+      const anchor = linkLabelAnchor(conn);
       svgAppend(
         visuals,
-        label(conn.linkLabel, mx, my - 5, {
+        label(conn.linkLabel, anchor.x, anchor.y, {
           'text-anchor': 'middle',
-          'font-size': 11,
+          'font-size': LINK_LABEL_FONT_SIZE,
           'font-style': 'italic',
+          'text-rendering': LINK_LABEL_TEXT_RENDERING,
           fill: COLORS.inkSoft,
         }),
       );
@@ -481,46 +485,4 @@ function connectionArrow(from: Point, to: Point, color: string, len = 10, w = 5)
     `${bx - w * Math.sin(angle)},${by + w * Math.cos(angle)} ` +
     `${bx + w * Math.sin(angle)},${by - w * Math.cos(angle)}`;
   return svgAttr(svgCreate('polygon'), { points, fill: color });
-}
-
-function centerOf(s: EventStormingShape): Point {
-  return { x: s.x + s.width / 2, y: s.y + s.height / 2 };
-}
-
-/** Point where the ray from the rect center towards `to` exits the (slightly padded) rect. */
-function rectBoundaryPoint(s: EventStormingShape, to: Point): Point {
-  const c = centerOf(s);
-  const dx = to.x - c.x;
-  const dy = to.y - c.y;
-  if (dx === 0 && dy === 0) return c;
-  const halfW = s.width / 2 + 2;
-  const halfH = s.height / 2 + 2;
-  const t = Math.min(
-    dx !== 0 ? halfW / Math.abs(dx) : Infinity,
-    dy !== 0 ? halfH / Math.abs(dy) : Infinity,
-  );
-  return { x: c.x + dx * t, y: c.y + dy * t };
-}
-
-/**
- * Connection endpoints from the CURRENT shape centers, cropped at the rectangle boundary
- * (line ends at the sticky's edge, arrowhead visible — independent of z-order, and correct
- * after moving, since recomputed on every render).
- */
-function endpoints(conn: EventStormingConnection): [Point, Point] {
-  const s = conn.source as unknown as EventStormingShape | undefined;
-  const t = conn.target as unknown as EventStormingShape | undefined;
-  const wp = conn.waypoints;
-  if (!s || !t) {
-    const a = wp[0] ?? { x: 0, y: 0 };
-    return [a, wp[wp.length - 1] ?? a];
-  }
-  const sc = centerOf(s);
-  const tc = centerOf(t);
-  const start = rectBoundaryPoint(s, tc);
-  const end = rectBoundaryPoint(t, sc);
-  // Overlapping stickies: fall back to the raw centers instead of crossed-over crop points.
-  const along = (tc.x - sc.x) * (end.x - start.x) + (tc.y - sc.y) * (end.y - start.y);
-  if (along <= 0) return [sc, tc];
-  return [start, end];
 }
