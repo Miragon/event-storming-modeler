@@ -308,8 +308,8 @@ describe('the content bounds (modeler-api 1.3)', () => {
   });
 
   /**
-   * The union of what every element draws, read from the SVG at 100 %: strokes and the sticky
-   * shadow aside, as `getBBox` leaves them out.
+   * The union of what every element draws, read from the SVG in board coordinates, whatever the
+   * zoom: strokes and the sticky shadow aside, as `getBBox` leaves them out.
    */
   function drawnBox(modeler: CollaborativeEventStormingModeler) {
     const registry = modeler.diagram.get<ElementRegistry>('elementRegistry');
@@ -345,21 +345,23 @@ Place Order -> Order Placed; a very long arrow annotation that runs far wider th
       await modeler.importText(annotatedBoard);
       const canvas = modeler.diagram.get<Canvas>('canvas');
       canvas.zoom(1);
-      const drawn = drawnBox(modeler);
       const box = modeler.contentBounds()!;
-      expect(drawn.x).toBeLessThan(0);
-      expect(box.x).toBeCloseTo(drawn.x, 0);
-      expect(box.y).toBeCloseTo(drawn.y, 0);
-      expect(box.x + box.width).toBeCloseTo(drawn.x + drawn.width, 0);
-      expect(box.y + box.height).toBeCloseTo(drawn.y + drawn.height, 0);
+      expect(box.x).toBeLessThan(0);
       expect(box.x + box.width).toBeGreaterThan(465);
       expect(box.y + box.height).toBeGreaterThan(445);
 
-      canvas.zoom(0.37);
-      canvas.scroll({ dx: -420, dy: 130 });
-      expect(modeler.contentBounds()).toEqual(box);
-      canvas.zoom(3.1);
-      expect(modeler.contentBounds()).toEqual(box);
+      // Chromium lays SVG text out at the zoomed font size unless told otherwise, and on Linux
+      // with whole-pixel advances: an annotation drawn that way leaves the box at most zooms.
+      for (const zoom of [1, 0.37, 0.745, 3.1]) {
+        canvas.zoom(zoom);
+        canvas.scroll({ dx: -42, dy: 13 });
+        expect(modeler.contentBounds()).toEqual(box);
+        const drawn = drawnBox(modeler);
+        expect(box.x).toBeCloseTo(drawn.x, 1);
+        expect(box.y).toBeCloseTo(drawn.y, 1);
+        expect(box.x + box.width).toBeCloseTo(drawn.x + drawn.width, 1);
+        expect(box.y + box.height).toBeCloseTo(drawn.y + drawn.height, 1);
+      }
 
       const { svg } = await modeler.diagram.saveSVG();
       const viewBox = /viewBox="([^"]+)"/.exec(svg)?.[1] ?? '';

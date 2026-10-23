@@ -78,10 +78,13 @@ typed when an import arrives is reopened on the same element afterwards, with th
 board coordinates, which zoom and scroll leave alone): every sticky, note and drawing, a hotspot
 with its tilt, and every arrow's annotation, which can reach far past the two stickies it stands
 between. It reads the live canvas and measures the annotations on a 2D canvas, so a zoom never
-changes it, and gives `undefined` while the board has no element. A host that fits the view itself
-fits to it and adds its own margins; the importer's fit and the SVG export frame the same box with
-padding. A sticky's label wider than the sticky can overhang it, since the wrapping goes by an
-estimated character width; that overhang is not part of the box.
+changes it, and gives `undefined` while the board has no element. The annotations are drawn with
+`text-rendering: geometricPrecision`, as they are measured: without it Chromium lays SVG text out
+at the zoomed font size, and where it rounds glyph advances to whole pixels (Linux) the drawn text
+grows and shrinks with the zoom. A host that fits the view itself fits to it and adds its own
+margins; the importer's fit and the SVG export frame the same box with padding. A sticky's label
+wider than the sticky can overhang it, since the wrapping goes by an estimated character width;
+that overhang is not part of the box.
 
 Enter or Space on a creating palette entry (a click without a pointer, `detail` 0) places the
 element in the centre of `freeArea` (the container minus the margins a host's chrome covers, or the

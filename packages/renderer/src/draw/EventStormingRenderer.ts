@@ -19,6 +19,7 @@ import { parseNoteMarkdown, type NoteLine, type NoteRun } from './note-markdown.
 import {
   HOTSPOT_ROTATION_DEG,
   LINK_LABEL_FONT_SIZE,
+  LINK_LABEL_TEXT_RENDERING,
   connectionEndpoints,
   linkLabelAnchor,
 } from './extent.js';
@@ -217,6 +218,7 @@ export default class EventStormingRenderer extends BaseRenderer {
           'text-anchor': 'middle',
           'font-size': LINK_LABEL_FONT_SIZE,
           'font-style': 'italic',
+          'text-rendering': LINK_LABEL_TEXT_RENDERING,
           fill: COLORS.inkSoft,
         }),
       );

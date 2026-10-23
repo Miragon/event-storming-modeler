@@ -8,6 +8,13 @@ export const HOTSPOT_ROTATION_DEG = -3;
 /** The arrow annotation (`; …`): small italic text centred above the arrow's midpoint. */
 export const LINK_LABEL_FONT_SIZE = 11;
 export const LINK_LABEL_RISE = 5;
+/**
+ * Chromium lays SVG text out at the zoomed font size and, where it snaps glyph advances to whole
+ * pixels (Linux), the annotation's width changes with the zoom, by up to a fifth. With geometric
+ * precision it lays the text out at its own size and scales the glyphs, so the canvas measure,
+ * taken with the same setting, holds at every zoom.
+ */
+export const LINK_LABEL_TEXT_RENDERING = 'geometricPrecision';
 const LINK_LABEL_FONT = `italic ${LINK_LABEL_FONT_SIZE}px ${FONT.family}`;
 
 export interface DrawnBox {
@@ -112,11 +119,7 @@ function canvasContext(): CanvasRenderingContext2D | null {
   return measuringContext;
 }
 
-/**
- * Measured on a 2D canvas, which lays text out at the given size whatever the zoom: Chromium lays
- * SVG text out at the scaled font size, so a box measured on the canvas's SVG would change with
- * every zoom.
- */
+/** Measured on a 2D canvas, which needs no drawn element. */
 function linkLabelMetrics(text: string): TextMetrics {
   const collapsed = text.replace(/\s+/g, ' ').trim();
   const context = canvasContext();
@@ -128,6 +131,7 @@ function linkLabelMetrics(text: string): TextMetrics {
     };
   }
   context.font = LINK_LABEL_FONT;
+  context.textRendering = LINK_LABEL_TEXT_RENDERING;
   const metrics = context.measureText(collapsed);
   return {
     width: metrics.width,
