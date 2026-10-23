@@ -1,6 +1,6 @@
 {
   "name": "@miragon/event-storming-renderer",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Render and edit Event Storming boards in the browser, with a viewer and modeler built on diagram-js.",
   "license": "MIT",
   "repository": {
