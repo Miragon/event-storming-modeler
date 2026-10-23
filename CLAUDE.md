@@ -52,7 +52,7 @@ portless service install` — see [`CONTRIBUTING.md`](CONTRIBUTING.md)). `npm ru
   VS Code window opens; needs Docker, about 7 to 17 s (mostly under 10) once the image and VS Code
   are cached. It copies the repo in without `node_modules`/`.git`, runs `npm ci` there and brings
   `test-results/vscode-smoke/` back; options after `--`, e.g.
-  `-- --env VSCODE_SMOKE_VERSION=1.96.0 --env VSCODE_SMOKE_KEEP=1` (VS Code's logs in
+  `-- --env VSCODE_VERSION=1.96.0 --env VSCODE_SMOKE_KEEP=1` (VS Code's logs in
   `vscode-logs/`).
 - `npm run test:vscode` — the packaged extension in a real VS Code on the host, for CI and for
   watching the window (Vitest project `vscode`,
@@ -61,13 +61,16 @@ portless service install` — see [`CONTRIBUTING.md`](CONTRIBUTING.md)). `npm ru
   shell's `runVsCodeSmoke` (open `smoke.storm`, palette edit, save, undo, the four default themes,
   screenshots in the gitignored `test-results/vscode-smoke/`); no build needed, on macOS a VS Code
   window opens for ~5 s and takes the focus, the first run downloads VS Code into the OS cache;
-  `VSCODE_SMOKE_VERSION=1.96.0` for another version, `VSCODE_SMOKE_KEEP=1` keeps VS Code's profile
-  and logs. A failed save is not retried (the driver, shell 0.3.2, reads it only once the tab is
-  clean); only a run whose sole failures are missed theme switches gets one retry, shown as
-  `(retry x1)`. In CI only
-  [`.github/workflows/vscode-smoke.yml`](.github/workflows/vscode-smoke.yml) runs it (weekly, on
-  PRs touching `apps/vscode/**`, on demand; `xvfb-run -a`, engines floor and newest stable;
-  screenshots and VS Code's logs as artifacts), never the CI workflow. Details in
+  `VSCODE_VERSION=1.96.0` for another version, `VSCODE_SMOKE_KEEP=1` keeps VS Code's profile
+  and logs, `VSCODE_SMOKE_VSIX=<file>` smokes a packaged VSIX instead of packing one. A failed
+  save is not retried (the driver, shell 0.3.2, reads it only once the tab is clean); only a run
+  whose sole failures are missed theme switches gets one retry, shown as `(retry x1)`. In CI the
+  reusable [`.github/workflows/vscode-smoke.yml`](.github/workflows/vscode-smoke.yml) runs it
+  (`xvfb-run -a`, engines floor and newest stable; screenshots and, for a failed run, VS Code's
+  logs as artifacts):
+  as the CI job `vscode-smoke`, which starts VS Code only when a path the VSIX or the smoke
+  depends on changed, weekly through `vscode-smoke-weekly.yml` (a failure opens a tracking
+  issue), and in the release on the VSIX it publishes. Details in
   [`CONTRIBUTING.md`](CONTRIBUTING.md).
 - `npm run format` — Prettier · `npm run depcruise` — check the module graph
 
@@ -131,6 +134,10 @@ libraries to npm (with provenance) and the VS Code extension
   `event_k3x9q2ab`), so stickies two peers add at the same time do not collide. A view change
   (`setViewState`, a host's fit, scroll, zoom) never commits an open label editor: it stays open
   and follows its element (contract L5).
+- CI: the job `ci-ok` in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) is the merge gate;
+  it fails unless every other job succeeded, so **a new CI job goes into its `needs`**. `ci-ok` and
+  the PR-title check are the checks for the `main` ruleset to require, not the single jobs (see
+  [CI and the merge gate](CONTRIBUTING.md#ci-and-the-merge-gate)).
 - Contributor onboarding in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Design system (mandatory)

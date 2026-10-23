@@ -110,9 +110,9 @@ runs `npm run test:vscode` in a Linux container under `xvfb-run -a`, through the
 Docker (Docker Desktop on a Mac) next to the installed dependencies. Options go after `--`:
 
 ```bash
-npm run test:vscode:docker                                       # newest stable VS Code
-npm run test:vscode:docker -- --env VSCODE_SMOKE_VERSION=1.96.0  # the engines.vscode floor, or another
-npm run test:vscode:docker -- --env VSCODE_SMOKE_KEEP=1          # VS Code's logs in vscode-logs/
+npm run test:vscode:docker                                 # newest stable VS Code
+npm run test:vscode:docker -- --env VSCODE_VERSION=1.96.0  # the engines.vscode floor, or another
+npm run test:vscode:docker -- --env VSCODE_SMOKE_KEEP=1    # VS Code's logs in vscode-logs/
 ```
 
 The command copies the repository into the container without `node_modules` and `.git`, runs
@@ -131,9 +131,10 @@ are in the shell's README
 watching VS Code go through it. `unzip` must be on the `PATH` (it is on macOS and Ubuntu).
 
 ```bash
-npm run test:vscode                              # newest stable VS Code
-VSCODE_SMOKE_VERSION=1.96.0 npm run test:vscode  # the engines.vscode floor, or any other version
-VSCODE_SMOKE_KEEP=1 npm run test:vscode          # keep VS Code's profile and logs ("kept <dir>")
+npm run test:vscode                                 # newest stable VS Code
+VSCODE_VERSION=1.96.0 npm run test:vscode           # the engines.vscode floor, or any other version
+VSCODE_SMOKE_KEEP=1 npm run test:vscode             # keep VS Code's profile and logs ("kept <dir>")
+VSCODE_SMOKE_VSIX=path/to.vsix npm run test:vscode  # smoke a packaged VSIX instead of packing one
 ```
 
 A VS Code window opens for about 5 seconds and takes the focus; leave it alone until it closes. The
@@ -162,19 +163,61 @@ applies a theme once it notices that its settings file changed, and in 1 of 35 D
 not within the driver's 30 s. Vitest marks such a pass `(retry x1)`; every other failure fails the
 run at once.
 
-**In CI.** [`.github/workflows/vscode-smoke.yml`](.github/workflows/vscode-smoke.yml) runs it on
-`ubuntu-24.04` under `xvfb-run -a` (VS Code needs an X server), against both the floor of
-`engines.vscode` and the newest stable release: weekly on Mondays (a new VS Code arrives without a
-commit here), on pull requests that touch `apps/vscode/**` or the workflow, and on demand
-(**Actions → VS Code smoke → Run workflow**). The download is cached per VS Code version. The
-screenshots are uploaded as the artifacts `vscode-smoke-minimum` and `vscode-smoke-stable`, and VS
-Code's logs (the job runs with `VSCODE_SMOKE_KEEP=1`) as `vscode-smoke-minimum-logs` and
-`vscode-smoke-stable-logs`, each for 7 days. It is a workflow of its own and not a required check,
-so it never delays or blocks the CI workflow. It calls `npm run test:vscode` on the runner, not the
-Docker command: the runner already has an X server and VS Code's libraries, and `actions/cache`
-keeps each VS Code version between runs, while the Docker command would build its image, install
-the dependencies a second time and download VS Code again on every run, since a hosted runner keeps
-neither images nor volumes.
+**In CI.** [`.github/workflows/vscode-smoke.yml`](.github/workflows/vscode-smoke.yml) is a
+reusable workflow: the CI workflow calls it as the job `vscode-smoke`, so `ci-ok` waits for it (see
+[CI and the merge gate](#ci-and-the-merge-gate) for when it starts VS Code). Inside it, the matrix
+job of the same name runs on `ubuntu-24.04` under `xvfb-run -a` (VS Code needs an X server), once
+against the floor of `engines.vscode` (read from `apps/vscode/package.json` at run time) and once
+against the newest stable release, passing each version as `VSCODE_VERSION`. The download is
+cached per VS Code version. The screenshots are uploaded as the artifacts `vscode-smoke-minimum` and
+`vscode-smoke-stable`, and, when a run failed, VS Code's logs (the job runs with
+`VSCODE_SMOKE_KEEP=1`) as `vscode-smoke-logs-minimum` or `vscode-smoke-logs-stable`, each for 7
+days. It calls `npm run test:vscode` on the runner, not the Docker command: the runner already has
+an X server and VS Code's libraries, and `actions/cache` keeps each VS Code version between runs,
+while the Docker command would build its image, install the dependencies a second time and download
+VS Code again on every run, since a hosted runner keeps neither images nor volumes.
+
+[`.github/workflows/vscode-smoke-weekly.yml`](.github/workflows/vscode-smoke-weekly.yml) calls the
+same workflow every Monday, because a new VS Code arrives without a commit here, and on demand
+(**Actions → VS Code smoke weekly → Run workflow**). When it fails, its `alert` job opens the
+issue **VS Code smoke: the weekly run failed**, or comments on it while it is open; close it once a
+run passes again. The release smokes the VSIX it is about to upload: each job that publishes to the
+VS Code Marketplace or Open VSX packages the extension, runs `npm run test:vscode` under
+`xvfb-run -a` with `VSCODE_SMOKE_VSIX` set to that file (newest stable VS Code), and publishes only
+when it passes; the release workflow's dry run does the same. When that smoke fails, its screenshots
+and VS Code's logs are uploaded as the artifact `vscode-smoke-marketplace`, `vscode-smoke-open-vsx`
+or `vscode-smoke-dry-run`.
+
+## CI and the merge gate
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) ends with the job **`ci-ok`**, the merge
+gate: it and the PR-title check (`validate-pr-title`) are the checks for the `main` ruleset to
+require, in place of the single jobs, so that Dependabot's auto-merge waits for every job, the VS
+Code smoke included. `ci-ok` runs after every other job of the workflow, even when one of them
+failed, and passes only when each one succeeded. A failed or cancelled job fails it, and so does a
+job that was skipped because a job it needs failed (a red `lint` skips `e2e` and `test-browser`; a
+required check would count that skip as passed). The one skip it accepts is `dependency-review`
+outside pull requests, which that job's own `if:` skips by design; such skips are listed in
+`SKIPPED_BY_DESIGN`. **A new job in `ci.yml` has to go into `ci-ok`'s `needs`**, or the gate does
+not wait for it; a new job that skips itself on some events by design also goes into
+`SKIPPED_BY_DESIGN` for those events.
+
+The job `vscode-smoke` calls the VS Code smoke workflow. Its first job, `changes`, decides whether
+VS Code starts at all: on a pull request, a push to `main` and in the merge queue it compares the
+commit with its base (the pull request's base, the commit before the push, the merge group's base)
+and starts VS Code only when one of these paths changed: `package-lock.json`, any `package.json`,
+`apps/vscode/**`, `packages/**` (the extension bundles the packages' sources),
+`tsconfig.base.json` (esbuild compiles both bundles with its options), `vitest.config.ts` (the
+smoke's Vitest project), `.github/actions/setup/**`, `ci.yml`, `vscode-smoke.yml` or
+`vscode-smoke-weekly.yml`. A moved file counts under its old and its new path, so moving a file out
+of `apps/vscode/**` starts it too. A missing or all-zero base, a base it cannot fetch, the weekly
+schedule and a manual run always start it. When it skips VS Code, the job `skipped` succeeds with a
+notice, so `ci-ok` sees `vscode-smoke` succeed or fail, never skip.
+
+Dependabot groups minor and patch updates of npm packages and auto-merges them once the checks
+pass, except updates of `@miragon/modeler-*` (the group `modeler-platform`): a 0.x minor of the
+shell changes the chrome, and a `chore(deps)` commit is never released, so adopt those by hand with
+a `fix(deps): adopt modeler-shell x.y` commit.
 
 ## Design tokens
 
